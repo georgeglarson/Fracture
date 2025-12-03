@@ -27,14 +27,16 @@ function main(config) {
     console.info("Starting BrowserQuest game server...");
 
     // Initialize Venice AI service if API key is configured
-    if (config.venice_api_key) {
-        initVeniceService(config.venice_api_key, {
-            model: config.venice_model || 'llama-3.3-70b',
-            timeout: config.venice_timeout || 5000
+    // Priority: environment variable > config file
+    const veniceApiKey = process.env.VENICE_API_KEY || config.venice_api_key;
+    if (veniceApiKey) {
+        initVeniceService(veniceApiKey, {
+            model: process.env.VENICE_MODEL || config.venice_model || 'llama-3.3-70b',
+            timeout: parseInt(process.env.VENICE_TIMEOUT || '') || config.venice_timeout || 5000
         });
         console.info("Venice AI service initialized");
     } else {
-        console.info("Venice AI service not configured (no API key)");
+        console.info("Venice AI service not configured (set VENICE_API_KEY env var or venice_api_key in config)");
     }
 
     server.onConnect(function(connection) {

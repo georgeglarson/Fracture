@@ -4,3 +4,7 @@ client/audio/music
 .DS_Store
 *.swp
 .idea
+
+# Config with secrets - use config.example.json as template
+server/config.json
+.env
