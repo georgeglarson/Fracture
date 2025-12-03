@@ -412,8 +412,22 @@ Make it sound legendary and interesting:`;
         temperature: 0.9
       });
 
-      let text = response.choices?.[0]?.message?.content;
-      if (text) {
+      const content = response.choices?.[0]?.message?.content;
+      if (content) {
+        // Handle both string and ContentItem[] response types
+        let text: string;
+        if (typeof content === 'string') {
+          text = content;
+        } else if (Array.isArray(content)) {
+          // Extract text from ContentItem array
+          text = content
+            .filter((item: any) => item.type === 'text')
+            .map((item: any) => item.text)
+            .join('');
+        } else {
+          return null;
+        }
+
         text = text.trim();
         if (text.startsWith('"') && text.endsWith('"')) {
           text = text.slice(1, -1);
