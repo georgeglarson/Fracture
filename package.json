@@ -1,14 +1,18 @@
 {
-  "name": "fate-of-the-four",
-  "version": "0.0.1",
+  "name": "browserquest-ultra",
+  "version": "1.0.0",
+  "description": "BrowserQuest Ultra - HTML5 multiplayer RPG with Venice AI integration",
   "private": false,
   "scripts": {
     "watch:client": "webpack serve --env NODE_ENV=dev --config ./webpack.config.js --mode development",
     "watch:server": "tsx --watch  ./server/ts/main.ts",
     "build:client": "webpack --env NODE_ENV=prod --config ./webpack.config.js --mode production",
-    "build:server": "tsc -p ./server"
+    "build:server": "tsc -p ./server",
+    "start": "node dist/server/main.js",
+    "dev": "concurrently \"npm run watch:client\" \"npm run watch:server\""
   },
   "dependencies": {
+    "@venice-dev-tools/core": "^2025.11.6",
     "express": "^4.18.2",
     "jquery": "^3.7.1",
     "lodash": "3.10.1",

@@ -28,7 +28,17 @@ export const Types: any = {
     HP: 23,
     BLINK: 24,
     OPEN: 25,
-    CHECK: 26
+    CHECK: 26,
+
+    // Venice AI Integration
+    NPCTALK: 27,
+    NPCTALK_RESPONSE: 28,
+    COMPANION_HINT: 29,
+    QUEST_OFFER: 30,
+    QUEST_STATUS: 31,
+    QUEST_COMPLETE: 32,
+    ITEM_LORE: 33,
+    REQUEST_QUEST: 34
   },
 
   Entities: {

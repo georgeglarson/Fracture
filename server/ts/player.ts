@@ -9,6 +9,7 @@ import {Messages} from './message';
 import {Formulas} from './formulas';
 import {Properties} from './properties';
 import {Chest} from './chest';
+import {getVeniceService} from './ai';
 
 export class Player extends Character {
 
@@ -235,6 +236,16 @@ export class Player extends Character {
           self.lastCheckpoint = checkpoint;
         }
       }
+      // Venice AI: NPC Talk
+      else if (action === Types.Messages.NPCTALK) {
+        var npcKind = message[1];
+        self.handleNpcTalk(npcKind);
+      }
+      // Venice AI: Request Quest
+      else if (action === Types.Messages.REQUEST_QUEST) {
+        var npcKind = message[1];
+        self.handleRequestQuest(npcKind);
+      }
       else {
         if (self.message_callback) {
           self.message_callback(message);
@@ -399,5 +410,129 @@ export class Player extends Character {
   timeout() {
     this.connection.sendUTF8('timeout');
     this.connection.close('Player was idle for too long');
+  }
+
+  // ============================================================================
+  // VENICE AI HANDLERS
+  // ============================================================================
+
+  async handleNpcTalk(npcKind: number) {
+    const venice = getVeniceService();
+    const npcType = Types.getKindAsString(npcKind);
+
+    if (!venice || !npcType) {
+      // Fallback: send empty response
+      this.send(new Messages.NpcTalkResponse(npcKind, '...').serialize());
+      return;
+    }
+
+    try {
+      const response = await venice.generateNpcDialogue(
+        npcType,
+        this.name,
+        this.id.toString()
+      );
+      this.send(new Messages.NpcTalkResponse(npcKind, response).serialize());
+    } catch (error) {
+      console.error('Venice NPC talk error:', error);
+      const fallback = venice.getFallback(npcType);
+      this.send(new Messages.NpcTalkResponse(npcKind, fallback).serialize());
+    }
+  }
+
+  async handleRequestQuest(npcKind: number) {
+    const venice = getVeniceService();
+    const npcType = Types.getKindAsString(npcKind);
+
+    if (!venice || !npcType) {
+      return;
+    }
+
+    try {
+      const quest = await venice.generateQuest(this.id.toString(), npcType);
+      this.send(new Messages.QuestOffer(quest).serialize());
+    } catch (error) {
+      console.error('Venice quest generation error:', error);
+    }
+  }
+
+  // Called when player kills a mob - for quest tracking
+  handleKill(mobType: string) {
+    const venice = getVeniceService();
+    if (!venice) return;
+
+    const result = venice.recordKill(this.id.toString(), mobType);
+    if (result && result.completed) {
+      this.send(new Messages.QuestComplete(result).serialize());
+    }
+  }
+
+  // Called when player enters a new area - for quest tracking and companion hints
+  async handleAreaChange(area: string) {
+    const venice = getVeniceService();
+    if (!venice) return;
+
+    const result = venice.recordArea(this.id.toString(), area);
+    if (result && result.completed) {
+      this.send(new Messages.QuestComplete(result).serialize());
+    }
+
+    // Send companion hint for new area
+    const hint = await venice.getCompanionHint(this.id.toString(), 'newArea', { area });
+    if (hint) {
+      this.send(new Messages.CompanionHint(hint).serialize());
+    }
+  }
+
+  // Called when player picks up an item - for lore generation
+  async handleItemPickup(itemKind: number) {
+    const venice = getVeniceService();
+    if (!venice) return;
+
+    const itemType = Types.getKindAsString(itemKind);
+    if (itemType) {
+      venice.recordItem(this.id.toString(), itemType);
+      const lore = await venice.generateItemLore(itemType);
+      this.send(new Messages.ItemLore(itemKind, lore).serialize());
+    }
+  }
+
+  // Called when player health is low - for companion hints
+  async handleLowHealth(healthPercent: number) {
+    const venice = getVeniceService();
+    if (!venice) return;
+
+    const hint = await venice.getCompanionHint(
+      this.id.toString(),
+      'lowHealth',
+      { percent: Math.round(healthPercent * 100) }
+    );
+    if (hint) {
+      this.send(new Messages.CompanionHint(hint).serialize());
+    }
+  }
+
+  // Called when player dies - for companion hints
+  async handleDeath(killerType: string) {
+    const venice = getVeniceService();
+    if (!venice) return;
+
+    venice.recordDeath(this.id.toString());
+    const hint = await venice.getCompanionHint(
+      this.id.toString(),
+      'death',
+      { killer: killerType }
+    );
+    if (hint) {
+      this.send(new Messages.CompanionHint(hint).serialize());
+    }
+  }
+
+  // Cleanup Venice data when player disconnects
+  cleanupVenice() {
+    const venice = getVeniceService();
+    if (venice) {
+      venice.cleanupPlayer(this.id.toString());
+    }
   }
 }

@@ -186,6 +186,100 @@ export const Messages = {
       return [Types.Messages.BLINK,
         this.item.id];
     }
+  },
+
+  // Venice AI Messages
+  NpcTalkResponse: class {
+    constructor(private npcKind: number, private response: string) {
+    }
+
+    serialize() {
+      return [Types.Messages.NPCTALK_RESPONSE,
+        this.npcKind,
+        this.response];
+    }
+  },
+
+  CompanionHint: class {
+    constructor(private hint: string) {
+    }
+
+    serialize() {
+      return [Types.Messages.COMPANION_HINT,
+        this.hint];
+    }
+  },
+
+  QuestOffer: class {
+    constructor(private quest: {
+      type: string;
+      target: string;
+      count: number;
+      progress: number;
+      reward: string;
+      xp: number;
+      description: string;
+    }) {
+    }
+
+    serialize() {
+      return [Types.Messages.QUEST_OFFER,
+        this.quest.type,
+        this.quest.target,
+        this.quest.count,
+        this.quest.progress,
+        this.quest.reward,
+        this.quest.xp,
+        this.quest.description];
+    }
+  },
+
+  QuestStatus: class {
+    constructor(private quest: {
+      type: string;
+      target: string;
+      count: number;
+      progress: number;
+    } | null) {
+    }
+
+    serialize() {
+      if (!this.quest) {
+        return [Types.Messages.QUEST_STATUS, null];
+      }
+      return [Types.Messages.QUEST_STATUS,
+        this.quest.type,
+        this.quest.target,
+        this.quest.count,
+        this.quest.progress];
+    }
+  },
+
+  QuestComplete: class {
+    constructor(private result: {
+      reward: string;
+      xp: number;
+      description: string;
+    }) {
+    }
+
+    serialize() {
+      return [Types.Messages.QUEST_COMPLETE,
+        this.result.reward,
+        this.result.xp,
+        this.result.description];
+    }
+  },
+
+  ItemLore: class {
+    constructor(private itemKind: number, private lore: string) {
+    }
+
+    serialize() {
+      return [Types.Messages.ITEM_LORE,
+        this.itemKind,
+        this.lore];
+    }
   }
 };
 

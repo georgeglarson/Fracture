@@ -1421,6 +1421,52 @@ export class Game {
         }
       });
 
+      // Venice AI: NPC dialogue response
+      self.client.onNpcTalkResponse(function (npcKind, response) {
+        if (self.currentNpcTalk) {
+          var npc = self.currentNpcTalk;
+          self.currentNpcTalk = null;
+          if (response) {
+            self.createBubble(npc.id, response);
+            self.assignBubbleTo(npc);
+            self.audioManager.playSound('npc');
+          }
+        }
+      });
+
+      // Venice AI: Companion hints
+      self.client.onCompanionHint(function (hint) {
+        if (hint && self.player) {
+          // Show as a speech bubble from the player (like a fairy companion)
+          self.createBubble(self.player.id, '\u2728 ' + hint);
+          self.assignBubbleTo(self.player);
+        }
+      });
+
+      // Venice AI: Quest offers
+      self.client.onQuestOffer(function (quest) {
+        if (quest && self.notification_callback) {
+          self.notification_callback('Quest: ' + quest.description);
+          self.currentQuest = quest;
+        }
+      });
+
+      // Venice AI: Quest completion
+      self.client.onQuestComplete(function (result) {
+        if (result && self.notification_callback) {
+          self.notification_callback('Quest Complete! Reward: ' + result.reward);
+          self.currentQuest = null;
+        }
+      });
+
+      // Venice AI: Item lore on pickup
+      self.client.onItemLore(function (itemKind, lore) {
+        if (lore && self.notification_callback) {
+          var itemName = Types.getKindAsString(itemKind);
+          self.notification_callback(itemName + ': ' + lore);
+        }
+      });
+
       self.client.onDisconnected(function (message) {
         if (self.player) {
           self.player.die();
@@ -1560,26 +1606,46 @@ export class Game {
    *
    */
   makeNpcTalk(npc) {
-    var msg;
+    var self = this;
 
     if (npc) {
-      msg = npc.talk();
       this.previousClickPosition = {};
-      if (msg) {
-        this.createBubble(npc.id, msg);
-        this.assignBubbleTo(npc);
-        this.audioManager.playSound('npc');
-      } else {
-        this.destroyBubble(npc.id);
-        this.audioManager.playSound('npc-end');
-      }
       this.tryUnlockingAchievement('SMALL_TALK');
 
       if (npc.kind === Types.Entities.RICK) {
         this.tryUnlockingAchievement('RICKROLLD');
       }
+
+      // Store current NPC for when response arrives
+      this.currentNpcTalk = npc;
+
+      // Show thinking indicator
+      this.createBubble(npc.id, '...');
+      this.assignBubbleTo(npc);
+
+      // Request AI-generated dialogue from server
+      this.client.sendNpcTalk(npc.kind);
+
+      // Fallback: if no response in 5 seconds, use static dialogue
+      setTimeout(function() {
+        if (self.currentNpcTalk === npc) {
+          self.currentNpcTalk = null;
+          var msg = npc.talk();
+          if (msg) {
+            self.createBubble(npc.id, msg);
+            self.assignBubbleTo(npc);
+          }
+          self.audioManager.playSound('npc');
+        }
+      }, 5000);
     }
   }
+
+  // Current NPC being talked to (for Venice AI response handling)
+  currentNpcTalk = null;
+
+  // Current quest (for tracking)
+  currentQuest = null;
 
   /**
    * Loops through all the entities currently present in the game.

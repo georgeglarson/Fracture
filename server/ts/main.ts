@@ -3,6 +3,7 @@ import {World} from './world';
 import {Server} from './ws';
 import {Metrics} from './metrics';
 import {Player} from './player';
+import {initVeniceService} from './ai';
 
 function main(config) {
     var WorldServer = World,
@@ -24,6 +25,17 @@ function main(config) {
         }, 1000);
 
     console.info("Starting BrowserQuest game server...");
+
+    // Initialize Venice AI service if API key is configured
+    if (config.venice_api_key) {
+        initVeniceService(config.venice_api_key, {
+            model: config.venice_model || 'llama-3.3-70b',
+            timeout: config.venice_timeout || 5000
+        });
+        console.info("Venice AI service initialized");
+    } else {
+        console.info("Venice AI service not configured (no API key)");
+    }
 
     server.onConnect(function(connection) {
         var world, // the one in which the player will be spawned

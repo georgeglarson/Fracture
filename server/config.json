@@ -6,5 +6,8 @@
   "map_filepath": "./server/maps/world_server.json",
   "metrics_enabled": false,
   "memcached_port": 11211,
-  "memcached_host": "127.0.0.1"
+  "memcached_host": "127.0.0.1",
+  "venice_api_key": "",
+  "venice_model": "llama-3.3-70b",
+  "venice_timeout": 5000
 }

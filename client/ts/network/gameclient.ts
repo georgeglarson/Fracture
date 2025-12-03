@@ -41,6 +41,14 @@ export class GameClient {
   hp_callback;
   blink_callback;
 
+  // Venice AI callbacks
+  npctalk_callback;
+  companion_hint_callback;
+  quest_offer_callback;
+  quest_status_callback;
+  quest_complete_callback;
+  item_lore_callback;
+
   constructor(host, port) {
 
     this.host = host;
@@ -65,6 +73,14 @@ export class GameClient {
     this.handlers[Types.Messages.KILL] = this.receiveKill;
     this.handlers[Types.Messages.HP] = this.receiveHitPoints;
     this.handlers[Types.Messages.BLINK] = this.receiveBlink;
+
+    // Venice AI handlers
+    this.handlers[Types.Messages.NPCTALK_RESPONSE] = this.receiveNpcTalkResponse;
+    this.handlers[Types.Messages.COMPANION_HINT] = this.receiveCompanionHint;
+    this.handlers[Types.Messages.QUEST_OFFER] = this.receiveQuestOffer;
+    this.handlers[Types.Messages.QUEST_STATUS] = this.receiveQuestStatus;
+    this.handlers[Types.Messages.QUEST_COMPLETE] = this.receiveQuestComplete;
+    this.handlers[Types.Messages.ITEM_LORE] = this.receiveItemLore;
 
     this.enable();
   }
@@ -372,6 +388,81 @@ export class GameClient {
     }
   }
 
+  // Venice AI receive methods
+  receiveNpcTalkResponse(data) {
+    var npcKind = data[1],
+      response = data[2];
+
+    if (this.npctalk_callback) {
+      this.npctalk_callback(npcKind, response);
+    }
+  }
+
+  receiveCompanionHint(data) {
+    var hint = data[1];
+
+    if (this.companion_hint_callback) {
+      this.companion_hint_callback(hint);
+    }
+  }
+
+  receiveQuestOffer(data) {
+    var quest = {
+      type: data[1],
+      target: data[2],
+      count: data[3],
+      progress: data[4],
+      reward: data[5],
+      xp: data[6],
+      description: data[7]
+    };
+
+    if (this.quest_offer_callback) {
+      this.quest_offer_callback(quest);
+    }
+  }
+
+  receiveQuestStatus(data) {
+    if (data[1] === null) {
+      if (this.quest_status_callback) {
+        this.quest_status_callback(null);
+      }
+      return;
+    }
+
+    var quest = {
+      type: data[1],
+      target: data[2],
+      count: data[3],
+      progress: data[4]
+    };
+
+    if (this.quest_status_callback) {
+      this.quest_status_callback(quest);
+    }
+  }
+
+  receiveQuestComplete(data) {
+    var result = {
+      reward: data[1],
+      xp: data[2],
+      description: data[3]
+    };
+
+    if (this.quest_complete_callback) {
+      this.quest_complete_callback(result);
+    }
+  }
+
+  receiveItemLore(data) {
+    var itemKind = data[1],
+      lore = data[2];
+
+    if (this.item_lore_callback) {
+      this.item_lore_callback(itemKind, lore);
+    }
+  }
+
   onDispatched(callback) {
     this.dispatched_callback = callback;
   }
@@ -464,6 +555,31 @@ export class GameClient {
     this.blink_callback = callback;
   }
 
+  // Venice AI callback setters
+  onNpcTalkResponse(callback) {
+    this.npctalk_callback = callback;
+  }
+
+  onCompanionHint(callback) {
+    this.companion_hint_callback = callback;
+  }
+
+  onQuestOffer(callback) {
+    this.quest_offer_callback = callback;
+  }
+
+  onQuestStatus(callback) {
+    this.quest_status_callback = callback;
+  }
+
+  onQuestComplete(callback) {
+    this.quest_complete_callback = callback;
+  }
+
+  onItemLore(callback) {
+    this.item_lore_callback = callback;
+  }
+
   sendHello(player) {
     this.sendMessage([Types.Messages.HELLO,
       player.name,
@@ -537,5 +653,16 @@ export class GameClient {
   sendCheck(id) {
     this.sendMessage([Types.Messages.CHECK,
       id]);
+  }
+
+  // Venice AI send methods
+  sendNpcTalk(npcKind) {
+    this.sendMessage([Types.Messages.NPCTALK,
+      npcKind]);
+  }
+
+  sendRequestQuest(npcKind) {
+    this.sendMessage([Types.Messages.REQUEST_QUEST,
+      npcKind]);
   }
 }

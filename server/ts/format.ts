@@ -20,6 +20,10 @@ export class FormatChecker {
     this.formats[Types.Messages.ZONE] = [];
     this.formats[Types.Messages.OPEN] = ['n'];
     this.formats[Types.Messages.CHECK] = ['n'];
+
+    // Venice AI message formats
+    this.formats[Types.Messages.NPCTALK] = ['n']; // npcKind
+    this.formats[Types.Messages.REQUEST_QUEST] = ['n']; // npcKind
   }
 
   check(msg) {
