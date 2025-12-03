@@ -405,7 +405,7 @@ Make it sound legendary and interesting:`;
 
   private async callVenice(prompt: string): Promise<string | null> {
     try {
-      const response = await this.venice.chat.createCompletion({
+      const response = await this.venice.chat.completions.create({
         model: this.model,
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 100,
