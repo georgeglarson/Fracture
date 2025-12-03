@@ -7,7 +7,7 @@
   "metrics_enabled": false,
   "memcached_port": 11211,
   "memcached_host": "127.0.0.1",
-  "venice_api_key": "",
+  "venice_api_key": "zMej4Dp426O4SBebgzjdJBhdiXS6WSn5ddw10-zhNr",
   "venice_model": "llama-3.3-70b",
   "venice_timeout": 5000
 }
