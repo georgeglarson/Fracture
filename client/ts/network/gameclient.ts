@@ -48,6 +48,10 @@ export class GameClient {
   quest_status_callback;
   quest_complete_callback;
   item_lore_callback;
+  narrator_callback;
+  entity_thought_callback;
+  world_event_callback;
+  news_callback;
 
   constructor(host, port) {
 
@@ -81,6 +85,10 @@ export class GameClient {
     this.handlers[Types.Messages.QUEST_STATUS] = this.receiveQuestStatus;
     this.handlers[Types.Messages.QUEST_COMPLETE] = this.receiveQuestComplete;
     this.handlers[Types.Messages.ITEM_LORE] = this.receiveItemLore;
+    this.handlers[Types.Messages.NARRATOR] = this.receiveNarrator;
+    this.handlers[Types.Messages.ENTITY_THOUGHT] = this.receiveEntityThought;
+    this.handlers[Types.Messages.WORLD_EVENT] = this.receiveWorldEvent;
+    this.handlers[Types.Messages.NEWS_RESPONSE] = this.receiveNewsResponse;
 
     this.enable();
   }
@@ -94,7 +102,9 @@ export class GameClient {
   }
 
   connect() {
-    var url = 'http://' + this.host + ':' + this.port + '/',
+    var protocol = this.port === 443 ? 'https://' : 'http://';
+    var portSuffix = (this.port === 443 || this.port === 80) ? '' : ':' + this.port;
+    var url = protocol + this.host + portSuffix + '/',
       self = this;
 
     console.info('Trying to connect to server : ' + url);
@@ -161,6 +171,10 @@ export class GameClient {
 
   receiveAction(data) {
     var action = data[0];
+    // Debug: Log Venice AI message types (27-39)
+    if (action >= 27 && action <= 39) {
+      console.log('[Client] Venice AI message received, type:', action, 'data:', data);
+    }
     if (this.handlers[action] && _.isFunction(this.handlers[action])) {
       this.handlers[action].call(this, data);
     }
@@ -223,10 +237,14 @@ export class GameClient {
       x = data[3],
       y = data[4];
 
+    console.log('[SPAWN] Received spawn message: id=' + id + ' kind=' + kind + ' x=' + x + ' y=' + y);
+
     if (Types.isItem(kind)) {
+      console.log('[SPAWN] Creating item entity for kind=' + kind);
       var item = EntityFactory.createEntity(kind, id);
 
       if (this.spawn_item_callback) {
+        console.log('[SPAWN] Calling spawn_item_callback for item ' + id);
         this.spawn_item_callback(item, x, y);
       }
     } else if (Types.isChest(kind)) {
@@ -393,8 +411,12 @@ export class GameClient {
     var npcKind = data[1],
       response = data[2];
 
+    console.log('[NpcTalk] Received response:', npcKind, response);
     if (this.npctalk_callback) {
+      console.log('[NpcTalk] Calling callback');
       this.npctalk_callback(npcKind, response);
+    } else {
+      console.log('[NpcTalk] No callback registered!');
     }
   }
 
@@ -460,6 +482,17 @@ export class GameClient {
 
     if (this.item_lore_callback) {
       this.item_lore_callback(itemKind, lore);
+    }
+  }
+
+  receiveNarrator(data) {
+    var text = data[1],
+      style = data[2] || 'epic';
+
+    console.log('[Narrator] Received:', text, '(style:', style + ')');
+
+    if (this.narrator_callback) {
+      this.narrator_callback(text, style);
     }
   }
 
@@ -578,6 +611,66 @@ export class GameClient {
 
   onItemLore(callback) {
     this.item_lore_callback = callback;
+  }
+
+  onNarrator(callback) {
+    this.narrator_callback = callback;
+  }
+
+  // Entity Thought Bubble (Ant Farm feature)
+  receiveEntityThought(data) {
+    console.log('[Client] Received entity thought:', data);
+    var entityId = data[1],
+      thought = data[2],
+      state = data[3];
+
+    if (this.entity_thought_callback) {
+      this.entity_thought_callback(entityId, thought, state);
+    } else {
+      console.warn('[Client] No entity_thought_callback registered');
+    }
+  }
+
+  onEntityThought(callback) {
+    this.entity_thought_callback = callback;
+  }
+
+  // World Event (Faction Director)
+  receiveWorldEvent(data) {
+    var title = data[1],
+      description = data[2],
+      eventType = data[3];
+
+    if (this.world_event_callback) {
+      this.world_event_callback(title, description, eventType);
+    }
+  }
+
+  onWorldEvent(callback) {
+    this.world_event_callback = callback;
+  }
+
+  // Town Crier - Newspaper
+  receiveNewsResponse(data) {
+    console.log('[TownCrier] receiveNewsResponse called with:', JSON.stringify(data));
+    // data[0] is the message type, rest are headlines
+    var headlines = data.slice(1);
+    console.log('[TownCrier] Extracted headlines:', headlines);
+
+    if (this.news_callback) {
+      console.log('[TownCrier] Calling news_callback...');
+      this.news_callback(headlines);
+    } else {
+      console.warn('[TownCrier] No news_callback registered!');
+    }
+  }
+
+  onNewsResponse(callback) {
+    this.news_callback = callback;
+  }
+
+  sendNewsRequest() {
+    this.sendMessage([Types.Messages.NEWS_REQUEST]);
   }
 
   sendHello(player) {

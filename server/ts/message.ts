@@ -280,6 +280,60 @@ export const Messages = {
         this.itemKind,
         this.lore];
     }
+  },
+
+  // AI Narrator - dynamic commentary on player actions
+  Narrator: class {
+    constructor(private text: string, private style?: string) {
+      // style: 'epic' | 'humor' | 'ominous' | 'info'
+    }
+
+    serialize() {
+      return [Types.Messages.NARRATOR,
+        this.text,
+        this.style || 'epic'];
+    }
+  },
+
+  // AI Thought Bubble - visible entity thoughts
+  EntityThought: class {
+    constructor(
+      private entityId: number,
+      private thought: string,
+      private state: string  // 'idle' | 'combat' | 'flee' | 'special'
+    ) {}
+
+    serialize() {
+      return [Types.Messages.ENTITY_THOUGHT,
+        this.entityId,
+        this.thought,
+        this.state];
+    }
+  },
+
+  // World Event - faction director announcements
+  WorldEvent: class {
+    constructor(
+      private title: string,
+      private description: string,
+      private eventType: string  // 'horde' | 'village' | 'boss' | 'special'
+    ) {}
+
+    serialize() {
+      return [Types.Messages.WORLD_EVENT,
+        this.title,
+        this.description,
+        this.eventType];
+    }
+  },
+
+  // Town Crier - newspaper headlines
+  NewsResponse: class {
+    constructor(private headlines: string[]) {}
+
+    serialize() {
+      return [Types.Messages.NEWS_RESPONSE, ...this.headlines];
+    }
   }
 };
 

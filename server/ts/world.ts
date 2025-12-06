@@ -11,6 +11,8 @@ import {Mob} from './mob';
 import {Player} from './player';
 import {Utils} from './utils';
 import {Map} from './map';
+import {getVeniceService} from './ai/venice.service';
+import {AIPlayerManager} from './ai/aiplayer';
 
 export class World {
 
@@ -43,10 +45,14 @@ export class World {
   removed_callback;
   added_callback;
   regen_callback;
+  thought_callback;
   init_callback;
   connect_callback;
   enter_callback;
   attack_callback;
+
+  // AI Players (Westworld feature)
+  aiPlayerManager: AIPlayerManager | null = null;
 
   constructor(id, maxPlayers, websocketServer) {
     var self = this;
@@ -71,6 +77,12 @@ export class World {
 
       if (!player.hasEnteredGame) {
         self.incrementPlayerCount();
+      }
+
+      // Record world event for Town Crier
+      const venice = getVeniceService();
+      if (venice) {
+        venice.recordWorldEvent('join', player.name, {});
       }
 
       // Number of players in this world
@@ -150,6 +162,68 @@ export class World {
         }
       });
     });
+
+    // AI Thought Bubbles - The "Ant Farm" Feature
+    this.onThoughtTick(function () {
+      console.log('[Thoughts] Tick fired');
+      const venice = getVeniceService();
+      if (!venice) {
+        console.log('[Thoughts] No venice service');
+        return;
+      }
+
+      let groupsWithPlayers = 0;
+      let totalEntities = 0;
+
+      // For each group with players, generate thoughts for nearby mobs/npcs
+      _.each(self.groups, function (group: any, groupId: string) {
+        if (!group.players || group.players.length === 0) return;
+        groupsWithPlayers++;
+
+        // Get all mobs and NPCs in this group
+        // group.entities is an object: { entityId: entity }
+        const entities: any[] = [];
+        _.each(group.entities, function (entity: any, entityId: string) {
+          if (entity && (entity.type === 'mob' || entity.type === 'npc')) {
+            entities.push(entity);
+          }
+        });
+        totalEntities += entities.length;
+
+        // Only process a random subset to avoid spam (max 3 per group per tick)
+        // lodash 3.x uses _.sample(collection, n) instead of _.sampleSize
+        const toProcess = _.sample(entities, Math.min(3, entities.length)) as any[];
+
+        _.each(toProcess, function (entity: any) {
+          // Determine state
+          let state: 'idle' | 'combat' | 'playerNearby' = 'idle';
+          if (entity.target) {
+            state = 'combat';
+          } else if (group.players && group.players.length > 0) {
+            state = 'playerNearby';
+          }
+
+          // Get entity type name
+          const typeName = Types.getKindAsString(entity.kind);
+          if (!typeName) return;
+
+          // Generate thought
+          const thoughtResult = venice.getEntityThought(typeName, state);
+          console.log('[Thoughts]', typeName, '(id:', entity.id, '):', thoughtResult.thought);
+
+          // Broadcast to all players in adjacent groups
+          // Use groupId (the key) not group.id (which doesn't exist)
+          const message = new Messages.EntityThought(
+            entity.id,
+            thoughtResult.thought,
+            thoughtResult.state
+          );
+          self.pushToAdjacentGroups(groupId, message);
+        });
+      });
+
+      console.log('[Thoughts] Processed', groupsWithPlayers, 'groups,', totalEntities, 'entities');
+    });
   }
 
   run(mapFilePath) {
@@ -194,7 +268,9 @@ export class World {
     });
 
     var regenCount = this.ups * 2;
+    var thoughtCount = this.ups * 15;  // Thoughts every 15 seconds
     var updateCount = 0;
+    var thoughtUpdateCount = 0;
     setInterval(function () {
       self.processGroups();
       self.processQueues();
@@ -207,9 +283,25 @@ export class World {
         }
         updateCount = 0;
       }
+
+      // Thought bubble tick (every ~15 seconds)
+      if (thoughtUpdateCount < thoughtCount) {
+        thoughtUpdateCount += 1;
+      } else {
+        if (self.thought_callback) {
+          self.thought_callback();
+        }
+        thoughtUpdateCount = 0;
+      }
     }, 1000 / this.ups);
 
     console.info('' + this.id + ' created (capacity: ' + this.maxPlayers + ' players).');
+
+    // Start AI Players (Westworld feature) - after a delay to let the world settle
+    setTimeout(() => {
+      this.aiPlayerManager = new AIPlayerManager(this, 5); // 5 AI players
+      this.aiPlayerManager.start();
+    }, 3000);
   }
 
   setUpdatesPerSecond(ups) {
@@ -238,6 +330,10 @@ export class World {
 
   onRegenTick(callback) {
     this.regen_callback = callback;
+  }
+
+  onThoughtTick(callback) {
+    this.thought_callback = callback;
   }
 
   pushRelevantEntityListTo(player) {
@@ -326,7 +422,10 @@ export class World {
     for (var id in this.outgoingQueues) {
       if (this.outgoingQueues[id].length > 0) {
         connection = this.server.getConnection(id);
-        connection.send(this.outgoingQueues[id]);
+        // Skip AI players that don't have real connections
+        if (connection) {
+          connection.send(this.outgoingQueues[id]);
+        }
         this.outgoingQueues[id] = [];
       }
     }
@@ -554,6 +653,23 @@ export class World {
           item = this.getDroppedItem(mob);
 
         this.pushToPlayer(attacker, new Messages.Kill(mob));
+
+        // AI: Trigger kill handling for narrator and quest tracking
+        const mobType = Types.getKindAsString(mob.kind);
+        if (attacker.handleKill && mobType) {
+          attacker.handleKill(mobType);
+        }
+
+        // Record world event for Town Crier
+        const venice = getVeniceService();
+        if (venice && mobType) {
+          const isBoss = mob.kind === Types.Entities.BOSS;
+          venice.recordWorldEvent(isBoss ? 'bossKill' : 'kill', attacker.name, {
+            mobType,
+            bossType: isBoss ? mobType : undefined
+          });
+        }
+
         this.pushToAdjacentGroups(mob.group, mob.despawn()); // Despawn must be enqueued before the item drop
         if (item) {
           this.pushToAdjacentGroups(mob.group, mob.drop(item));
@@ -562,6 +678,15 @@ export class World {
       }
 
       if (entity.type === 'player') {
+        // Record world event for Town Crier
+        const veniceForDeath = getVeniceService();
+        if (veniceForDeath) {
+          const killerType = attacker ? Types.getKindAsString(attacker.kind) : 'unknown';
+          veniceForDeath.recordWorldEvent('death', entity.name, {
+            killer: killerType
+          });
+        }
+
         this.handlePlayerVanish(entity);
         this.pushToAdjacentGroups(entity.group, entity.despawn());
       }
@@ -704,7 +829,8 @@ export class World {
     if (entity && entity.group) {
 
       var group = this.groups[entity.group];
-      if (entity instanceof Player) {
+      // Check type instead of instanceof to support AIPlayer
+      if (entity.type === 'player') {
         group.players = _.reject(group.players, function (id) {
           return id === entity.id;
         });
@@ -757,7 +883,8 @@ export class World {
       });
       entity.group = groupId;
 
-      if (entity instanceof Player) {
+      // Check type instead of instanceof to support AIPlayer
+      if (entity.type === 'player') {
         this.groups[groupId].players.push(entity.id);
       }
     }
@@ -798,7 +925,8 @@ export class World {
         var spawns = [];
         if (self.groups[id].incoming.length > 0) {
           spawns = _.each(self.groups[id].incoming, function (entity) {
-            if (entity instanceof Player) {
+            // Check type instead of instanceof to support AIPlayer
+            if (entity.type === 'player') {
               self.pushToGroup(id, new Messages.Spawn(entity), entity.id);
             } else {
               self.pushToGroup(id, new Messages.Spawn(entity));
@@ -842,18 +970,47 @@ export class World {
   handleEmptyChestArea(area) {
     if (area) {
       var chest = this.addItem(this.createChest(area.chestX, area.chestY, area.items));
-      this.handleItemDespawn(chest);
+      this.handleChestDespawn(chest);  // Use longer timer for chests
+    }
+  }
+
+  // Chests get a much longer despawn timer than regular items
+  handleChestDespawn(chest) {
+    var self = this;
+
+    if (chest) {
+      chest.handleDespawn({
+        beforeBlinkDelay: 60000,  // 60 seconds before blinking (was 10)
+        blinkCallback() {
+          self.pushToAdjacentGroups(chest.group, new Messages.Blink(chest));
+        },
+        blinkingDuration: 10000,  // 10 seconds of blinking (was 4)
+        despawnCallback() {
+          self.pushToAdjacentGroups(chest.group, new Messages.Destroy(chest));
+          self.removeEntity(chest);
+        }
+      });
     }
   }
 
   handleOpenedChest(chest, player) {
-    this.pushToAdjacentGroups(chest.group, chest.despawn());
+    var chestGroup = chest.group;  // Save group before removing
+    console.log('[Chest] Opening chest', chest.id, 'at', chest.x, chest.y);
+    console.log('[Chest] Chest items:', chest.items);
+    this.pushToAdjacentGroups(chestGroup, chest.despawn());
     this.removeEntity(chest);
 
     var kind = chest.getRandomItem();
+    console.log('[Chest] Random item kind:', kind);
     if (kind) {
       var item = this.addItemFromChest(kind, chest.x, chest.y);
+      console.log('[Chest] Created item', item.id, 'of kind', kind, 'at', chest.x, chest.y);
+      // Push to adjacent groups - player is already in these groups, so they'll receive it
+      // NOTE: Removed redundant pushToPlayer() which caused duplicate spawn messages
+      this.pushToAdjacentGroups(chestGroup, new Messages.Spawn(item));
       this.handleItemDespawn(item);
+    } else {
+      console.log('[Chest] No item dropped - chest.items was:', chest.items);
     }
   }
 

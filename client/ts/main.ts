@@ -395,6 +395,12 @@ var initGame = function () {
         // game.player.hit();
         return false;
       }
+      if (key === 78) { // N - Toggle Town Crier newspaper
+        if (game.ready && game.started) {
+          game.toggleNewspaper();
+        }
+        return false;
+      }
     } else {
       if (key === 13 && game.ready) {
         $chat.focus();

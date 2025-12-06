@@ -21,7 +21,7 @@ export class Server {
     const server = http.createServer(app);
       this.io = new SocketIOServer(server, {
           cors: {
-              origin: "http://localhost:8008",
+              origin: ["http://localhost:8008", "http://45.77.216.118:8008"],
               methods: ["GET", "POST"],
               credentials: true
           }

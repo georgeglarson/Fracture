@@ -393,6 +393,7 @@ export class Renderer {
 
       if (!this.mobile && !this.tablet) {
         this.drawEntityName(entity);
+        this.drawEntityThought(entity);  // AI thought bubbles
       }
 
       this.context.save();
@@ -600,6 +601,69 @@ export class Renderer {
         true,
         color);
     }
+    this.context.restore();
+  }
+
+  // AI Thought Bubbles - "Ant Farm" feature
+  drawEntityThought(entity) {
+    // Only show thoughts that are less than 12 seconds old
+    if (!entity.currentThought || !entity.thoughtTime) return;
+    const age = Date.now() - entity.thoughtTime;
+    if (age > 12000) {
+      entity.currentThought = null;
+      return;
+    }
+
+    // Fade out effect in last 2 seconds
+    let alpha = 1;
+    if (age > 10000) {
+      alpha = 1 - ((age - 10000) / 2000);
+    }
+
+    this.context.save();
+    this.context.globalAlpha = alpha;
+
+    // Style based on state
+    let color = '#c0c0c0';  // Default light grey for idle
+    if (entity.thoughtState === 'combat') {
+      color = '#ff6666';  // Red for combat
+    } else if (entity.thoughtState === 'playerNearby') {
+      color = '#ffdd77';  // Brighter yellow when player nearby
+    } else if (entity.thoughtState === 'special') {
+      color = '#dd99ff';  // Brighter purple for special thoughts
+    }
+
+    // Position above the entity (higher than names)
+    const x = (entity.x + 8) * this.scale;
+    const y = (entity.y - 10) * this.scale;  // Above the entity
+
+    // Set up font for measurement and drawing
+    this.context.font = 'italic 14px GraphicPixel';
+    this.context.textAlign = 'center';
+
+    // Measure text for background
+    const text = entity.currentThought;
+    const metrics = this.context.measureText(text);
+    const textWidth = metrics.width;
+    const textHeight = 14;  // Approximate height based on font size
+    const padding = 4;
+
+    // Draw semi-transparent dark background
+    this.context.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    this.context.fillRect(
+      x - textWidth / 2 - padding,
+      y - textHeight + 2,
+      textWidth + padding * 2,
+      textHeight + padding
+    );
+
+    // Draw thought text
+    this.context.fillStyle = color;
+    this.context.strokeStyle = '#000000';
+    this.context.lineWidth = 1;
+    this.context.strokeText(text, x, y);
+    this.context.fillText(text, x, y);
+
     this.context.restore();
   }
 

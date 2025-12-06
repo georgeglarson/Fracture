@@ -1,4 +1,4 @@
 {
-    "host": "Set production websocket host here",
-    "port": 8000
+    "host": "bq.venice.guru",
+    "port": 443
 }

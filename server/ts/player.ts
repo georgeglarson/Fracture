@@ -1,3 +1,4 @@
+// BrowserQuest Ultra Player - with AI Narrator integration
 import * as _ from 'lodash';
 import {FormatChecker} from './format';
 import {Character} from './character';
@@ -86,6 +87,9 @@ export class Player extends Character {
         self.send([Types.Messages.WELCOME, self.id, self.name, self.x, self.y, self.hitPoints]);
         self.hasEnteredGame = true;
         self.isDead = false;
+
+        // AI Narrator: Welcome the player
+        self.triggerNarration('join');
       }
       else if (action === Types.Messages.WHO) {
         message.shift();
@@ -245,6 +249,10 @@ export class Player extends Character {
       else if (action === Types.Messages.REQUEST_QUEST) {
         var npcKind = message[1];
         self.handleRequestQuest(npcKind);
+      }
+      // Town Crier: Request Newspaper
+      else if (action === Types.Messages.NEWS_REQUEST) {
+        self.handleNewsRequest();
       }
       else {
         if (self.message_callback) {
@@ -417,21 +425,26 @@ export class Player extends Character {
   // ============================================================================
 
   async handleNpcTalk(npcKind: number) {
+    console.log(`[Venice] handleNpcTalk called with npcKind: ${npcKind}`);
     const venice = getVeniceService();
     const npcType = Types.getKindAsString(npcKind);
+    console.log(`[Venice] npcType resolved to: ${npcType}, venice service: ${venice ? 'available' : 'null'}`);
 
     if (!venice || !npcType) {
       // Fallback: send empty response
+      console.log('[Venice] Sending fallback response (no venice or npcType)');
       this.send(new Messages.NpcTalkResponse(npcKind, '...').serialize());
       return;
     }
 
     try {
+      console.log(`[Venice] Generating dialogue for ${npcType}...`);
       const response = await venice.generateNpcDialogue(
         npcType,
         this.name,
         this.id.toString()
       );
+      console.log(`[Venice] Got response: ${response}`);
       this.send(new Messages.NpcTalkResponse(npcKind, response).serialize());
     } catch (error) {
       console.error('Venice NPC talk error:', error);
@@ -456,25 +469,52 @@ export class Player extends Character {
     }
   }
 
-  // Called when player kills a mob - for quest tracking
+  // Called when player kills a mob - for quest tracking and narration
   handleKill(mobType: string) {
     const venice = getVeniceService();
     if (!venice) return;
+
+    const profile = venice.getProfile(this.id.toString());
+    const prevKills = profile.totalKills;
 
     const result = venice.recordKill(this.id.toString(), mobType);
     if (result && result.completed) {
       this.send(new Messages.QuestComplete(result).serialize());
     }
+
+    // AI Narrator: Trigger narration for special kills
+    const newKills = profile.totalKills;
+
+    // First kill ever
+    if (prevKills === 0 && newKills === 1) {
+      this.triggerNarration('firstKill', { mobType });
+    }
+    // Kill milestones (10, 25, 50, 100, etc.)
+    else if ([10, 25, 50, 100, 250, 500].includes(newKills)) {
+      this.triggerNarration('killMilestone', { mobType, count: newKills });
+    }
+    // Boss kill
+    else if (mobType.toLowerCase() === 'boss' || mobType.toLowerCase() === 'skeleton2') {
+      this.triggerNarration('bossKill', { bossType: mobType });
+    }
   }
 
-  // Called when player enters a new area - for quest tracking and companion hints
+  // Called when player enters a new area - for quest tracking, companion hints, and narration
   async handleAreaChange(area: string) {
     const venice = getVeniceService();
     if (!venice) return;
 
+    const profile = venice.getProfile(this.id.toString());
+    const isNewArea = !profile.areas.includes(area);
+
     const result = venice.recordArea(this.id.toString(), area);
     if (result && result.completed) {
       this.send(new Messages.QuestComplete(result).serialize());
+    }
+
+    // AI Narrator: Announce new area discovery
+    if (isNewArea) {
+      this.triggerNarration('newArea', { area });
     }
 
     // Send companion hint for new area
@@ -512,12 +552,16 @@ export class Player extends Character {
     }
   }
 
-  // Called when player dies - for companion hints
+  // Called when player dies - for companion hints and narration
   async handleDeath(killerType: string) {
     const venice = getVeniceService();
     if (!venice) return;
 
     venice.recordDeath(this.id.toString());
+
+    // AI Narrator: Dramatic death commentary
+    this.triggerNarration('death', { killer: killerType });
+
     const hint = await venice.getCompanionHint(
       this.id.toString(),
       'death',
@@ -533,6 +577,77 @@ export class Player extends Character {
     const venice = getVeniceService();
     if (venice) {
       venice.cleanupPlayer(this.id.toString());
+    }
+  }
+
+  // Town Crier: Handle newspaper request
+  async handleNewsRequest() {
+    console.log('[TownCrier] handleNewsRequest called for player:', this.name);
+    const venice = getVeniceService();
+    if (!venice) {
+      console.log('[TownCrier] No Venice service, sending empty response');
+      this.send(new Messages.NewsResponse([]).serialize());
+      return;
+    }
+
+    try {
+      console.log('[TownCrier] Generating newspaper...');
+      const newspaper = await venice.generateNewspaper();
+      console.log('[TownCrier] Generated', newspaper.headlines.length, 'headlines');
+      const response = new Messages.NewsResponse(newspaper.headlines).serialize();
+      console.log('[TownCrier] Sending response:', JSON.stringify(response));
+      this.send(response);
+    } catch (error) {
+      console.error('[TownCrier] Venice newspaper error:', error);
+      this.send(new Messages.NewsResponse(['📰 No news today...']).serialize());
+    }
+  }
+
+  // ============================================================================
+  // AI NARRATOR - Triggers dramatic commentary on player actions
+  // ============================================================================
+
+  private lastNarrationTime: number = 0;
+  private narrationCooldown: number = 5000; // 5 seconds between narrations
+
+  async triggerNarration(event: string, details?: Record<string, any>) {
+    const venice = getVeniceService();
+    if (!venice) return;
+
+    // Cooldown to prevent spam (except for important events)
+    const importantEvents = ['join', 'death', 'bossKill'];
+    const now = Date.now();
+    if (!importantEvents.includes(event) && (now - this.lastNarrationTime) < this.narrationCooldown) {
+      return;
+    }
+
+    console.log(`[Narrator] Triggering narration for event: ${event}`);
+
+    try {
+      // Try AI narration first
+      const narration = await venice.generateNarration(
+        event,
+        this.name,
+        this.id.toString(),
+        details
+      );
+
+      if (narration) {
+        console.log(`[Narrator] AI response: "${narration.text}"`);
+        this.send(new Messages.Narrator(narration.text, narration.style).serialize());
+        this.lastNarrationTime = now;
+      } else {
+        // Fallback to static narration
+        const fallback = venice.getStaticNarration(event, this.name, details);
+        console.log(`[Narrator] Using fallback: "${fallback.text}"`);
+        this.send(new Messages.Narrator(fallback.text, fallback.style).serialize());
+        this.lastNarrationTime = now;
+      }
+    } catch (error) {
+      console.error('[Narrator] Error:', error);
+      // Use static fallback on error
+      const fallback = venice.getStaticNarration(event, this.name, details);
+      this.send(new Messages.Narrator(fallback.text, fallback.style).serialize());
     }
   }
 }

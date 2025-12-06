@@ -38,7 +38,12 @@ export const Types: any = {
     QUEST_STATUS: 31,
     QUEST_COMPLETE: 32,
     ITEM_LORE: 33,
-    REQUEST_QUEST: 34
+    REQUEST_QUEST: 34,
+    NARRATOR: 35,  // Dynamic AI narrator commentary
+    ENTITY_THOUGHT: 36,  // AI thought bubbles above entities
+    WORLD_EVENT: 37,  // Faction director announcements
+    NEWS_REQUEST: 38,  // Player requests town crier newspaper
+    NEWS_RESPONSE: 39  // Server sends newspaper headlines
   },
 
   Entities: {

@@ -72,6 +72,7 @@ export class Updater {
       z = this.game.currentZoning;
 
     this.game.forEachEntity(function (entity) {
+      if (!entity) return;
       m = entity.movement;
       if (m) {
         if (m.inProgress) {

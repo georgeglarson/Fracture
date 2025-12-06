@@ -8,7 +8,7 @@
     "watch:server": "tsx --watch  ./server/ts/main.ts",
     "build:client": "webpack --env NODE_ENV=prod --config ./webpack.config.js --mode production",
     "build:server": "tsc -p ./server",
-    "start": "node dist/server/main.js",
+    "start": "node dist/server/ts/main.js",
     "dev": "concurrently \"npm run watch:client\" \"npm run watch:server\""
   },
   "dependencies": {
@@ -25,6 +25,7 @@
     "@eslint/js": "^9.30.1",
     "@types/jquery": "^3.5.32",
     "@types/lodash": "^3.10.1",
+    "@types/node": "^24.10.1",
     "copy-webpack-plugin": "^11.0.0",
     "eslint": "^9.30.1",
     "html-webpack-plugin": "^5.5.3",

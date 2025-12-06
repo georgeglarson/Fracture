@@ -24,6 +24,7 @@ export class FormatChecker {
     // Venice AI message formats
     this.formats[Types.Messages.NPCTALK] = ['n']; // npcKind
     this.formats[Types.Messages.REQUEST_QUEST] = ['n']; // npcKind
+    this.formats[Types.Messages.NEWS_REQUEST] = []; // no params - just request newspaper
   }
 
   check(msg) {

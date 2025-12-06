@@ -389,10 +389,17 @@ export class Game {
   }
 
   addItem(item, x, y) {
+    // Idempotent check: skip if item already exists (prevents duplicate spawn issues)
+    if (this.entityIdExists(item.id)) {
+      console.warn('[addItem] Item already exists, skipping duplicate:', item.id);
+      return;
+    }
+    console.log('[addItem] Adding item ' + item.id + ' at ' + x + ', ' + y);
     item.setSprite(this.sprites[item.getSpriteName()]);
     item.setGridPosition(x, y);
     item.setAnimation('idle', 150);
     this.addEntity(item);
+    console.log('[addItem] Item ' + item.id + ' added to entities. itemGrid entry exists:', !!this.itemGrid[y][x][item.id]);
   }
 
   removeItem(item) {
@@ -1030,6 +1037,10 @@ export class Game {
         self.addEntity(chest);
 
         chest.onOpen(function () {
+          // Immediately unblock the path so items can be picked up
+          // The chest animation continues but doesn't block pathing
+          self.removeFromPathingGrid(chest.gridX, chest.gridY);
+
           chest.stopBlinking();
           chest.setSprite(self.sprites['death']);
           chest.setAnimation('death', 120, 1, function () {
@@ -1465,6 +1476,35 @@ export class Game {
           var itemName = Types.getKindAsString(itemKind);
           self.notification_callback(itemName + ': ' + lore);
         }
+      });
+
+      // Venice AI: Dynamic World Narrator
+      self.client.onNarrator(function (text, style) {
+        if (text) {
+          self.showNarratorText(text, style);
+        }
+      });
+
+      // Venice AI: Entity Thought Bubbles ("Ant Farm" feature)
+      self.client.onEntityThought(function (entityId, thought, state) {
+        console.log('[Thought] Received for entity', entityId, ':', thought);
+        var entity = self.getEntityById(entityId);
+        if (entity) {
+          // Store the thought on the entity for rendering
+          entity.currentThought = thought;
+          entity.thoughtState = state;
+          entity.thoughtTime = Date.now();
+
+          console.log('[Thought] Set on', entity.kind, '(id:', entityId, '):', thought);
+        } else {
+          console.warn('[Thought] Entity not found:', entityId, '- thought discarded');
+        }
+      });
+
+      // Town Crier: Newspaper response
+      self.client.onNewsResponse(function (headlines) {
+        console.log('[TownCrier] Showing newspaper with', headlines.length, 'headlines');
+        self.showNewspaper(headlines);
       });
 
       self.client.onDisconnected(function (message) {
@@ -1939,9 +1979,22 @@ export class Game {
       && !this.hoveringCollidingTile
       && !this.hoveringPlateauTile) {
       entity = this.getEntityAt(pos.x, pos.y);
+      console.log('[Click Debug] Position:', pos.x, pos.y, 'Entity:', entity ? entity.kind : null, 'isChest:', entity instanceof Chest, 'constructor:', entity ? entity.constructor.name : null);
 
       if (entity instanceof Mob) {
         this.makePlayerAttack(entity);
+      }
+      else if (entity instanceof Chest) {
+        // Check Chest BEFORE Item since Chest extends Item
+        const isAdjacent = this.player.isAdjacentNonDiagonal(entity);
+        console.log('[Chest Debug] Player at:', this.player.gridX, this.player.gridY, 'Chest at:', entity.gridX, entity.gridY, 'Adjacent:', isAdjacent);
+        if (isAdjacent === false) {
+          this.makePlayerOpenChest(entity);
+        } else {
+          console.log('[Chest Debug] Sending OPEN to server for chest:', entity.id);
+          this.client.sendOpen(entity);
+          this.audioManager.playSound('chest');
+        }
       }
       else if (entity instanceof Item) {
         this.makePlayerGoToItem(entity);
@@ -1952,9 +2005,6 @@ export class Game {
         } else {
           this.makeNpcTalk(entity);
         }
-      }
-      else if (entity instanceof Chest) {
-        this.makePlayerOpenChest(entity);
       }
       else {
         this.makePlayerGoTo(pos.x, pos.y);
@@ -2362,6 +2412,184 @@ export class Game {
   showNotification(message) {
     if (this.notification_callback) {
       this.notification_callback(message);
+    }
+  }
+
+  /**
+   * Shows narrator text prominently at the top of the screen
+   * with dramatic styling based on the style parameter
+   */
+  showNarratorText(text: string, style: string = 'epic') {
+    // Create or get narrator container
+    let narratorEl = document.getElementById('narrator-text');
+    if (!narratorEl) {
+      narratorEl = document.createElement('div');
+      narratorEl.id = 'narrator-text';
+      narratorEl.style.cssText = `
+        position: fixed;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 80%;
+        padding: 15px 30px;
+        font-family: 'Georgia', serif;
+        font-size: 18px;
+        text-align: center;
+        border-radius: 5px;
+        z-index: 9999;
+        opacity: 0;
+        transition: opacity 0.5s ease-in-out;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        pointer-events: none;
+      `;
+      document.body.appendChild(narratorEl);
+    }
+
+    // Style based on narrator style
+    switch (style) {
+      case 'epic':
+        narratorEl.style.background = 'linear-gradient(to right, rgba(139, 69, 19, 0.9), rgba(101, 67, 33, 0.9))';
+        narratorEl.style.color = '#ffd700';
+        narratorEl.style.border = '2px solid #ffd700';
+        break;
+      case 'humor':
+        narratorEl.style.background = 'linear-gradient(to right, rgba(75, 0, 130, 0.9), rgba(138, 43, 226, 0.9))';
+        narratorEl.style.color = '#fff';
+        narratorEl.style.border = '2px solid #da70d6';
+        break;
+      case 'ominous':
+        narratorEl.style.background = 'linear-gradient(to right, rgba(40, 0, 0, 0.95), rgba(80, 0, 0, 0.95))';
+        narratorEl.style.color = '#ff4444';
+        narratorEl.style.border = '2px solid #8b0000';
+        break;
+      case 'info':
+        narratorEl.style.background = 'linear-gradient(to right, rgba(0, 50, 80, 0.9), rgba(0, 80, 100, 0.9))';
+        narratorEl.style.color = '#87ceeb';
+        narratorEl.style.border = '2px solid #4682b4';
+        break;
+      default:
+        narratorEl.style.background = 'rgba(0, 0, 0, 0.8)';
+        narratorEl.style.color = '#fff';
+        narratorEl.style.border = '2px solid #666';
+    }
+
+    // Set text with dramatic quotes
+    narratorEl.innerHTML = `<em>"${text}"</em>`;
+
+    // Fade in
+    narratorEl.style.opacity = '1';
+
+    // Fade out after delay (based on text length)
+    const displayTime = Math.max(4000, text.length * 60);
+    setTimeout(() => {
+      narratorEl.style.opacity = '0';
+    }, displayTime);
+
+    console.log('[Narrator]', style + ':', text);
+  }
+
+  /**
+   * Town Crier - Shows newspaper overlay with headlines
+   */
+  showNewspaper(headlines: string[]) {
+    // Create or get newspaper container
+    let newsEl = document.getElementById('newspaper-overlay');
+    if (!newsEl) {
+      newsEl = document.createElement('div');
+      newsEl.id = 'newspaper-overlay';
+      newsEl.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 400px;
+        max-width: 90%;
+        max-height: 80vh;
+        padding: 20px 30px;
+        font-family: 'Georgia', serif;
+        background: linear-gradient(to bottom, #f4e4bc, #e8d5a3);
+        color: #2a2a2a;
+        border-radius: 5px;
+        border: 3px solid #8b4513;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        z-index: 10000;
+        overflow-y: auto;
+      `;
+      document.body.appendChild(newsEl);
+    }
+
+    // Build newspaper content
+    let html = `
+      <div style="text-align: center; border-bottom: 2px solid #8b4513; padding-bottom: 10px; margin-bottom: 15px;">
+        <h2 style="margin: 0; font-size: 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;">
+          Town Crier
+        </h2>
+        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+          All the news that's fit to proclaim!
+        </div>
+      </div>
+      <div style="font-size: 14px; line-height: 1.6;">
+    `;
+
+    if (headlines.length === 0) {
+      html += '<p style="text-align: center; font-style: italic;">No news today... The realm is quiet.</p>';
+    } else {
+      headlines.forEach(headline => {
+        html += `<p style="margin: 10px 0; padding-left: 10px; border-left: 3px solid #8b4513;">
+          ${headline}
+        </p>`;
+      });
+    }
+
+    html += `
+      </div>
+      <div style="text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #ccc;">
+        <button id="close-newspaper" style="
+          padding: 8px 20px;
+          font-family: Georgia, serif;
+          font-size: 14px;
+          background: #8b4513;
+          color: #fff;
+          border: none;
+          border-radius: 3px;
+          cursor: pointer;
+        ">Close</button>
+        <div style="font-size: 10px; color: #888; margin-top: 8px;">Press N to toggle</div>
+      </div>
+    `;
+
+    newsEl.innerHTML = html;
+    newsEl.style.display = 'block';
+
+    // Add close button handler
+    const closeBtn = document.getElementById('close-newspaper');
+    if (closeBtn) {
+      closeBtn.onclick = () => this.hideNewspaper();
+    }
+
+    console.log('[TownCrier] Displayed newspaper with', headlines.length, 'headlines');
+  }
+
+  hideNewspaper() {
+    const newsEl = document.getElementById('newspaper-overlay');
+    if (newsEl) {
+      newsEl.style.display = 'none';
+    }
+  }
+
+  toggleNewspaper() {
+    const newsEl = document.getElementById('newspaper-overlay');
+    if (newsEl && newsEl.style.display !== 'none') {
+      this.hideNewspaper();
+    } else {
+      this.requestNews();
+    }
+  }
+
+  requestNews() {
+    if (this.client) {
+      console.log('[TownCrier] Requesting news from server...');
+      this.client.sendNewsRequest();
     }
   }
 
