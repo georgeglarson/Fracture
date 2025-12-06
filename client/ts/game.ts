@@ -24,6 +24,7 @@ import {Exceptions} from './exceptions';
 import _ from 'lodash';
 import {Entity} from './entity/entity';
 import {Renderer} from './renderer/renderer';
+import {GridManager} from './world/grid-manager';
 
 export class Game {
 
@@ -45,10 +46,13 @@ export class Game {
   // Game state
   entities = {};
   deathpositions = {};
-  entityGrid = null;
-  pathingGrid = null;
-  renderingGrid = null;
-  itemGrid = null;
+  gridManager: GridManager | null = null;
+
+  // Grid accessors (delegate to gridManager)
+  get entityGrid() { return this.gridManager?.entityGrid ?? null; }
+  get pathingGrid() { return this.gridManager?.pathingGrid ?? null; }
+  get renderingGrid() { return this.gridManager?.renderingGrid ?? null; }
+  get itemGrid() { return this.gridManager?.itemGrid ?? null; }
   currentCursor = null;
   currentCursorOrientation;
   mouse = {x: 0, y: 0};
@@ -413,47 +417,19 @@ export class Game {
   }
 
   initPathingGrid() {
-    this.pathingGrid = [];
-    for (var i = 0; i < this.map.height; i += 1) {
-      this.pathingGrid[i] = [];
-      for (var j = 0; j < this.map.width; j += 1) {
-        this.pathingGrid[i][j] = this.map.grid[i][j];
-      }
-    }
-    console.info('Initialized the pathing grid with static colliding cells.');
+    this.gridManager?.initPathingGrid();
   }
 
   initEntityGrid() {
-    this.entityGrid = [];
-    for (var i = 0; i < this.map.height; i += 1) {
-      this.entityGrid[i] = [];
-      for (var j = 0; j < this.map.width; j += 1) {
-        this.entityGrid[i][j] = {};
-      }
-    }
-    console.info('Initialized the entity grid.');
+    this.gridManager?.initEntityGrid();
   }
 
   initRenderingGrid() {
-    this.renderingGrid = [];
-    for (var i = 0; i < this.map.height; i += 1) {
-      this.renderingGrid[i] = [];
-      for (var j = 0; j < this.map.width; j += 1) {
-        this.renderingGrid[i][j] = {};
-      }
-    }
-    console.info('Initialized the rendering grid.');
+    this.gridManager?.initRenderingGrid();
   }
 
   initItemGrid() {
-    this.itemGrid = [];
-    for (var i = 0; i < this.map.height; i += 1) {
-      this.itemGrid[i] = [];
-      for (var j = 0; j < this.map.width; j += 1) {
-        this.itemGrid[i][j] = {};
-      }
-    }
-    console.info('Initialized the item grid.');
+    this.gridManager?.initItemGrid();
   }
 
   /**
@@ -478,31 +454,23 @@ export class Game {
   }
 
   addToRenderingGrid(entity, x, y) {
-    if (!this.map.isOutOfBounds(x, y)) {
-      this.renderingGrid[y][x][entity.id] = entity;
-    }
+    this.gridManager?.addToRenderingGrid(entity, x, y);
   }
 
   removeFromRenderingGrid(entity, x, y) {
-    if (entity && this.renderingGrid[y][x] && entity.id in this.renderingGrid[y][x]) {
-      delete this.renderingGrid[y][x][entity.id];
-    }
+    this.gridManager?.removeFromRenderingGrid(entity, x, y);
   }
 
   removeFromEntityGrid(entity, x, y) {
-    if (this.entityGrid[y][x][entity.id]) {
-      delete this.entityGrid[y][x][entity.id];
-    }
+    this.gridManager?.removeFromEntityGrid(entity, x, y);
   }
 
   removeFromItemGrid(item, x, y) {
-    if (item && this.itemGrid[y][x][item.id]) {
-      delete this.itemGrid[y][x][item.id];
-    }
+    this.gridManager?.removeFromItemGrid(item, x, y);
   }
 
   removeFromPathingGrid(x, y) {
-    this.pathingGrid[y][x] = 0;
+    this.gridManager?.removeFromPathingGrid(x, y);
   }
 
   /**
@@ -513,18 +481,7 @@ export class Game {
    * @param {Entity} entity The moving entity
    */
   registerEntityDualPosition(entity) {
-    if (entity) {
-      this.entityGrid[entity.gridY][entity.gridX][entity.id] = entity;
-
-      this.addToRenderingGrid(entity, entity.gridX, entity.gridY);
-
-      if (entity.nextGridX >= 0 && entity.nextGridY >= 0) {
-        this.entityGrid[entity.nextGridY][entity.nextGridX][entity.id] = entity;
-        if (!(entity instanceof Player)) {
-          this.pathingGrid[entity.nextGridY][entity.nextGridX] = 1;
-        }
-      }
-    }
+    this.gridManager?.registerEntityDualPosition(entity);
   }
 
   /**
@@ -533,36 +490,11 @@ export class Game {
    * @param {Entity} entity The moving entity
    */
   unregisterEntityPosition(entity) {
-    if (entity) {
-      this.removeFromEntityGrid(entity, entity.gridX, entity.gridY);
-      this.removeFromPathingGrid(entity.gridX, entity.gridY);
-
-      this.removeFromRenderingGrid(entity, entity.gridX, entity.gridY);
-
-      if (entity.nextGridX >= 0 && entity.nextGridY >= 0) {
-        this.removeFromEntityGrid(entity, entity.nextGridX, entity.nextGridY);
-        this.removeFromPathingGrid(entity.nextGridX, entity.nextGridY);
-      }
-    }
+    this.gridManager?.unregisterEntityPosition(entity);
   }
 
   registerEntityPosition(entity) {
-    var x = entity.gridX,
-      y = entity.gridY;
-
-    if (entity) {
-      if (entity instanceof Character || entity instanceof Chest) {
-        this.entityGrid[y][x][entity.id] = entity;
-        if (!(entity instanceof Player)) {
-          this.pathingGrid[y][x] = 1;
-        }
-      }
-      if (entity instanceof Item) {
-        this.itemGrid[y][x][entity.id] = entity;
-      }
-
-      this.addToRenderingGrid(entity, x, y);
-    }
+    this.gridManager?.registerEntityPosition(entity);
   }
 
   setServerOptions(host, port, username) {
@@ -611,6 +543,8 @@ export class Game {
           self.initSilhouettes();
         }
 
+        // Initialize grid manager
+        self.gridManager = new GridManager(self.map);
         self.initEntityGrid();
         self.initItemGrid();
         self.initPathingGrid();
@@ -2013,17 +1947,7 @@ export class Game {
   }
 
   isMobOnSameTile(mob, x?, y?) {
-    var X = x || mob.gridX,
-      Y = y || mob.gridY,
-      list = this.entityGrid[Y][X],
-      result = false;
-
-    _.each(list, function (entity) {
-      if (entity instanceof Mob && entity.id !== mob.id) {
-        result = true;
-      }
-    });
-    return result;
+    return this.gridManager?.isMobOnSameTile(mob, x, y) ?? false;
   }
 
   getFreeAdjacentNonDiagonalPosition(entity) {
@@ -2655,15 +2579,7 @@ export class Game {
   }
 
   forEachEntityAround(x, y, r, callback) {
-    for (var i = x - r, max_i = x + r; i <= max_i; i += 1) {
-      for (var j = y - r, max_j = y + r; j <= max_j; j += 1) {
-        if (!this.map.isOutOfBounds(i, j)) {
-          _.each(this.renderingGrid[j][i], function (entity) {
-            callback(entity);
-          });
-        }
-      }
-    }
+    this.gridManager?.forEachEntityAround(x, y, r, callback);
   }
 
   checkOtherDirtyRects(r1, source, x, y) {
