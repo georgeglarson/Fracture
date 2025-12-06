@@ -14,6 +14,7 @@ import {Map} from './map';
 import {getVeniceService} from './ai/venice.service';
 import {AIPlayerManager} from './ai/aiplayer';
 import {MessageBroadcaster} from './messaging/message-broadcaster';
+import {CombatSystem} from './combat/combat-system';
 
 export class World {
 
@@ -38,6 +39,9 @@ export class World {
 
   // Message broadcaster (initialized in run() after map is ready)
   broadcaster: MessageBroadcaster | null = null;
+
+  // Combat system (initialized in run() after map is ready)
+  combatSystem: CombatSystem | null = null;
 
   itemCount = 0;
   playerCount = 0;
@@ -243,6 +247,17 @@ export class World {
         self.map,
         { getEntityById: (id) => self.getEntityById(id) }
       );
+
+      // Initialize combat system
+      self.combatSystem = new CombatSystem({
+        getEntityById: (id) => self.getEntityById(id),
+        pushToPlayer: (player, message) => self.pushToPlayer(player, message),
+        pushToAdjacentGroups: (groupId, message, ignoredPlayer) => self.pushToAdjacentGroups(groupId, message, ignoredPlayer),
+        getDroppedItem: (mob) => self.getDroppedItem(mob),
+        handleItemDespawn: (item) => self.handleItemDespawn(item),
+        removeEntity: (entity) => self.removeEntity(entity),
+        handleEntityGroupMembership: (entity) => self.handleEntityGroupMembership(entity)
+      });
 
       self.map.generateCollisionGrid();
 
@@ -497,25 +512,11 @@ export class World {
    * The mob will no longer be registered as an attacker of its current target.
    */
   clearMobAggroLink(mob) {
-    var player = null;
-    if (mob.target) {
-      player = this.getEntityById(mob.target);
-      if (player) {
-        player.removeAttacker(mob);
-      }
-    }
+    this.combatSystem?.clearMobAggroLink(mob);
   }
 
   clearMobHateLinks(mob) {
-    var self = this;
-    if (mob) {
-      _.each(mob.hatelist, function (obj) {
-        var player = self.getEntityById(obj.id);
-        if (player) {
-          player.removeHater(mob);
-        }
-      });
-    }
+    this.combatSystem?.clearMobHateLinks(mob);
   }
 
   forEachEntity(callback) {
@@ -542,37 +543,16 @@ export class World {
   }
 
   handleMobHate(mobId, playerId, hatePoints) {
-    var mob = this.getEntityById(mobId),
-      player = this.getEntityById(playerId),
-      mostHated;
-
-    if (player && mob) {
-      mob.increaseHateFor(playerId, hatePoints);
-      player.addHater(mob);
-
-      if (mob.hitPoints > 0) { // only choose a target if still alive
-        this.chooseMobTarget(mob);
-      }
-    }
+    this.combatSystem?.handleMobHate(mobId, playerId, hatePoints);
   }
 
   chooseMobTarget(mob, hateRank?) {
-    var player = this.getEntityById(mob.getHatedPlayerId(hateRank));
-
-    // If the mob is not already attacking the player, create an attack link between them.
-    if (player && !(mob.id in player.attackers)) {
-      this.clearMobAggroLink(mob);
-
-      player.addAttacker(mob);
-      mob.setTarget(player);
-
-      this.broadcastAttacker(mob);
-      console.debug(mob.id + ' is now attacking ' + player.id);
-    }
+    this.combatSystem?.chooseMobTarget(mob, hateRank);
   }
 
   onEntityAttack(callback) {
     this.attack_callback = callback;
+    this.combatSystem?.onEntityAttack(callback);
   }
 
   getEntityById(id) {
@@ -594,74 +574,11 @@ export class World {
   }
 
   broadcastAttacker(character) {
-    if (character) {
-      this.pushToAdjacentGroups(character.group, character.attack(), character.id);
-    }
-    if (this.attack_callback) {
-      this.attack_callback(character);
-    }
+    this.combatSystem?.broadcastAttacker(character);
   }
 
   handleHurtEntity(entity, attacker?, damage?) {
-    var self = this;
-
-    if (entity.type === 'player') {
-      // A player is only aware of his own hitpoints
-      this.pushToPlayer(entity, entity.health());
-    }
-
-    if (entity.type === 'mob') {
-      // Let the mob's attacker (player) know how much damage was inflicted
-      this.pushToPlayer(attacker, new Messages.Damage(entity, damage));
-    }
-
-    // If the entity is about to die
-    if (entity.hitPoints <= 0) {
-      if (entity.type === 'mob') {
-        var mob = entity,
-          item = this.getDroppedItem(mob);
-
-        this.pushToPlayer(attacker, new Messages.Kill(mob));
-
-        // AI: Trigger kill handling for narrator and quest tracking
-        const mobType = Types.getKindAsString(mob.kind);
-        if (attacker.handleKill && mobType) {
-          attacker.handleKill(mobType);
-        }
-
-        // Record world event for Town Crier
-        const venice = getVeniceService();
-        if (venice && mobType) {
-          const isBoss = mob.kind === Types.Entities.BOSS;
-          venice.recordWorldEvent(isBoss ? 'bossKill' : 'kill', attacker.name, {
-            mobType,
-            bossType: isBoss ? mobType : undefined
-          });
-        }
-
-        this.pushToAdjacentGroups(mob.group, mob.despawn()); // Despawn must be enqueued before the item drop
-        if (item) {
-          this.pushToAdjacentGroups(mob.group, mob.drop(item));
-          this.handleItemDespawn(item);
-        }
-      }
-
-      if (entity.type === 'player') {
-        // Record world event for Town Crier
-        const veniceForDeath = getVeniceService();
-        if (veniceForDeath) {
-          const killerType = attacker ? Types.getKindAsString(attacker.kind) : 'unknown';
-          veniceForDeath.recordWorldEvent('death', entity.name, {
-            killer: killerType
-          });
-        }
-
-        this.handlePlayerVanish(entity);
-        this.pushToAdjacentGroups(entity.group, entity.despawn());
-      }
-
-      this.removeEntity(entity);
-    }
+    this.combatSystem?.handleHurtEntity(entity, attacker, damage);
   }
 
   despawn(entity) {
@@ -710,22 +627,7 @@ export class World {
   }
 
   handlePlayerVanish(player) {
-    var self = this,
-      previousAttackers = [];
-
-    // When a player dies or teleports, all of his attackers go and attack their second most hated player.
-    player.forEachAttacker(function (mob) {
-      previousAttackers.push(mob);
-      self.chooseMobTarget(mob, 2);
-    });
-
-    _.each(previousAttackers, function (mob) {
-      player.removeAttacker(mob);
-      mob.clearTarget();
-      mob.forgetPlayer(player.id, 1000);
-    });
-
-    this.handleEntityGroupMembership(player);
+    this.combatSystem?.handlePlayerVanish(player);
   }
 
   setPlayerCount(count) {
