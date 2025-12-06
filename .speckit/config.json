@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "project": "BrowserQuest-Ultra",
+  "specsDir": "specs",
+  "workflow": {
+    "phases": ["specify", "plan", "tasks", "implement"],
+    "requireConstitutionCheck": true
+  }
+}
