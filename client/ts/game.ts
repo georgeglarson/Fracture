@@ -522,7 +522,8 @@ export class Game {
           camera: self.camera,
           renderer: self.renderer,
           bubbleManager: self.bubbleManager,
-          client: self.client,
+          // Use closure - client is created later in connect()
+          client: { sendZone: () => self.client?.sendZone() },
           initAnimatedTiles: () => self.initAnimatedTiles(),
           forEachVisibleEntityByDepth: (cb) => self.forEachVisibleEntityByDepth(cb)
         });
