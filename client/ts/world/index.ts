@@ -4,3 +4,4 @@
  */
 
 export * from './grid-manager.js';
+export * from './map-query.js';

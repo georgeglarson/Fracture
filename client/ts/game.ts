@@ -25,6 +25,7 @@ import _ from 'lodash';
 import {Entity} from './entity/entity';
 import {Renderer} from './renderer/renderer';
 import {GridManager} from './world/grid-manager';
+import {MapQueryService} from './world/map-query';
 import {EntityManager} from './entities/entity-manager';
 import {InputManager} from './input/input-manager';
 
@@ -49,6 +50,7 @@ export class Game {
   entityManager: EntityManager | null = null;
   gridManager: GridManager | null = null;
   inputManager: InputManager | null = null;
+  mapQueryService: MapQueryService | null = null;
 
   // Entity accessors (delegate to entityManager)
   get entities() { return this.entityManager?.entities ?? {}; }
@@ -508,6 +510,14 @@ export class Game {
         self.entityManager.setDirtyRectCallback((rect, entity, x, y) => {
           self.checkOtherDirtyRects(rect, entity, x, y);
         });
+
+        // Initialize map query service
+        self.mapQueryService = new MapQueryService();
+        self.mapQueryService.setMap(self.map);
+        self.mapQueryService.setGridProvider(() => ({
+          entityGrid: self.entityGrid,
+          itemGrid: self.itemGrid
+        }));
 
         // Initialize input manager
         self.inputManager = new InputManager();
@@ -1667,93 +1677,48 @@ export class Game {
 
   /**
    * Returns the entity located at the given position on the world grid.
-   * @returns {Entity} the entity located at (x, y) or null if there is none.
    */
   getEntityAt(x, y) {
-    if (this.map.isOutOfBounds(x, y) || !this.entityGrid) {
-      return null;
-    }
-
-    var entities = this.entityGrid[y][x],
-      entity = null;
-    if (_.size(entities) > 0) {
-      entity = entities[_.keys(entities)[0]];
-    } else {
-      entity = this.getItemAt(x, y);
-    }
-    return entity;
+    return this.mapQueryService?.getEntityAt(x, y) ?? null;
   }
 
   getMobAt(x, y) {
-    var entity = this.getEntityAt(x, y);
-    if (entity && (entity instanceof Mob)) {
-      return entity;
-    }
-    return null;
+    return this.mapQueryService?.getMobAt(x, y) ?? null;
   }
 
   getNpcAt(x, y) {
-    var entity = this.getEntityAt(x, y);
-    if (entity && (entity instanceof Npc)) {
-      return entity;
-    }
-    return null;
+    return this.mapQueryService?.getNpcAt(x, y) ?? null;
   }
 
   getChestAt(x, y) {
-    var entity = this.getEntityAt(x, y);
-    if (entity && (entity instanceof Chest)) {
-      return entity;
-    }
-    return null;
+    return this.mapQueryService?.getChestAt(x, y) ?? null;
   }
 
   getItemAt(x, y) {
-    if (this.map.isOutOfBounds(x, y) || !this.itemGrid) {
-      return null;
-    }
-    var items = this.itemGrid[y][x],
-      item = null;
-
-    if (_.size(items) > 0) {
-      // If there are potions/burgers stacked with equipment items on the same tile, always get expendable items first.
-      _.each(items, function (i) {
-        if (Types.isExpendableItem(i.kind)) {
-          item = i;
-        }
-        ;
-      });
-
-      // Else, get the first item of the stack
-      if (!item) {
-        item = items[_.keys(items)[0]];
-      }
-    }
-    return item;
+    return this.mapQueryService?.getItemAt(x, y) ?? null;
   }
 
   /**
    * Returns true if an entity is located at the given position on the world grid.
-   * @returns {Boolean} Whether an entity is at (x, y).
    */
   isEntityAt(x, y) {
-    return !_.isNull(this.getEntityAt(x, y));
+    return this.mapQueryService?.isEntityAt(x, y) ?? false;
   }
 
   isMobAt(x, y) {
-    return !_.isNull(this.getMobAt(x, y));
+    return this.mapQueryService?.isMobAt(x, y) ?? false;
   }
 
   isItemAt(x, y) {
-    return !_.isNull(this.getItemAt(x, y));
+    return this.mapQueryService?.isItemAt(x, y) ?? false;
   }
 
   isNpcAt(x, y) {
-    return !_.isNull(this.getNpcAt(x, y));
+    return this.mapQueryService?.isNpcAt(x, y) ?? false;
   }
 
   isChestAt(x, y) {
-    return !_.isNull(this.getChestAt(x, y));
+    return this.mapQueryService?.isChestAt(x, y) ?? false;
   }
 
   /**
