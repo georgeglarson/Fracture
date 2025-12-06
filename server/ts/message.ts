@@ -1,5 +1,6 @@
 import {Types} from '../../shared/ts/gametypes';
 import * as _ from 'lodash';
+import { serializeProperties } from '../../shared/ts/items/index.js';
 export const Messages = {
   Spawn: class {
     constructor(private entity) {
@@ -87,10 +88,16 @@ export const Messages = {
     }
 
     serialize() {
+      // Include item properties if available
+      const properties = this.item.properties
+        ? serializeProperties(this.item.properties)
+        : null;
+
       var drop = [Types.Messages.DROP,
         this.mob.id,
         this.item.id,
         this.item.kind,
+        properties,
         _.pluck(this.mob.hatelist, 'id')];
 
       return drop;

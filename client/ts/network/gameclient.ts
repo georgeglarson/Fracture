@@ -327,11 +327,18 @@ export class GameClient {
   receiveDrop(data) {
     var mobId = data[1],
       id = data[2],
-      kind = data[3];
+      kind = data[3],
+      properties = data[4],  // Item properties (rarity, stats) - may be null
+      playersInvolved = data[5];
 
     var item = EntityFactory.createEntity(kind, id);
     item.wasDropped = true;
-    item.playersInvolved = data[4];
+    item.playersInvolved = playersInvolved;
+
+    // Set item properties if available
+    if (properties && item.setProperties) {
+      item.setProperties(properties);
+    }
 
     if (this.drop_callback) {
       this.drop_callback(item, mobId);

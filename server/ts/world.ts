@@ -466,6 +466,10 @@ export class World {
     return this.entityManager?.createItem(kind, x, y);
   }
 
+  createItemWithProperties(kind, x, y) {
+    return this.entityManager?.createItemWithProperties(kind, x, y);
+  }
+
   createChest(x, y, items) {
     return this.entityManager?.createChest(x, y, items);
   }
@@ -581,7 +585,8 @@ export class World {
 
       p += percentage;
       if (v <= p) {
-        item = this.addItem(this.createItem(Types.getKindFromString(itemName), mob.x, mob.y));
+        // Use createItemWithProperties to generate items with random stats
+        item = this.addItem(this.createItemWithProperties(Types.getKindFromString(itemName), mob.x, mob.y));
         break;
       }
     }

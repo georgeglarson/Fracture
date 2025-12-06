@@ -1,6 +1,17 @@
 import {Entity} from './entity';
+import { ItemProperties, GeneratedItem } from '../../shared/ts/items/index.js';
 
 export class Item extends Entity {
+
+  /**
+   * Item properties (rarity, stats, bonuses)
+   */
+  properties: ItemProperties | null = null;
+
+  /**
+   * Display name (includes rarity prefix)
+   */
+  displayName: string | null = null;
 
   /**
    *
@@ -35,9 +46,14 @@ export class Item extends Entity {
    * @param kind
    * @param x
    * @param y
+   * @param generatedItem Optional generated item with properties
    */
-  constructor(id, kind, x, y) {
+  constructor(id, kind, x, y, generatedItem?: GeneratedItem) {
     super(id, 'item', kind, x, y);
+    if (generatedItem) {
+      this.properties = generatedItem.properties;
+      this.displayName = generatedItem.displayName;
+    }
   }
 
   /**

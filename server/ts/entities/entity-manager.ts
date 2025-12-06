@@ -7,6 +7,7 @@ import { Types } from '../../../shared/ts/gametypes.js';
 import { Npc } from '../npc.js';
 import { Chest } from '../chest.js';
 import { Item } from '../item.js';
+import { generateItem } from '../items/index.js';
 
 // Using 'any' for entities to avoid type conflicts with various entity classes
 // The actual entity classes (Player, Mob, Item, Npc) have different interfaces
@@ -142,6 +143,21 @@ export class EntityManager {
       return new Chest(id, x, y);
     } else {
       return new Item(id, kind, x, y);
+    }
+  }
+
+  /**
+   * Create an item with generated properties (rarity, stats, bonuses)
+   */
+  createItemWithProperties(kind: number, x: number, y: number): Item | Chest {
+    const id = '9' + this.itemCount++;
+
+    if (kind === Types.Entities.CHEST) {
+      return new Chest(id, x, y);
+    } else {
+      // Generate item with random properties
+      const generated = generateItem(kind);
+      return new Item(id, kind, x, y, generated);
     }
   }
 
