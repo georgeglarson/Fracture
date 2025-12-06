@@ -1,14 +1,10 @@
 import * as _ from 'lodash';
 import {Messages} from './message';
-import {MobArea} from './mobarea';
-import {ChestArea} from './chestarea';
 import {Types} from '../../shared/ts/gametypes';
-import {Npc} from './npc';
 import {Chest} from './chest';
 import {Item} from './item';
 import {Properties} from './properties';
 import {Mob} from './mob';
-import {Player} from './player';
 import {Utils} from './utils';
 import {Map} from './map';
 import {getVeniceService} from './ai/venice.service';
@@ -16,6 +12,9 @@ import {AIPlayerManager} from './ai/aiplayer';
 import {MessageBroadcaster} from './messaging/message-broadcaster';
 import {CombatSystem} from './combat/combat-system';
 import {EntityManager} from './entities/entity-manager';
+import {SpatialManager} from './world/spatial-manager';
+import {SpawnManager} from './world/spawn-manager';
+import {GameLoop} from './world/game-loop';
 
 export class World {
 
@@ -40,9 +39,23 @@ export class World {
   attackers = {};
   equipping = {};
   hurt = {};
-  mobAreas = [];
-  chestAreas = [];
-  groups = {};
+
+  // Spatial manager (initialized in run() after map is ready)
+  spatialManager: SpatialManager | null = null;
+
+  // Spawn manager (initialized in run() after map is ready)
+  spawnManager: SpawnManager | null = null;
+
+  // Game loop (initialized in run() after map is ready)
+  gameLoop: GameLoop | null = null;
+
+  // Accessors for backward compatibility - delegate to spatialManager
+  get groups() { return this.spatialManager?.groups ?? {}; }
+  get zoneGroupsReady() { return this.spatialManager?.zoneGroupsReady ?? false; }
+
+  // Accessors for backward compatibility - delegate to spawnManager
+  get mobAreas() { return this.spawnManager?.mobAreas ?? []; }
+  get chestAreas() { return this.spawnManager?.chestAreas ?? []; }
 
   // Message broadcaster (initialized in run() after map is ready)
   broadcaster: MessageBroadcaster | null = null;
@@ -51,8 +64,6 @@ export class World {
   combatSystem: CombatSystem | null = null;
 
   playerCount = 0;
-
-  zoneGroupsReady = false;
 
   removed_callback;
   added_callback;
@@ -244,7 +255,10 @@ export class World {
     this.map = new Map(mapFilePath);
 
     this.map.ready(function () {
-      self.initZoneGroups();
+      // Initialize spatial manager for zone groups
+      self.spatialManager = new SpatialManager();
+      self.spatialManager.setMap(self.map);
+      self.spatialManager.initZoneGroups();
 
       // Initialize entity manager
       self.entityManager = new EntityManager();
@@ -260,6 +274,11 @@ export class World {
         self.map,
         { getEntityById: (id) => self.getEntityById(id) }
       );
+
+      // Wire spatial manager to broadcaster
+      self.spatialManager!.setBroadcaster({
+        pushToGroup: (groupId, message, ignoredPlayer) => self.pushToGroup(groupId, message, ignoredPlayer)
+      });
 
       // Initialize combat system
       self.combatSystem = new CombatSystem({
@@ -278,64 +297,47 @@ export class World {
 
       self.map.generateCollisionGrid();
 
-      // Populate all mob "roaming" areas
-      _.each(self.map.mobAreas, function (a) {
-        var area = new MobArea(a.id, a.nb, a.type, a.x, a.y, a.width, a.height, self);
-        area.spawnMobs();
-        area.onEmpty(self.handleEmptyMobArea.bind(self, area));
-
-        self.mobAreas.push(area);
+      // Initialize spawn manager
+      self.spawnManager = new SpawnManager();
+      self.spawnManager.setMap(self.map);
+      self.spawnManager.setEntityManager({
+        addNpc: (kind, x, y) => self.addNpc(kind, x, y),
+        addMob: (mob) => self.addMob(mob),
+        addItem: (item) => self.addItem(item),
+        addStaticItem: (item) => self.addStaticItem(item),
+        addItemFromChest: (kind, x, y) => self.addItemFromChest(kind, x, y),
+        createItem: (kind, x, y) => self.createItem(kind, x, y),
+        createChest: (x, y, items) => self.createChest(x, y, items),
+        removeEntity: (entity) => self.removeEntity(entity)
       });
-
-      // Create all chest areas
-      _.each(self.map.chestAreas, function (a) {
-        var area = new ChestArea(a.id, a.x, a.y, a.w, a.h, a.tx, a.ty, a.i, self);
-        self.chestAreas.push(area);
-        area.onEmpty(self.handleEmptyChestArea.bind(self, area));
+      self.spawnManager.setBroadcaster({
+        pushToAdjacentGroups: (groupId, message) => self.pushToAdjacentGroups(groupId, message)
       });
+      self.spawnManager.setWorldContext(self);
 
-      // Spawn static chests
-      _.each(self.map.staticChests, function (chest) {
-        var c = self.createChest(chest.x, chest.y, chest.i);
-        self.addStaticItem(c);
+      // Initialize all spawn areas and entities
+      self.spawnManager.initializeAreas();
+
+      // Initialize game loop
+      self.gameLoop = new GameLoop(self.ups);
+      self.gameLoop.setSpatialContext({
+        processGroups: () => self.processGroups()
       });
-
-      // Spawn static entities
-      self.spawnStaticEntities();
-
-      // Set maximum number of entities contained in each chest area
-      _.each(self.chestAreas, function (area) {
-        area.setNumberOfEntities(area.entities.length);
+      self.gameLoop.setBroadcasterContext({
+        processQueues: () => self.processQueues()
       });
-    });
-
-    var regenCount = this.ups * 2;
-    var thoughtCount = this.ups * 15;  // Thoughts every 15 seconds
-    var updateCount = 0;
-    var thoughtUpdateCount = 0;
-    setInterval(function () {
-      self.processGroups();
-      self.processQueues();
-
-      if (updateCount < regenCount) {
-        updateCount += 1;
-      } else {
+      self.gameLoop.onRegen(() => {
         if (self.regen_callback) {
           self.regen_callback();
         }
-        updateCount = 0;
-      }
-
-      // Thought bubble tick (every ~15 seconds)
-      if (thoughtUpdateCount < thoughtCount) {
-        thoughtUpdateCount += 1;
-      } else {
+      });
+      self.gameLoop.onThought(() => {
         if (self.thought_callback) {
           self.thought_callback();
         }
-        thoughtUpdateCount = 0;
-      }
-    }, 1000 / this.ups);
+      });
+      self.gameLoop.start();
+    });
 
     console.info('' + this.id + ' created (capacity: ' + this.maxPlayers + ' players).');
 
@@ -540,35 +542,7 @@ export class World {
     }
   }
 
-  spawnStaticEntities() {
-    var self = this,
-      count = 0;
-
-    _.each(this.map.staticEntities, function (kindName, tid) {
-      var kind = Types.getKindFromString(kindName),
-        pos = self.map.tileIndexToGridPosition(tid);
-
-      if (Types.isNpc(kind)) {
-        self.addNpc(kind, pos.x + 1, pos.y);
-      }
-      if (Types.isMob(kind)) {
-        var mob = new Mob('7' + kind + count++, kind, pos.x + 1, pos.y);
-        mob.onRespawn(function () {
-          mob.isDead = false;
-          self.addMob(mob);
-          if (mob.area && mob.area instanceof ChestArea) {
-            mob.area.addToArea(mob);
-          }
-        });
-        mob.onMove(self.onMobMoveCallback.bind(self));
-        self.addMob(mob);
-        self.tryAddingMobToChestArea(mob);
-      }
-      if (Types.isItem(kind)) {
-        self.addStaticItem(self.createItem(kind, pos.x + 1, pos.y));
-      }
-    });
-  }
+  // spawnStaticEntities() moved to SpawnManager
 
   isValidPosition(x, y) {
     if (this.map && _.isNumber(x) && _.isNumber(y) && !this.map.isOutOfBounds(x, y) && !this.map.isColliding(x, y)) {
@@ -631,133 +605,30 @@ export class World {
     return pos;
   }
 
-  initZoneGroups() {
-    var self = this;
-
-    this.map.forEachGroup(function (id) {
-      self.groups[id] = {
-        entities: {},
-        players: [],
-        incoming: []
-      };
-    });
-    this.zoneGroupsReady = true;
-  }
+  // Spatial group methods - delegate to SpatialManager
 
   removeFromGroups(entity) {
-    var self = this,
-      oldGroups = [];
-
-    if (entity && entity.group) {
-
-      var group = this.groups[entity.group];
-      // Check type instead of instanceof to support AIPlayer
-      if (entity.type === 'player') {
-        group.players = _.reject(group.players, function (id) {
-          return id === entity.id;
-        });
-      }
-
-      this.map.forEachAdjacentGroup(entity.group, function (id) {
-        if (entity.id in self.groups[id].entities) {
-          delete self.groups[id].entities[entity.id];
-          oldGroups.push(id);
-        }
-      });
-      entity.group = null;
-    }
-    return oldGroups;
+    return this.spatialManager?.removeFromGroups(entity) ?? [];
   }
 
-  /**
-   * Registers an entity as "incoming" into several groups, meaning that it just entered them.
-   * All players inside these groups will receive a Spawn message when WorldServer.processGroups is called.
-   */
   addAsIncomingToGroup(entity, groupId) {
-    var self = this,
-      isChest = entity && entity instanceof Chest,
-      isItem = entity && entity instanceof Item,
-      isDroppedItem = entity && isItem && !entity.isStatic && !entity.isFromChest;
-
-    if (entity && groupId) {
-      this.map.forEachAdjacentGroup(groupId, function (id) {
-        var group = self.groups[id];
-
-        if (group) {
-          if (!_.include(group.entities, entity.id)
-            //  Items dropped off of mobs are handled differently via DROP messages. See handleHurtEntity.
-            && (!isItem || isChest || (isItem && !isDroppedItem))) {
-            group.incoming.push(entity);
-          }
-        }
-      });
-    }
+    this.spatialManager?.addAsIncomingToGroup(entity, groupId);
   }
 
   addToGroup(entity, groupId) {
-    var self = this,
-      newGroups = [];
-
-    if (entity && groupId && (groupId in this.groups)) {
-      this.map.forEachAdjacentGroup(groupId, function (id) {
-        self.groups[id].entities[entity.id] = entity;
-        newGroups.push(id);
-      });
-      entity.group = groupId;
-
-      // Check type instead of instanceof to support AIPlayer
-      if (entity.type === 'player') {
-        this.groups[groupId].players.push(entity.id);
-      }
-    }
-    return newGroups;
+    return this.spatialManager?.addToGroup(entity, groupId) ?? [];
   }
 
   logGroupPlayers(groupId) {
-    console.debug('Players inside group ' + groupId + ':');
-    _.each(this.groups[groupId].players, function (id) {
-      console.debug('- player ' + id);
-    });
+    this.spatialManager?.logGroupPlayers(groupId);
   }
 
   handleEntityGroupMembership(entity) {
-    var hasChangedGroups = false;
-    if (entity) {
-      var groupId = this.map.getGroupIdFromPosition(entity.x, entity.y);
-      if (!entity.group || (entity.group && entity.group !== groupId)) {
-        hasChangedGroups = true;
-        this.addAsIncomingToGroup(entity, groupId);
-        var oldGroups = this.removeFromGroups(entity);
-        var newGroups = this.addToGroup(entity, groupId);
-
-        if (_.size(oldGroups) > 0) {
-          entity.recentlyLeftGroups = _.difference(oldGroups, newGroups);
-          console.debug('group diff: ' + entity.recentlyLeftGroups);
-        }
-      }
-    }
-    return hasChangedGroups;
+    return this.spatialManager?.handleEntityGroupMembership(entity) ?? false;
   }
 
   processGroups() {
-    var self = this;
-
-    if (this.zoneGroupsReady) {
-      this.map.forEachGroup(function (id) {
-        var spawns = [];
-        if (self.groups[id].incoming.length > 0) {
-          spawns = _.each(self.groups[id].incoming, function (entity) {
-            // Check type instead of instanceof to support AIPlayer
-            if (entity.type === 'player') {
-              self.pushToGroup(id, new Messages.Spawn(entity), entity.id);
-            } else {
-              self.pushToGroup(id, new Messages.Spawn(entity));
-            }
-          });
-          self.groups[id].incoming = [];
-        }
-      });
-    }
+    this.spatialManager?.processGroups();
   }
 
   moveEntity(entity, x, y) {
@@ -767,81 +638,30 @@ export class World {
     }
   }
 
-  handleItemDespawn(item) {
-    var self = this;
+  // Spawn methods - delegate to SpawnManager
 
-    if (item) {
-      item.handleDespawn({
-        beforeBlinkDelay: 10000,
-        blinkCallback() {
-          self.pushToAdjacentGroups(item.group, new Messages.Blink(item));
-        },
-        blinkingDuration: 4000,
-        despawnCallback() {
-          self.pushToAdjacentGroups(item.group, new Messages.Destroy(item));
-          self.removeEntity(item);
-        }
-      });
-    }
+  handleItemDespawn(item) {
+    this.spawnManager?.handleItemDespawn(item);
   }
 
   handleEmptyMobArea(area) {
-
+    this.spawnManager?.handleEmptyMobArea(area);
   }
 
   handleEmptyChestArea(area) {
-    if (area) {
-      var chest = this.addItem(this.createChest(area.chestX, area.chestY, area.items));
-      this.handleChestDespawn(chest);  // Use longer timer for chests
-    }
+    this.spawnManager?.handleEmptyChestArea(area);
   }
 
-  // Chests get a much longer despawn timer than regular items
   handleChestDespawn(chest) {
-    var self = this;
-
-    if (chest) {
-      chest.handleDespawn({
-        beforeBlinkDelay: 60000,  // 60 seconds before blinking (was 10)
-        blinkCallback() {
-          self.pushToAdjacentGroups(chest.group, new Messages.Blink(chest));
-        },
-        blinkingDuration: 10000,  // 10 seconds of blinking (was 4)
-        despawnCallback() {
-          self.pushToAdjacentGroups(chest.group, new Messages.Destroy(chest));
-          self.removeEntity(chest);
-        }
-      });
-    }
+    this.spawnManager?.handleChestDespawn(chest);
   }
 
   handleOpenedChest(chest, player) {
-    var chestGroup = chest.group;  // Save group before removing
-    console.log('[Chest] Opening chest', chest.id, 'at', chest.x, chest.y);
-    console.log('[Chest] Chest items:', chest.items);
-    this.pushToAdjacentGroups(chestGroup, chest.despawn());
-    this.removeEntity(chest);
-
-    var kind = chest.getRandomItem();
-    console.log('[Chest] Random item kind:', kind);
-    if (kind) {
-      var item = this.addItemFromChest(kind, chest.x, chest.y);
-      console.log('[Chest] Created item', item.id, 'of kind', kind, 'at', chest.x, chest.y);
-      // Push to adjacent groups - player is already in these groups, so they'll receive it
-      // NOTE: Removed redundant pushToPlayer() which caused duplicate spawn messages
-      this.pushToAdjacentGroups(chestGroup, new Messages.Spawn(item));
-      this.handleItemDespawn(item);
-    } else {
-      console.log('[Chest] No item dropped - chest.items was:', chest.items);
-    }
+    this.spawnManager?.handleOpenedChest(chest, player);
   }
 
   tryAddingMobToChestArea(mob) {
-    _.each(this.chestAreas, function (area) {
-      if (area.contains(mob)) {
-        area.addToArea(mob);
-      }
-    });
+    this.spawnManager?.tryAddingMobToChestArea(mob);
   }
 
   updatePopulation(totalPlayers) {
