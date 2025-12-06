@@ -26,6 +26,7 @@ import {Entity} from './entity/entity';
 import {Renderer} from './renderer/renderer';
 import {GridManager} from './world/grid-manager';
 import {EntityManager} from './entities/entity-manager';
+import {InputManager} from './input/input-manager';
 
 export class Game {
 
@@ -47,6 +48,7 @@ export class Game {
   // Game state
   entityManager: EntityManager | null = null;
   gridManager: GridManager | null = null;
+  inputManager: InputManager | null = null;
 
   // Entity accessors (delegate to entityManager)
   get entities() { return this.entityManager?.entities ?? {}; }
@@ -57,21 +59,31 @@ export class Game {
   get pathingGrid() { return this.gridManager?.pathingGrid ?? null; }
   get renderingGrid() { return this.gridManager?.renderingGrid ?? null; }
   get itemGrid() { return this.gridManager?.itemGrid ?? null; }
-  currentCursor = null;
-  currentCursorOrientation;
-  mouse = {x: 0, y: 0};
-  zoningQueue = [];
-  previousClickPosition: any = {};
 
-  selectedX = 0;
-  selectedY = 0;
-  selectedCellVisible = false;
-  targetColor = 'rgba(255, 255, 255, 0.5)';
-  targetCellVisible = true;
-  hoveringTarget = false;
-  hoveringMob = false;
-  hoveringItem = false;
-  hoveringCollidingTile = false;
+  // Input accessors (delegate to inputManager)
+  get currentCursor() { return this.inputManager?.currentCursor ?? null; }
+  get currentCursorOrientation() { return this.inputManager?.currentCursorOrientation; }
+  get mouse() { return this.inputManager?.mouse ?? { x: 0, y: 0 }; }
+  get previousClickPosition() { return this.inputManager?.previousClickPosition ?? { x: -1, y: -1 }; }
+  set previousClickPosition(pos) { if (this.inputManager) this.inputManager.previousClickPosition = pos; }
+  get selectedX() { return this.inputManager?.selectedX ?? 0; }
+  set selectedX(val) { if (this.inputManager) this.inputManager.selectedX = val; }
+  get selectedY() { return this.inputManager?.selectedY ?? 0; }
+  set selectedY(val) { if (this.inputManager) this.inputManager.selectedY = val; }
+  get selectedCellVisible() { return this.inputManager?.selectedCellVisible ?? false; }
+  set selectedCellVisible(val) { if (this.inputManager) this.inputManager.selectedCellVisible = val; }
+  get targetColor() { return this.inputManager?.targetColor ?? 'rgba(255, 255, 255, 0.5)'; }
+  get targetCellVisible() { return this.inputManager?.targetCellVisible ?? true; }
+  get hoveringTarget() { return this.inputManager?.hoveringTarget ?? false; }
+  get hoveringMob() { return this.inputManager?.hoveringMob ?? false; }
+  get hoveringItem() { return this.inputManager?.hoveringItem ?? false; }
+  get hoveringCollidingTile() { return this.inputManager?.hoveringCollidingTile ?? false; }
+  get hoveringNpc() { return this.inputManager?.hoveringNpc ?? false; }
+  get hoveringChest() { return this.inputManager?.hoveringChest ?? false; }
+  get hoveringPlateauTile() { return this.inputManager?.hoveringPlateauTile ?? false; }
+  get lastHovered() { return this.inputManager?.lastHovered ?? null; }
+
+  zoningQueue = [];
 
 
   currentZoning = null;
@@ -103,10 +115,6 @@ export class Game {
   spritesets;
   currentTime;
 
-  hoveringNpc;
-  hoveringChest;
-  lastHovered;
-  hoveringPlateauTile;
   camera: Camera;
 
   host;
@@ -320,42 +328,11 @@ export class Game {
   }
 
   setCursor(name, orientation?) {
-    if (name in this.cursors) {
-      this.currentCursor = this.cursors[name];
-      this.currentCursorOrientation = orientation;
-    } else {
-      console.error('Unknown cursor name :' + name);
-    }
+    this.inputManager?.setCursor(name, orientation);
   }
 
   updateCursorLogic() {
-    if (this.hoveringCollidingTile && this.started) {
-      this.targetColor = 'rgba(255, 50, 50, 0.5)';
-    }
-    else {
-      this.targetColor = 'rgba(255, 255, 255, 0.5)';
-    }
-
-    if (this.hoveringMob && this.started) {
-      this.setCursor('sword');
-      this.hoveringTarget = false;
-      this.targetCellVisible = false;
-    }
-    else if (this.hoveringNpc && this.started) {
-      this.setCursor('talk');
-      this.hoveringTarget = false;
-      this.targetCellVisible = false;
-    }
-    else if ((this.hoveringItem || this.hoveringChest) && this.started) {
-      this.setCursor('loot');
-      this.hoveringTarget = false;
-      this.targetCellVisible = true;
-    }
-    else {
-      this.setCursor('hand');
-      this.hoveringTarget = false;
-      this.targetCellVisible = true;
-    }
+    this.inputManager?.updateCursorLogic();
   }
 
   focusPlayer() {
@@ -531,6 +508,21 @@ export class Game {
         self.entityManager.setDirtyRectCallback((rect, entity, x, y) => {
           self.checkOtherDirtyRects(rect, entity, x, y);
         });
+
+        // Initialize input manager
+        self.inputManager = new InputManager();
+        self.inputManager.setRenderer(self.renderer);
+        self.inputManager.setMap(self.map);
+        self.inputManager.setEntityQuery({
+          isMobAt: (x, y) => self.isMobAt(x, y),
+          isItemAt: (x, y) => self.isItemAt(x, y),
+          isNpcAt: (x, y) => self.isNpcAt(x, y),
+          isChestAt: (x, y) => self.isChestAt(x, y),
+          getEntityAt: (x, y) => self.getEntityAt(x, y)
+        });
+        self.inputManager.setPlayerProvider(() => self.player);
+        self.inputManager.setGameStartedProvider(() => self.started);
+        self.inputManager.setCursors(self.cursors);
 
         self.setPathfinder(new Pathfinder(self.map.width, self.map.height));
 
@@ -958,7 +950,7 @@ export class Game {
             console.info(chest.id + ' was removed');
             self.removeEntity(chest);
             self.removeFromRenderingGrid(chest, chest.gridX, chest.gridY);
-            self.previousClickPosition = {};
+            self.previousClickPosition = { x: -1, y: -1 };
           });
         });
       });
@@ -1114,7 +1106,7 @@ export class Game {
 
           if (entity.gridX === self.previousClickPosition.x
             && entity.gridY === self.previousClickPosition.y) {
-            self.previousClickPosition = {};
+            self.previousClickPosition = { x: -1, y: -1 };
           }
 
           if (entity instanceof Item) {
@@ -1467,17 +1459,7 @@ export class Game {
    * @returns {Object} An object containing x and y properties.
    */
   getMouseGridPosition() {
-    var mx = this.mouse.x,
-      my = this.mouse.y,
-      c = this.renderer.camera,
-      s = this.renderer.scale,
-      ts = this.renderer.tilesize,
-      offsetX = mx % (ts * s),
-      offsetY = my % (ts * s),
-      x = ((mx - offsetX) / (ts * s)) + c.gridX,
-      y = ((my - offsetY) / (ts * s)) + c.gridY;
-
-    return {x: x, y: y};
+    return this.inputManager?.getMouseGridPosition() ?? { x: 0, y: 0 };
   }
 
   /**
@@ -1560,7 +1542,7 @@ export class Game {
     var self = this;
 
     if (npc) {
-      this.previousClickPosition = {};
+      this.previousClickPosition = { x: -1, y: -1 };
       this.tryUnlockingAchievement('SMALL_TALK');
 
       if (npc.kind === Types.Entities.RICK) {
@@ -1829,37 +1811,10 @@ export class Game {
   }
 
   /**
-   *
+   * Updates hover state based on current mouse position.
    */
   movecursor() {
-    var mouse = this.getMouseGridPosition(),
-      x = mouse.x,
-      y = mouse.y;
-
-    if (this.player && !this.renderer.mobile && !this.renderer.tablet) {
-      this.hoveringCollidingTile = this.map.isColliding(x, y);
-      this.hoveringPlateauTile = this.player.isOnPlateau ? !this.map.isPlateau(x, y) : this.map.isPlateau(x, y);
-      this.hoveringMob = this.isMobAt(x, y);
-      this.hoveringItem = this.isItemAt(x, y);
-      this.hoveringNpc = this.isNpcAt(x, y);
-      this.hoveringChest = this.isChestAt(x, y);
-
-      if (this.hoveringMob || this.hoveringNpc || this.hoveringChest) {
-        var entity = this.getEntityAt(x, y);
-
-        if (!entity.isHighlighted && this.renderer.supportsSilhouettes) {
-          if (this.lastHovered) {
-            this.lastHovered.setHighlight(false);
-          }
-          this.lastHovered = entity;
-          entity.setHighlight(true);
-        }
-      }
-      else if (this.lastHovered) {
-        this.lastHovered.setHighlight(false);
-        this.lastHovered = null;
-      }
-    }
+    this.inputManager?.updateHoverState();
   }
 
   /**
