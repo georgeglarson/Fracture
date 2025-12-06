@@ -7,6 +7,7 @@ import * as _ from 'lodash';
 import { Messages } from '../message.js';
 import { Types } from '../../../shared/ts/gametypes.js';
 import { getVeniceService } from '../ai/venice.service.js';
+import { getServerEventBus } from '../../../shared/ts/events/index.js';
 
 export interface Entity {
   id: string | number;
@@ -201,6 +202,18 @@ export class CombatSystem {
           bossType: isBoss ? mobType : undefined
         });
       }
+
+      // Emit mob:killed event for decoupled systems
+      const eventBus = getServerEventBus();
+      eventBus.emit('mob:killed', {
+        mobId: mob.id as number,
+        mobType: mob.kind,
+        mobName: mobType || 'unknown',
+        killerId: attacker.id as number,
+        killerName: attacker.name || 'unknown',
+        x: (mob as any).x ?? 0,
+        y: (mob as any).y ?? 0
+      });
     }
 
     // Despawn must be enqueued before the item drop
@@ -228,6 +241,17 @@ export class CombatSystem {
         killer: killerType
       });
     }
+
+    // Emit player:died event
+    const eventBus = getServerEventBus();
+    eventBus.emit('player:died', {
+      playerId: player.id as number,
+      playerName: player.name || 'unknown',
+      killerId: attacker?.id as number | undefined,
+      killerType: attacker?.kind,
+      x: (player as any).x ?? 0,
+      y: (player as any).y ?? 0
+    });
 
     this.handlePlayerVanish(player);
 

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@venice-dev-tools/core": "^2025.11.6",
+    "eventemitter3": "^5.0.1",
     "express": "^4.18.2",
     "jquery": "^3.7.1",
     "lodash": "3.10.1",
