@@ -53,6 +53,10 @@ export class GameClient {
   world_event_callback;
   news_callback;
 
+  // Progression system callbacks
+  xp_gain_callback;
+  level_up_callback;
+
   constructor(host, port) {
 
     this.host = host;
@@ -89,6 +93,10 @@ export class GameClient {
     this.handlers[Types.Messages.ENTITY_THOUGHT] = this.receiveEntityThought;
     this.handlers[Types.Messages.WORLD_EVENT] = this.receiveWorldEvent;
     this.handlers[Types.Messages.NEWS_RESPONSE] = this.receiveNewsResponse;
+
+    // Progression system handlers
+    this.handlers[Types.Messages.XP_GAIN] = this.receiveXpGain;
+    this.handlers[Types.Messages.LEVEL_UP] = this.receiveLevelUp;
 
     this.enable();
   }
@@ -776,5 +784,38 @@ export class GameClient {
   sendDropItem(itemType: string) {
     this.sendMessage([Types.Messages.DROP_ITEM,
       itemType]);
+  }
+
+  // Progression system receive methods
+  receiveXpGain(data) {
+    var amount = data[1],
+      currentXp = data[2],
+      xpToNext = data[3];
+
+    console.log('[XP] Gained ' + amount + ' XP (' + currentXp + '/' + xpToNext + ')');
+
+    if (this.xp_gain_callback) {
+      this.xp_gain_callback(amount, currentXp, xpToNext);
+    }
+  }
+
+  receiveLevelUp(data) {
+    var newLevel = data[1],
+      bonusHP = data[2],
+      bonusDamage = data[3];
+
+    console.log('[LevelUp] Reached level ' + newLevel + ' (+' + bonusHP + ' HP, +' + bonusDamage + ' dmg)');
+
+    if (this.level_up_callback) {
+      this.level_up_callback(newLevel, bonusHP, bonusDamage);
+    }
+  }
+
+  onXpGain(callback) {
+    this.xp_gain_callback = callback;
+  }
+
+  onLevelUp(callback) {
+    this.level_up_callback = callback;
   }
 }

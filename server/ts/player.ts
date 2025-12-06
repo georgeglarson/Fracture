@@ -11,6 +11,8 @@ import {Formulas} from './formulas';
 import {Properties} from './properties';
 import {Chest} from './chest';
 import {getVeniceService} from './ai';
+import {EquipmentManager} from './equipment/equipment-manager';
+import {EquipmentSlot, getSlotForKind} from '../../shared/ts/equipment/equipment-types';
 
 export class Player extends Character {
 
@@ -22,11 +24,21 @@ export class Player extends Character {
   disconnectTimeout = null;
   formatChecker: FormatChecker;
   name;
-  weapon;
-  weaponLevel;
-  armor;
-  armorLevel;
   firepotionTimeout;
+
+  // Equipment management (unified handling of all equipment slots)
+  private equipment: EquipmentManager = new EquipmentManager();
+
+  // Legacy accessors for backward compatibility
+  get weapon(): number { return this.equipment.weapon; }
+  get armor(): number { return this.equipment.armor; }
+  get weaponLevel(): number { return this.equipment.weaponLevel; }
+  get armorLevel(): number { return this.equipment.armorLevel; }
+
+  // Progression system
+  level: number = 1;
+  xp: number = 0;
+  xpToNext: number = 100;  // Formulas.xpToNextLevel(1)
 
   zone_callback;
   move_callback;
@@ -377,31 +389,27 @@ export class Player extends Character {
   }
 
   equipArmor(kind) {
-    this.armor = kind;
-    this.armorLevel = Properties.getArmorLevel(kind);
+    this.equipment.equipToSlot('armor', kind);
   }
 
   equipWeapon(kind) {
-    this.weapon = kind;
-    this.weaponLevel = Properties.getWeaponLevel(kind);
+    this.equipment.equipToSlot('weapon', kind);
   }
 
   equipItem(item) {
     if (item) {
       console.debug(this.name + ' equips ' + Types.getKindAsString(item.kind));
 
-      if (Types.isArmor(item.kind)) {
-        this.equipArmor(item.kind);
+      const slot = this.equipment.equip(item.kind);
+      if (slot && slot === 'armor') {
         this.updateHitPoints();
         this.send(new Messages.HitPoints(this.maxHitPoints).serialize());
-      } else if (Types.isWeapon(item.kind)) {
-        this.equipWeapon(item.kind);
       }
     }
   }
 
   updateHitPoints() {
-    this.resetHitPoints(Formulas.hp(this.armorLevel));
+    this.resetHitPoints(Formulas.hp(this.armorLevel, this.level));
   }
 
   updatePosition() {
@@ -409,6 +417,61 @@ export class Player extends Character {
       var pos = this.requestpos_callback();
       this.setPosition(pos.x, pos.y);
     }
+  }
+
+  // ============================================================================
+  // PROGRESSION SYSTEM
+  // ============================================================================
+
+  /**
+   * Grant XP to the player, handling level ups
+   */
+  grantXP(amount: number) {
+    if (this.level >= Formulas.MAX_LEVEL) {
+      return; // Already max level
+    }
+
+    this.xp += amount;
+    console.log(`[XP] ${this.name} gained ${amount} XP (${this.xp}/${this.xpToNext})`);
+
+    // Send XP gain message to player
+    this.send(new Messages.XpGain(amount, this.xp, this.xpToNext).serialize());
+
+    // Check for level up
+    while (this.xp >= this.xpToNext && this.level < Formulas.MAX_LEVEL) {
+      this.levelUp();
+    }
+  }
+
+  /**
+   * Level up the player
+   */
+  private levelUp() {
+    this.xp -= this.xpToNext;
+    this.level++;
+    this.xpToNext = Formulas.xpToNextLevel(this.level);
+
+    const bonusHP = Formulas.levelBonusHP(this.level);
+    const bonusDamage = Formulas.levelBonusDamage(this.level);
+
+    console.log(`[LevelUp] ${this.name} reached level ${this.level}! (+${bonusHP} HP, +${bonusDamage} dmg)`);
+
+    // Update HP with new level bonus
+    this.updateHitPoints();
+
+    // Send level up message
+    this.send(new Messages.LevelUp(this.level, bonusHP, bonusDamage).serialize());
+    this.send(new Messages.HitPoints(this.maxHitPoints).serialize());
+  }
+
+  /**
+   * Set player level directly (for restoring from save)
+   */
+  setLevel(level: number, xp: number = 0) {
+    this.level = Math.min(Math.max(1, level), Formulas.MAX_LEVEL);
+    this.xp = xp;
+    this.xpToNext = Formulas.xpToNextLevel(this.level);
+    this.updateHitPoints();
   }
 
   onRequestPosition(callback) {
@@ -608,59 +671,36 @@ export class Player extends Character {
     }
   }
 
-  // Handle dropping currently equipped item
+  // Handle dropping currently equipped item (unified for all slots)
   handleDropItem(itemType: string) {
-    console.log(`[Drop] ${this.name} dropping ${itemType}`);
+    const slot = itemType as EquipmentSlot;
+    console.log(`[Drop] ${this.name} dropping ${slot}`);
 
-    if (itemType === 'weapon') {
-      // Don't allow dropping the default weapon
-      if (this.weapon === Types.Entities.SWORD1) {
-        console.log('[Drop] Cannot drop default weapon');
-        return;
-      }
+    // Use unified drop - handles default check internally
+    const droppedKind = this.equipment.drop(slot);
+    if (!droppedKind) {
+      console.log(`[Drop] Cannot drop default ${slot}`);
+      return;
+    }
 
-      const droppedKind = this.weapon;
+    // Create item at player's position
+    const item = this.world.createItemWithProperties(droppedKind, this.x, this.y);
+    if (item) {
+      this.world.addItem(item);
+      this.broadcast(new Messages.Spawn(item), false);
+      console.log(`[Drop] Created item ${Types.getKindAsString(droppedKind)} at (${this.x}, ${this.y})`);
+    }
 
-      // Create item at player's position and add to world
-      const item = this.world.createItemWithProperties(droppedKind, this.x, this.y);
-      if (item) {
-        this.world.addItem(item);
-        // Broadcast the item spawn to all nearby players
-        this.broadcast(new Messages.Spawn(item), false);
-        console.log(`[Drop] Created item ${Types.getKindAsString(droppedKind)} at (${this.x}, ${this.y})`);
-      }
+    // Get the new default item that was auto-equipped
+    const newKind = this.equipment.getEquipped(slot);
 
-      // Reset to default weapon
-      this.equipWeapon(Types.Entities.SWORD1);
-      // Tell the player themselves to switch weapons
-      this.send(this.equip(Types.Entities.SWORD1).serialize());
-      // Tell other players about the equipment change
-      this.broadcast(this.equip(Types.Entities.SWORD1));
+    // Tell the player and others about the equipment change
+    this.send(this.equip(newKind).serialize());
+    this.broadcast(this.equip(newKind));
 
-    } else if (itemType === 'armor') {
-      // Don't allow dropping default armor
-      if (this.armor === Types.Entities.CLOTHARMOR) {
-        console.log('[Drop] Cannot drop default armor');
-        return;
-      }
-
-      const droppedKind = this.armor;
-
-      // Create item at player's position
-      const item = this.world.createItemWithProperties(droppedKind, this.x, this.y);
-      if (item) {
-        this.world.addItem(item);
-        this.broadcast(new Messages.Spawn(item), false);
-        console.log(`[Drop] Created item ${Types.getKindAsString(droppedKind)} at (${this.x}, ${this.y})`);
-      }
-
-      // Reset to default armor
-      this.equipArmor(Types.Entities.CLOTHARMOR);
+    // Update HP if armor changed
+    if (slot === 'armor') {
       this.updateHitPoints();
-      // Tell the player themselves to switch armor
-      this.send(this.equip(Types.Entities.CLOTHARMOR).serialize());
-      // Tell other players about the equipment change
-      this.broadcast(this.equip(Types.Entities.CLOTHARMOR));
       this.send(new Messages.HitPoints(this.maxHitPoints).serialize());
     }
   }

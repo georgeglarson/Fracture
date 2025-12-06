@@ -27,6 +27,11 @@ export class Storage {
         totalKills: 0,
         totalDmg: 0,
         totalRevives: 0
+      },
+      progression: {
+        level: 1,
+        xp: 0,
+        xpToNext: 100
       }
     };
   }
@@ -163,6 +168,42 @@ export class Storage {
       this.data.achievements.totalRevives++;
       this.save();
     }
+  }
+
+  // Progression System
+
+  getProgression() {
+    // Initialize progression if it doesn't exist (for existing players)
+    if (!this.data.progression) {
+      this.data.progression = {
+        level: 1,
+        xp: 0,
+        xpToNext: 100
+      };
+    }
+    return this.data.progression;
+  }
+
+  saveProgression(level: number, xp: number, xpToNext: number) {
+    if (!this.data.progression) {
+      this.data.progression = { level: 1, xp: 0, xpToNext: 100 };
+    }
+    this.data.progression.level = level;
+    this.data.progression.xp = xp;
+    this.data.progression.xpToNext = xpToNext;
+    this.save();
+  }
+
+  getLevel() {
+    return this.getProgression().level;
+  }
+
+  getXp() {
+    return this.getProgression().xp;
+  }
+
+  getXpToNext() {
+    return this.getProgression().xpToNext;
   }
 
 }

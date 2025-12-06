@@ -18,7 +18,6 @@ import {Npc} from './entity/character/npc/npc';
 import {AudioManager} from './audio';
 import {InfoManager} from './interface/info.manager';
 import {GameClient} from './network/gameclient';
-import {Transition} from './utils/transition';
 import {Mobs} from './entity/character/mob/mobs';
 import {Exceptions} from './exceptions';
 import _ from 'lodash';
@@ -30,6 +29,9 @@ import {EntityManager} from './entities/entity-manager';
 import {InputManager} from './input/input-manager';
 import {UIManager} from './ui/ui-manager';
 import {ItemTooltip} from './ui/item-tooltip';
+import {setupNetworkHandlers} from './network/message-handlers';
+import {ZoningManager} from './world/zoning-manager';
+import {SpriteLoader} from './assets/sprite-loader';
 
 export class Game {
 
@@ -55,6 +57,8 @@ export class Game {
   mapQueryService: MapQueryService | null = null;
   uiManager: UIManager | null = null;
   itemTooltip: ItemTooltip | null = null;
+  zoningManager: ZoningManager | null = null;
+  spriteLoader: SpriteLoader | null = null;
 
   // Entity accessors (delegate to entityManager)
   get entities() { return this.entityManager?.entities ?? {}; }
@@ -89,10 +93,9 @@ export class Game {
   get hoveringPlateauTile() { return this.inputManager?.hoveringPlateauTile ?? false; }
   get lastHovered() { return this.inputManager?.lastHovered ?? null; }
 
-  zoningQueue = [];
-
-
-  currentZoning = null;
+  // Zoning accessors (delegate to zoningManager)
+  get currentZoning() { return this.zoningManager?.getCurrentZoning() ?? null; }
+  get zoningOrientation() { return this.zoningManager?.orientation ?? null; }
 
   cursors = {};
 
@@ -104,21 +107,12 @@ export class Game {
   // debug
   debugPathing = false;
 
-  // sprites
-  spriteNames = ['hand', 'sword', 'loot', 'target', 'talk', 'sparks', 'shadow16', 'rat', 'skeleton', 'skeleton2', 'spectre', 'boss', 'deathknight',
-    'ogre', 'crab', 'snake', 'eye', 'bat', 'goblin', 'wizard', 'guard', 'king', 'villagegirl', 'villager', 'coder', 'agent', 'rick', 'scientist', 'nyan', 'priest',
-    'sorcerer', 'octocat', 'beachnpc', 'forestnpc', 'desertnpc', 'lavanpc', 'clotharmor', 'leatherarmor', 'mailarmor',
-    'platearmor', 'redarmor', 'goldenarmor', 'firefox', 'death', 'sword1', 'axe', 'chest',
-    'sword2', 'redsword', 'bluesword', 'goldensword', 'item-sword2', 'item-axe', 'item-redsword', 'item-bluesword', 'item-goldensword', 'item-leatherarmor', 'item-mailarmor',
-    'item-platearmor', 'item-redarmor', 'item-goldenarmor', 'item-flask', 'item-cake', 'item-burger', 'morningstar', 'item-morningstar', 'item-firepotion'];
-
   map;
   targetAnimation: Animation;
   sparksAnimation: Animation;
   storage: Storage;
   shadows;
   achievements;
-  spritesets;
   currentTime;
 
   camera: Camera;
@@ -131,7 +125,6 @@ export class Game {
   client;
   playerId;
   clearTarget;
-  zoningOrientation;
 
   // obsoleteEntities accessor (delegate to entityManager)
   get obsoleteEntities() { return this.entityManager?.obsoleteEntities ?? null; }
@@ -146,6 +139,13 @@ export class Game {
   notification_callback;
   playerhp_callback;
   unlock_callback;
+
+  // Progression system
+  playerxp_callback;
+  levelup_callback;
+  playerLevel: number = 1;
+  playerXp: number = 0;
+  playerXpToNext: number = 100;
 
   constructor(app: App) {
     this.app = app;
@@ -214,17 +214,11 @@ export class Game {
   }
 
   initShadows() {
-    this.shadows = {};
-    this.shadows['small'] = this.sprites['shadow16'];
+    this.shadows = this.spriteLoader?.initShadows() ?? {};
   }
 
   initCursors() {
-    this.cursors['hand'] = this.sprites['hand'];
-    this.cursors['sword'] = this.sprites['sword'];
-    this.cursors['loot'] = this.sprites['loot'];
-    this.cursors['target'] = this.sprites['target'];
-    this.cursors['arrow'] = this.sprites['arrow'];
-    this.cursors['talk'] = this.sprites['talk'];
+    this.cursors = this.spriteLoader?.initCursors() ?? {};
   }
 
   initAnimations() {
@@ -236,21 +230,11 @@ export class Game {
   }
 
   initHurtSprites() {
-    var self = this;
-
-    Types.forEachArmorKind(function (kind, kindName) {
-      self.sprites[kindName].createHurtSprite();
-    });
+    this.spriteLoader?.initHurtSprites();
   }
 
   initSilhouettes() {
-    var self = this;
-
-    Types.forEachMobOrNpcKind(function (kind, kindName) {
-      self.sprites[kindName].createSilhouette();
-    });
-    self.sprites['chest'].createSilhouette();
-    self.sprites['item-cake'].createSilhouette();
+    this.spriteLoader?.initSilhouettes();
   }
 
   initAchievements() {
@@ -286,51 +270,22 @@ export class Game {
     return found;
   }
 
-  loadSprite(name) {
-    if (this.renderer.upscaledRendering) {
-      this.spritesets[0][name] = new Sprite(name, 1);
-    } else {
-      this.spritesets[1][name] = new Sprite(name, 2);
-      if (!this.renderer.mobile && !this.renderer.tablet) {
-        this.spritesets[2][name] = new Sprite(name, 3);
-      }
-    }
-  }
-
   setSpriteScale(scale) {
-    var self = this;
-
-    if (this.renderer.upscaledRendering) {
-      this.sprites = this.spritesets[0];
-    } else {
-      this.sprites = this.spritesets[scale - 1];
-
-      _.each(this.entities, function (entity: Entity) {
-        entity.sprite = null;
-        entity.setSprite(self.sprites[entity.getSpriteName()]);
-      });
-      this.initHurtSprites();
-      this.initShadows();
-      this.initCursors();
-    }
+    if (!this.spriteLoader) return;
+    this.spriteLoader.setSpriteScale(scale);
+    this.sprites = this.spriteLoader.getSprites();
+    this.initHurtSprites();
+    this.initShadows();
+    this.initCursors();
   }
 
   loadSprites() {
-    console.info('Loading sprites...');
-    this.spritesets = [];
-    this.spritesets[0] = {};
-    this.spritesets[1] = {};
-    this.spritesets[2] = {};
-    _.map(this.spriteNames, this.loadSprite, this);
+    if (!this.spriteLoader) return;
+    this.spriteLoader.loadSprites();
   }
 
   spritesLoaded() {
-    if (_.any(this.sprites, function (sprite: Sprite) {
-        return !sprite.isLoaded;
-      })) {
-      return false;
-    }
-    return true;
+    return this.spriteLoader?.spritesLoaded() ?? false;
   }
 
   setCursor(name, orientation?) {
@@ -472,6 +427,13 @@ export class Game {
   run(started_callback) {
     var self = this;
 
+    // Initialize sprite loader
+    this.spriteLoader = new SpriteLoader();
+    this.spriteLoader.setContext({
+      renderer: this.renderer,
+      entities: this.entities
+    });
+
     this.loadSprites();
     this.setUpdater(new Updater(this));
     this.camera = this.renderer.camera;
@@ -553,6 +515,17 @@ export class Game {
 
         // Initialize item tooltip
         self.itemTooltip = new ItemTooltip();
+
+        // Initialize zoning manager
+        self.zoningManager = new ZoningManager();
+        self.zoningManager.setContext({
+          camera: self.camera,
+          renderer: self.renderer,
+          bubbleManager: self.bubbleManager,
+          client: self.client,
+          initAnimatedTiles: () => self.initAnimatedTiles(),
+          forEachVisibleEntityByDepth: (cb) => self.forEachVisibleEntityByDepth(cb)
+        });
 
         self.setPathfinder(new Pathfinder(self.map.width, self.map.height));
 
@@ -685,6 +658,18 @@ export class Game {
       } else {
         self.showNotification('Welcome back to BrowserQuest!');
         self.storage.setPlayerName(name);
+
+        // Load saved progression from localStorage
+        var savedProgression = self.storage.getProgression();
+        self.playerLevel = savedProgression.level;
+        self.playerXp = savedProgression.xp;
+        self.playerXpToNext = savedProgression.xpToNext;
+        console.info('[Progression] Loaded from storage: Level ' + self.playerLevel + ', XP ' + self.playerXp + '/' + self.playerXpToNext);
+
+        // Update UI with saved progression
+        if (self.playerxp_callback) {
+          self.playerxp_callback(self.playerXp, self.playerXpToNext, self.playerLevel);
+        }
       }
 
       self.player.onStartPathing(function (path) {
@@ -957,497 +942,9 @@ export class Game {
         self.player.switchArmor(self.sprites['firefox']);
       });
 
-      self.client.onSpawnItem(function (item, x, y) {
-        console.info('Spawned ' + Types.getKindAsString(item.kind) + ' (' + item.id + ') at ' + x + ', ' + y);
-        self.addItem(item, x, y);
-      });
+      // Setup all network message handlers (extracted to network/message-handlers.ts)
+      setupNetworkHandlers(self, self.client);
 
-      self.client.onSpawnChest(function (chest, x, y) {
-        console.info('Spawned chest (' + chest.id + ') at ' + x + ', ' + y);
-        chest.setSprite(self.sprites[chest.getSpriteName()]);
-        chest.setGridPosition(x, y);
-        chest.setAnimation('idle_down', 150);
-        self.addEntity(chest);
-
-        chest.onOpen(function () {
-          // Immediately unblock the path so items can be picked up
-          // The chest animation continues but doesn't block pathing
-          self.removeFromPathingGrid(chest.gridX, chest.gridY);
-
-          chest.stopBlinking();
-          chest.setSprite(self.sprites['death']);
-          chest.setAnimation('death', 120, 1, function () {
-            console.info(chest.id + ' was removed');
-            self.removeEntity(chest);
-            self.removeFromRenderingGrid(chest, chest.gridX, chest.gridY);
-            self.previousClickPosition = { x: -1, y: -1 };
-          });
-        });
-      });
-
-      self.client.onSpawnCharacter(function (entity, x, y, orientation, targetId) {
-        if (!self.entityIdExists(entity.id)) {
-          try {
-            if (entity.id !== self.playerId) {
-              entity.setSprite(self.sprites[entity.getSpriteName()]);
-              entity.setGridPosition(x, y);
-              entity.setOrientation(orientation);
-              entity.idle();
-
-              self.addEntity(entity);
-
-              console.debug('Spawned ' + Types.getKindAsString(entity.kind) + ' (' + entity.id + ') at ' + entity.gridX + ', ' + entity.gridY);
-
-              if (entity instanceof Character) {
-                entity.onBeforeStep(function () {
-                  self.unregisterEntityPosition(entity);
-                });
-
-                entity.onStep(function () {
-                  if (!entity.isDying) {
-                    self.registerEntityDualPosition(entity);
-
-                    entity.forEachAttacker(function (attacker) {
-                      if (attacker.isAdjacent(attacker.target)) {
-                        attacker.lookAtTarget();
-                      } else {
-                        attacker.follow(entity);
-                      }
-                    });
-                  }
-                });
-
-                entity.onStopPathing(function (x, y) {
-                  if (!entity.isDying) {
-                    if (entity.hasTarget() && entity.isAdjacent(entity.target)) {
-                      entity.lookAtTarget();
-                    }
-
-                    if (entity instanceof Player) {
-                      var gridX = entity.destination.gridX,
-                        gridY = entity.destination.gridY;
-
-                      if (self.map.isDoor(gridX, gridY)) {
-                        var dest = self.map.getDoorDestination(gridX, gridY);
-                        entity.setGridPosition(dest.x, dest.y);
-                      }
-                    }
-
-                    entity.forEachAttacker(function (attacker) {
-                      if (!attacker.isAdjacentNonDiagonal(entity) && attacker.id !== self.playerId) {
-                        attacker.follow(entity);
-                      }
-                    });
-
-                    self.unregisterEntityPosition(entity);
-                    self.registerEntityPosition(entity);
-                  }
-                });
-
-                entity.onRequestPath(function (x, y) {
-                  var ignored = [entity], // Always ignore self
-                    ignoreTarget = function (target) {
-                      ignored.push(target);
-
-                      // also ignore other attackers of the target entity
-                      target.forEachAttacker(function (attacker) {
-                        ignored.push(attacker);
-                      });
-                    };
-
-                  if (entity.hasTarget()) {
-                    ignoreTarget(entity.target);
-                  } else if (entity.previousTarget) {
-                    // If repositioning before attacking again, ignore previous target
-                    // See: tryMovingToADifferentTile()
-                    ignoreTarget(entity.previousTarget);
-                  }
-
-                  return self.findPath(entity, x, y, ignored);
-                });
-
-                entity.onDeath(function () {
-                  console.info(entity.id + ' is dead');
-
-                  if (entity instanceof Mob) {
-                    // Keep track of where mobs die in order to spawn their dropped items
-                    // at the right position later.
-                    self.entityManager?.recordDeathPosition(entity.id, entity.gridX, entity.gridY);
-                  }
-
-                  entity.isDying = true;
-                  entity.setSprite(self.sprites[entity instanceof Mobs.Rat ? 'rat' : 'death']);
-                  entity.animate('death', 120, 1, function () {
-                    console.info(entity.id + ' was removed');
-
-                    self.removeEntity(entity);
-                    self.removeFromRenderingGrid(entity, entity.gridX, entity.gridY);
-                  });
-
-                  entity.forEachAttacker(function (attacker) {
-                    attacker.disengage();
-                  });
-
-                  if (self.player.target && self.player.target.id === entity.id) {
-                    self.player.disengage();
-                  }
-
-                  // Upon death, this entity is removed from both grids, allowing the player
-                  // to click very fast in order to loot the dropped item and not be blocked.
-                  // The entity is completely removed only after the death animation has ended.
-                  self.removeFromEntityGrid(entity, entity.gridX, entity.gridY);
-                  self.removeFromPathingGrid(entity.gridX, entity.gridY);
-
-                  if (self.camera.isVisible(entity)) {
-                    self.audioManager.playSound('kill' + Math.floor(Math.random() * 2 + 1));
-                  }
-
-                  self.updateCursor();
-                });
-
-                entity.onHasMoved(function (entity) {
-                  self.assignBubbleTo(entity); // Make chat bubbles follow moving entities
-                });
-
-                if (entity instanceof Mob) {
-                  if (targetId) {
-                    var player = self.getEntityById(targetId);
-                    if (player) {
-                      self.createAttackLink(entity, player);
-                    }
-                  }
-                }
-              }
-            }
-          }
-          catch (e) {
-            console.error(e);
-          }
-        } else {
-          console.debug('Character ' + entity.id + ' already exists. Dont respawn.');
-        }
-      });
-
-      self.client.onDespawnEntity(function (entityId) {
-        var entity = self.getEntityById(entityId);
-
-        if (entity) {
-          console.info('Despawning ' + Types.getKindAsString(entity.kind) + ' (' + entity.id + ')');
-
-          if (entity.gridX === self.previousClickPosition.x
-            && entity.gridY === self.previousClickPosition.y) {
-            self.previousClickPosition = { x: -1, y: -1 };
-          }
-
-          if (entity instanceof Item) {
-            self.removeItem(entity);
-          } else if (entity instanceof Character) {
-            entity.forEachAttacker(function (attacker) {
-              if (attacker.canReachTarget()) {
-                attacker.hit();
-              }
-            });
-            entity.die();
-          } else if (entity instanceof Chest) {
-            entity.open();
-          }
-
-          entity.clean();
-        }
-      });
-
-      self.client.onItemBlink(function (id) {
-        var item = self.getEntityById(id);
-
-        if (item) {
-          item.blink(150);
-        }
-      });
-
-      self.client.onEntityMove(function (id, x, y) {
-        var entity = null;
-
-        if (id !== self.playerId) {
-          entity = self.getEntityById(id);
-
-          if (entity) {
-            if (self.player.isAttackedBy(entity)) {
-              self.tryUnlockingAchievement('COWARD');
-            }
-            entity.disengage();
-            entity.idle();
-            self.makeCharacterGoTo(entity, x, y);
-          }
-        }
-      });
-
-      self.client.onEntityDestroy(function (id) {
-        var entity = self.getEntityById(id);
-        if (entity) {
-          if (entity instanceof Item) {
-            self.removeItem(entity);
-          } else {
-            self.removeEntity(entity);
-          }
-          console.debug('Entity was destroyed: ' + entity.id);
-        }
-      });
-
-      self.client.onPlayerMoveToItem(function (playerId, itemId) {
-        var player, item;
-
-        if (playerId !== self.playerId) {
-          player = self.getEntityById(playerId);
-          item = self.getEntityById(itemId);
-
-          if (player && item) {
-            self.makeCharacterGoTo(player, item.gridX, item.gridY);
-          }
-        }
-      });
-
-      self.client.onEntityAttack(function (attackerId, targetId) {
-        var attacker = self.getEntityById(attackerId),
-          target = self.getEntityById(targetId);
-
-        if (attacker && target && attacker.id !== self.playerId) {
-          console.debug(attacker.id + ' attacks ' + target.id);
-
-          if (attacker && target instanceof Player && target.id !== self.playerId && target.target && target.target.id === attacker.id && attacker.getDistanceToEntity(target) < 3) {
-            setTimeout(function () {
-              self.createAttackLink(attacker, target);
-            }, 200); // delay to prevent other players attacking mobs from ending up on the same tile as they walk towards each other.
-          } else {
-            self.createAttackLink(attacker, target);
-          }
-        }
-      });
-
-      self.client.onPlayerDamageMob(function (mobId, points) {
-        var mob = self.getEntityById(mobId);
-        if (mob && points) {
-          self.infoManager.addDamageInfo(points, mob.x, mob.y - 15, 'inflicted');
-        }
-      });
-
-      self.client.onPlayerKillMob(function (kind) {
-        var mobName = Types.getKindAsString(kind);
-
-        if (mobName === 'skeleton2') {
-          mobName = 'greater skeleton';
-        }
-
-        if (mobName === 'eye') {
-          mobName = 'evil eye';
-        }
-
-        if (mobName === 'deathknight') {
-          mobName = 'death knight';
-        }
-
-        if (mobName === 'boss') {
-          self.showNotification('You killed the skeleton king');
-        } else {
-          if (_.include(['a', 'e', 'i', 'o', 'u'], mobName[0])) {
-            self.showNotification('You killed an ' + mobName);
-          } else {
-            self.showNotification('You killed a ' + mobName);
-          }
-        }
-
-        self.storage.incrementTotalKills();
-        self.tryUnlockingAchievement('HUNTER');
-
-        if (kind === Types.Entities.RAT) {
-          self.storage.incrementRatCount();
-          self.tryUnlockingAchievement('ANGRY_RATS');
-        }
-
-        if (kind === Types.Entities.SKELETON || kind === Types.Entities.SKELETON2) {
-          self.storage.incrementSkeletonCount();
-          self.tryUnlockingAchievement('SKULL_COLLECTOR');
-        }
-
-        if (kind === Types.Entities.BOSS) {
-          self.tryUnlockingAchievement('HERO');
-        }
-      });
-
-      self.client.onPlayerChangeHealth(function (points, isRegen) {
-        var player = self.player,
-          diff,
-          isHurt;
-
-        if (player && !player.isDead && !player.invincible) {
-          isHurt = points <= player.hitPoints;
-          diff = points - player.hitPoints;
-          player.hitPoints = points;
-
-          if (player.hitPoints <= 0) {
-            player.die();
-          }
-          if (isHurt) {
-            player.hurt();
-            self.infoManager.addDamageInfo(diff, player.x, player.y - 15, 'received');
-            self.audioManager.playSound('hurt');
-            self.storage.addDamage(-diff);
-            self.tryUnlockingAchievement('MEATSHIELD');
-            if (self.playerhurt_callback) {
-              self.playerhurt_callback();
-            }
-          } else if (!isRegen) {
-            self.infoManager.addDamageInfo('+' + diff, player.x, player.y - 15, 'healed');
-          }
-          self.updateBars();
-        }
-      });
-
-      self.client.onPlayerChangeMaxHitPoints(function (hp) {
-        self.player.maxHitPoints = hp;
-        self.player.hitPoints = hp;
-        self.updateBars();
-      });
-
-      self.client.onPlayerEquipItem(function (playerId, itemKind) {
-        var player = self.getEntityById(playerId),
-          itemName = Types.getKindAsString(itemKind);
-
-        if (player) {
-          if (Types.isArmor(itemKind)) {
-            player.setSprite(self.sprites[itemName]);
-          } else if (Types.isWeapon(itemKind)) {
-            player.setWeaponName(itemName);
-          }
-        }
-      });
-
-      self.client.onPlayerTeleport(function (id, x, y) {
-        var entity = null,
-          currentOrientation;
-
-        if (id !== self.playerId) {
-          entity = self.getEntityById(id);
-
-          if (entity) {
-            currentOrientation = entity.orientation;
-
-            self.makeCharacterTeleportTo(entity, x, y);
-            entity.setOrientation(currentOrientation);
-
-            entity.forEachAttacker(function (attacker) {
-              attacker.disengage();
-              attacker.idle();
-              attacker.stop();
-            });
-          }
-        }
-      });
-
-      self.client.onDropItem(function (item, mobId) {
-        var pos = self.getDeadMobPosition(mobId);
-
-        if (pos) {
-          self.addItem(item, pos.x, pos.y);
-          self.updateCursor();
-        }
-      });
-
-      self.client.onChatMessage(function (entityId, message) {
-        var entity = self.getEntityById(entityId);
-        self.createBubble(entityId, message);
-        self.assignBubbleTo(entity);
-        self.audioManager.playSound('chat');
-      });
-
-      self.client.onPopulationChange(function (worldPlayers, totalPlayers) {
-        if (self.nbplayers_callback) {
-          self.nbplayers_callback(worldPlayers, totalPlayers);
-        }
-      });
-
-      // Venice AI: NPC dialogue response
-      self.client.onNpcTalkResponse(function (npcKind, response) {
-        if (self.currentNpcTalk) {
-          var npc = self.currentNpcTalk;
-          self.currentNpcTalk = null;
-          if (response) {
-            self.createBubble(npc.id, response);
-            self.assignBubbleTo(npc);
-            self.audioManager.playSound('npc');
-          }
-        }
-      });
-
-      // Venice AI: Companion hints
-      self.client.onCompanionHint(function (hint) {
-        if (hint && self.player) {
-          // Show as a speech bubble from the player (like a fairy companion)
-          self.createBubble(self.player.id, '\u2728 ' + hint);
-          self.assignBubbleTo(self.player);
-        }
-      });
-
-      // Venice AI: Quest offers
-      self.client.onQuestOffer(function (quest) {
-        if (quest && self.notification_callback) {
-          self.notification_callback('Quest: ' + quest.description);
-          self.currentQuest = quest;
-        }
-      });
-
-      // Venice AI: Quest completion
-      self.client.onQuestComplete(function (result) {
-        if (result && self.notification_callback) {
-          self.notification_callback('Quest Complete! Reward: ' + result.reward);
-          self.currentQuest = null;
-        }
-      });
-
-      // Venice AI: Item lore on pickup
-      self.client.onItemLore(function (itemKind, lore) {
-        if (lore && self.notification_callback) {
-          var itemName = Types.getKindAsString(itemKind);
-          self.notification_callback(itemName + ': ' + lore);
-        }
-      });
-
-      // Venice AI: Dynamic World Narrator
-      self.client.onNarrator(function (text, style) {
-        if (text) {
-          self.showNarratorText(text, style);
-        }
-      });
-
-      // Venice AI: Entity Thought Bubbles ("Ant Farm" feature)
-      self.client.onEntityThought(function (entityId, thought, state) {
-        console.log('[Thought] Received for entity', entityId, ':', thought);
-        var entity = self.getEntityById(entityId);
-        if (entity) {
-          // Store the thought on the entity for rendering
-          entity.currentThought = thought;
-          entity.thoughtState = state;
-          entity.thoughtTime = Date.now();
-
-          console.log('[Thought] Set on', entity.kind, '(id:', entityId, '):', thought);
-        } else {
-          console.warn('[Thought] Entity not found:', entityId, '- thought discarded');
-        }
-      });
-
-      // Town Crier: Newspaper response
-      self.client.onNewsResponse(function (headlines) {
-        console.log('[TownCrier] Showing newspaper with', headlines.length, 'headlines');
-        self.showNewspaper(headlines);
-      });
-
-      self.client.onDisconnected(function (message) {
-        if (self.player) {
-          self.player.die();
-        }
-        if (self.disconnect_callback) {
-          self.disconnect_callback(message);
-        }
-      });
 
       self.gamestart_callback();
 
@@ -2010,108 +1507,25 @@ export class Game {
     }
   }
 
-  /**
-   *
-   */
+  // Zoning methods - delegate to zoningManager
   isZoningTile(x, y) {
-    var c = this.camera;
-
-    x = x - c.gridX;
-    y = y - c.gridY;
-
-    if (x === 0 || y === 0 || x === c.gridW - 1 || y === c.gridH - 1) {
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   *
-   */
-  getZoningOrientation(x, y) {
-    var orientation = '',
-      c = this.camera;
-
-    x = x - c.gridX;
-    y = y - c.gridY;
-
-    if (x === 0) {
-      orientation = Types.Orientations.LEFT;
-    }
-    else if (y === 0) {
-      orientation = Types.Orientations.UP;
-    }
-    else if (x === c.gridW - 1) {
-      orientation = Types.Orientations.RIGHT;
-    }
-    else if (y === c.gridH - 1) {
-      orientation = Types.Orientations.DOWN;
-    }
-
-    return orientation;
-  }
-
-  startZoningFrom(x, y) {
-    this.zoningOrientation = this.getZoningOrientation(x, y);
-
-    if (this.renderer.mobile || this.renderer.tablet) {
-      var z = this.zoningOrientation,
-        c = this.camera,
-        ts = this.renderer.tilesize,
-        x = c.x,
-        y = c.y,
-        xoffset = (c.gridW - 2) * ts,
-        yoffset = (c.gridH - 2) * ts;
-
-      if (z === Types.Orientations.LEFT || z === Types.Orientations.RIGHT) {
-        x = (z === Types.Orientations.LEFT) ? c.x - xoffset : c.x + xoffset;
-      } else if (z === Types.Orientations.UP || z === Types.Orientations.DOWN) {
-        y = (z === Types.Orientations.UP) ? c.y - yoffset : c.y + yoffset;
-      }
-      c.setPosition(x, y);
-
-      this.renderer.clearScreen(this.renderer.context);
-      this.endZoning();
-
-      // Force immediate drawing of all visible entities in the new zone
-      this.forEachVisibleEntityByDepth(function (entity) {
-        entity.setDirty();
-      });
-    }
-    else {
-      this.currentZoning = new Transition();
-    }
-    this.bubbleManager.clean();
-    this.client.sendZone();
+    return this.zoningManager?.isZoningTile(x, y) ?? false;
   }
 
   enqueueZoningFrom(x, y) {
-    this.zoningQueue.push({x: x, y: y});
-
-    if (this.zoningQueue.length === 1) {
-      this.startZoningFrom(x, y);
-    }
+    this.zoningManager?.enqueueZoningFrom(x, y);
   }
 
   endZoning() {
-    this.currentZoning = null;
-    this.resetZone();
-    this.zoningQueue.shift();
-
-    if (this.zoningQueue.length > 0) {
-      var pos = this.zoningQueue[0];
-      this.startZoningFrom(pos.x, pos.y);
-    }
+    this.zoningManager?.endZoning();
   }
 
   isZoning() {
-    return !_.isNull(this.currentZoning);
+    return this.zoningManager?.isZoning() ?? false;
   }
 
   resetZone() {
-    this.bubbleManager.clean();
-    this.initAnimatedTiles();
-    this.renderer.renderStaticCanvases();
+    this.zoningManager?.resetZone();
   }
 
   resetCamera() {
@@ -2222,6 +1636,14 @@ export class Game {
 
   onPlayerInvincible(callback) {
     this.invincible_callback = callback
+  }
+
+  onPlayerXpChange(callback) {
+    this.playerxp_callback = callback;
+  }
+
+  onPlayerLevelUp(callback) {
+    this.levelup_callback = callback;
   }
 
   resize() {

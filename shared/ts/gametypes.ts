@@ -44,7 +44,9 @@ export const Types: any = {
     WORLD_EVENT: 37,  // Faction director announcements
     NEWS_REQUEST: 38,  // Player requests town crier newspaper
     NEWS_RESPONSE: 39,  // Server sends newspaper headlines
-    DROP_ITEM: 40  // Player drops currently equipped item
+    DROP_ITEM: 40,  // Player drops currently equipped item
+    XP_GAIN: 41,    // Player gains XP [41, amount, currentXP, xpToNext]
+    LEVEL_UP: 42    // Player levels up [42, newLevel, bonusHP, bonusDamage]
   },
 
   Entities: {

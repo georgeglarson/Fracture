@@ -10,6 +10,10 @@ const damageInfoColors = {
   'healed': {
     fill: 'rgb(80, 255, 80)',
     stroke: 'rgb(50, 120, 50)'
+  },
+  'xp': {
+    fill: 'rgb(255, 215, 0)',  // Gold color for XP
+    stroke: 'rgb(180, 150, 0)'
   }
 };
 

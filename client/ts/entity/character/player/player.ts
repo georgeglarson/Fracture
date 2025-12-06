@@ -1,6 +1,9 @@
 import {Character} from '../character';
 import {Types} from '../../../../../shared/ts/gametypes';
 import {Exceptions} from '../../../exceptions';
+import {ClientEquipmentManager} from '../../../equipment/equipment-manager';
+import {Sprite} from '../../../renderer/sprite';
+import {getSlotForKind, getRank} from '../../../../../shared/ts/equipment/equipment-types';
 
 export class Player extends Character {
   MAX_LEVEL: 10;
@@ -14,13 +17,13 @@ export class Player extends Character {
 
   // modes
   isLootMoving = false;
-  isSwitchingWeapon = true;
+
+  // Equipment management (unified handling)
+  private equipment: ClientEquipmentManager = new ClientEquipmentManager();
 
   currentArmorSprite;
   invincible;
-  switchingWeapon;
   switch_callback;
-  isSwitchingArmor;
   armorloot_callback;
   invincible_callback;
   invincibleTimeout;
@@ -31,11 +34,26 @@ export class Player extends Character {
   constructor(id, name, kind) {
     super(id, kind);
     this.name = name;
+
+    // Connect equipment manager to player visuals
+    this.equipment.setVisuals({
+      setWeaponName: (name) => { this.weaponName = name; },
+      setSprite: (sprite) => { this.setSprite(sprite); },
+      setSpriteName: (name) => { this.spriteName = name; },
+      setVisible: (visible) => { this.setVisible(visible); },
+      getSprite: () => this.sprite
+    });
+
+    this.equipment.onSwitch(() => {
+      if (this.switch_callback) {
+        this.switch_callback();
+      }
+    });
   }
 
   loot(item) {
     if (item) {
-      var rank, currentRank, msg, currentArmorName;
+      var currentArmorName;
 
       if (this.currentArmorSprite) {
         currentArmorName = this.currentArmorSprite.name;
@@ -43,21 +61,29 @@ export class Player extends Character {
         currentArmorName = this.spriteName;
       }
 
-      if (item.type === 'armor') {
-        rank = Types.getArmorRank(item.kind);
-        currentRank = Types.getArmorRank(Types.getKindFromString(currentArmorName));
-        msg = 'You are wearing a better armor';
-      } else if (item.type === 'weapon') {
-        rank = Types.getWeaponRank(item.kind);
-        currentRank = Types.getWeaponRank(Types.getKindFromString(this.weaponName));
-        msg = 'You are wielding a better weapon';
-      }
+      // Use unified slot-based comparison
+      const slot = getSlotForKind(item.kind);
+      if (slot) {
+        const newRank = getRank(slot, item.kind);
+        let currentKind: number;
+        let msg: string;
 
-      if (rank && currentRank) {
-        if (rank === currentRank) {
-          throw new Exceptions.LootException('You already have this ' + item.type);
-        } else if (rank <= currentRank) {
-          throw new Exceptions.LootException(msg);
+        if (slot === 'armor') {
+          currentKind = Types.getKindFromString(currentArmorName);
+          msg = 'You are wearing a better armor';
+        } else if (slot === 'weapon') {
+          currentKind = Types.getKindFromString(this.weaponName);
+          msg = 'You are wielding a better weapon';
+        }
+
+        const currentRank = getRank(slot, currentKind);
+
+        if (newRank >= 0 && currentRank >= 0) {
+          if (newRank === currentRank) {
+            throw new Exceptions.LootException('You already have this ' + slot);
+          } else if (newRank < currentRank) {
+            throw new Exceptions.LootException(msg);
+          }
         }
       }
 
@@ -82,6 +108,7 @@ export class Player extends Character {
 
   setSpriteName(name) {
     this.spriteName = name;
+    this.equipment.setEquipped('armor', name);
   }
 
   getArmorName() {
@@ -103,80 +130,33 @@ export class Player extends Character {
 
   setWeaponName(name) {
     this.weaponName = name;
+    if (name) {
+      this.equipment.setEquipped('weapon', name);
+    }
   }
 
   hasWeapon() {
     return this.weaponName !== null;
   }
 
+  // Unified equipment switching - delegates to EquipmentManager
   switchWeapon(newWeaponName) {
-    var count = 14,
-      value = false,
-      self = this;
+    this.equipment.switchEquipment('weapon', newWeaponName);
+  }
 
-    var toggle = function () {
-      value = !value;
-      return value;
-    };
-
-    if (newWeaponName !== this.getWeaponName()) {
-      if (this.isSwitchingWeapon) {
-        clearInterval(blanking);
-      }
-
-      this.switchingWeapon = true;
-      var blanking = setInterval(function () {
-        if (toggle()) {
-          self.setWeaponName(newWeaponName);
-        } else {
-          self.setWeaponName(null);
-        }
-
-        count -= 1;
-        if (count === 1) {
-          clearInterval(blanking);
-          self.switchingWeapon = false;
-
-          if (self.switch_callback) {
-            self.switch_callback();
-          }
-        }
-      }, 90);
+  switchArmor(newArmorSprite: Sprite) {
+    if (newArmorSprite) {
+      this.equipment.switchEquipment('armor', newArmorSprite.id, newArmorSprite);
     }
   }
 
-  switchArmor(newArmorSprite) {
-    var count = 14,
-      value = false,
-      self = this;
+  // Legacy compatibility getters
+  get isSwitchingWeapon(): boolean {
+    return this.equipment.isSwitching('weapon');
+  }
 
-    var toggle = function () {
-      value = !value;
-      return value;
-    };
-
-    if (newArmorSprite && newArmorSprite.id !== this.getSpriteName()) {
-      if (this.isSwitchingArmor) {
-        clearInterval(blanking);
-      }
-
-      this.isSwitchingArmor = true;
-      self.setSprite(newArmorSprite);
-      self.setSpriteName(newArmorSprite.id);
-      var blanking = setInterval(function () {
-        self.setVisible(toggle());
-
-        count -= 1;
-        if (count === 1) {
-          clearInterval(blanking);
-          self.isSwitchingArmor = false;
-
-          if (self.switch_callback) {
-            self.switch_callback();
-          }
-        }
-      }, 90);
-    }
+  get isSwitchingArmor(): boolean {
+    return this.equipment.isSwitching('armor');
   }
 
   onArmorLoot(callback) {

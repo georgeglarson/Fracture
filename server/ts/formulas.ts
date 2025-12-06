@@ -2,16 +2,21 @@ import {Utils} from './utils';
 
 export class Formulas {
 
+  // ============================================================================
+  // COMBAT FORMULAS
+  // ============================================================================
+
   /**
-   *
-   * @param weaponLevel
-   * @param armorLevel
-   * @returns {any}
+   * Calculate damage dealt, now including player level bonus
+   * @param weaponLevel - Weapon's base level
+   * @param armorLevel - Target's armor level
+   * @param attackerLevel - Attacker's character level (default 1)
    */
-  static dmg(weaponLevel, armorLevel) {
-    var dealt = weaponLevel * Utils.randomInt(5, 10),
-      absorbed = armorLevel * Utils.randomInt(1, 3),
-      dmg = dealt - absorbed;
+  static dmg(weaponLevel: number, armorLevel: number, attackerLevel: number = 1): number {
+    const levelBonus = Formulas.levelBonusDamage(attackerLevel);
+    const dealt = weaponLevel * Utils.randomInt(5, 10) + levelBonus;
+    const absorbed = armorLevel * Utils.randomInt(1, 3);
+    const dmg = dealt - absorbed;
 
     if (dmg <= 0) {
       return Utils.randomInt(0, 3);
@@ -21,11 +26,49 @@ export class Formulas {
   }
 
   /**
-   *
-   * @param armorLevel
-   * @returns {number}
+   * Calculate max HP, now including player level bonus
+   * @param armorLevel - Armor's base level
+   * @param playerLevel - Player's character level (default 1)
    */
-  static hp(armorLevel) {
-    return 80 + ((armorLevel - 1) * 30);
+  static hp(armorLevel: number, playerLevel: number = 1): number {
+    const baseHP = 80 + ((armorLevel - 1) * 30);
+    const levelBonus = Formulas.levelBonusHP(playerLevel);
+    return baseHP + levelBonus;
+  }
+
+  // ============================================================================
+  // PROGRESSION FORMULAS
+  // ============================================================================
+
+  static readonly MAX_LEVEL = 20;
+
+  /**
+   * XP required to reach the next level (exponential curve)
+   * Level 1->2: 100, Level 2->3: 150, Level 5->6: 506, Level 10->11: 3844
+   */
+  static xpToNextLevel(currentLevel: number): number {
+    if (currentLevel >= Formulas.MAX_LEVEL) return Infinity;
+    return Math.floor(100 * Math.pow(1.5, currentLevel - 1));
+  }
+
+  /**
+   * XP granted from killing a mob, based on mob's armor level (toughness)
+   */
+  static xpFromMob(mobArmorLevel: number): number {
+    return mobArmorLevel * 10 + Utils.randomInt(0, 5);
+  }
+
+  /**
+   * Bonus HP per player level (+10 HP per level above 1)
+   */
+  static levelBonusHP(level: number): number {
+    return (level - 1) * 10;
+  }
+
+  /**
+   * Bonus damage per player level (+2 damage per level above 1)
+   */
+  static levelBonusDamage(level: number): number {
+    return (level - 1) * 2;
   }
 }

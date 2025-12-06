@@ -6,6 +6,7 @@
 import * as _ from 'lodash';
 import { Messages } from '../message.js';
 import { Types } from '../../../shared/ts/gametypes.js';
+import { Formulas } from '../formulas.js';
 import { getVeniceService } from '../ai/venice.service.js';
 import { getServerEventBus } from '../../../shared/ts/events/index.js';
 
@@ -16,6 +17,7 @@ export interface Entity {
   name?: string;
   group?: string;
   hitPoints: number;
+  armorLevel?: number;  // For XP calculation
   target?: string | number;
   hatelist?: Array<{ id: string | number }>;
   attackers?: Record<string | number, any>;
@@ -34,6 +36,7 @@ export interface Entity {
   drop?(item: any): any;
   health?(): any;
   handleKill?(mobType: string): void;
+  grantXP?(amount: number): void;  // For progression system
 }
 
 export interface Message {
@@ -186,6 +189,12 @@ export class CombatSystem {
 
     if (attacker) {
       this.world.pushToPlayer(attacker, new Messages.Kill(mob));
+
+      // Grant XP to the attacker
+      if (attacker.grantXP && mob.armorLevel) {
+        const xpGained = Formulas.xpFromMob(mob.armorLevel);
+        attacker.grantXP(xpGained);
+      }
 
       // AI: Trigger kill handling for narrator and quest tracking
       const mobType = Types.getKindAsString(mob.kind);

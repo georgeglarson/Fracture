@@ -341,6 +341,38 @@ export const Messages = {
     serialize() {
       return [Types.Messages.NEWS_RESPONSE, ...this.headlines];
     }
+  },
+
+  // Progression System - XP gain notification
+  XpGain: class {
+    constructor(
+      private amount: number,
+      private currentXp: number,
+      private xpToNext: number
+    ) {}
+
+    serialize() {
+      return [Types.Messages.XP_GAIN,
+        this.amount,
+        this.currentXp,
+        this.xpToNext];
+    }
+  },
+
+  // Progression System - Level up notification
+  LevelUp: class {
+    constructor(
+      private newLevel: number,
+      private bonusHP: number,
+      private bonusDamage: number
+    ) {}
+
+    serialize() {
+      return [Types.Messages.LEVEL_UP,
+        this.newLevel,
+        this.bonusHP,
+        this.bonusDamage];
+    }
   }
 };
 
