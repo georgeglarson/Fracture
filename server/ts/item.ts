@@ -1,5 +1,5 @@
 import {Entity} from './entity';
-import { ItemProperties, GeneratedItem } from '../../shared/ts/items/index.js';
+import { ItemProperties, GeneratedItem, serializeProperties } from '../../shared/ts/items/index.js';
 
 export class Item extends Entity {
 
@@ -54,6 +54,16 @@ export class Item extends Entity {
       this.properties = generatedItem.properties;
       this.displayName = generatedItem.displayName;
     }
+  }
+
+  /**
+   * Override getState to include item properties in Spawn messages
+   */
+  getState() {
+    const baseState = this._getBaseState();
+    // Add serialized properties as 5th element (after id, kind, x, y)
+    const serializedProps = this.properties ? serializeProperties(this.properties) : null;
+    return [...baseState, serializedProps];
   }
 
   /**

@@ -1,9 +1,65 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import {World} from './world';
 import {Server} from './ws';
 import {Metrics} from './metrics';
 import {Player} from './player';
 import {initVeniceService} from './ai';
+
+// Server singleton - PID file to prevent multiple instances
+const PID_FILE = path.join(__dirname, '../../.server.pid');
+
+function isProcessRunning(pid: number): boolean {
+    try {
+        process.kill(pid, 0); // Signal 0 just checks if process exists
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function acquireServerLock(): boolean {
+    // Check if PID file exists
+    if (fs.existsSync(PID_FILE)) {
+        try {
+            const existingPid = parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
+            if (existingPid && isProcessRunning(existingPid)) {
+                console.error(`[Server] Another instance is already running (PID: ${existingPid})`);
+                console.error(`[Server] Kill it first with: kill ${existingPid}`);
+                console.error(`[Server] Or remove stale PID file: rm ${PID_FILE}`);
+                return false;
+            }
+            // Stale PID file - process no longer running
+            console.info(`[Server] Removing stale PID file (old PID: ${existingPid})`);
+        } catch (e) {
+            console.warn(`[Server] Could not read PID file, removing it`);
+        }
+    }
+
+    // Write our PID
+    fs.writeFileSync(PID_FILE, process.pid.toString());
+    console.info(`[Server] Acquired lock (PID: ${process.pid})`);
+    return true;
+}
+
+function releaseServerLock(): void {
+    try {
+        if (fs.existsSync(PID_FILE)) {
+            const storedPid = parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
+            if (storedPid === process.pid) {
+                fs.unlinkSync(PID_FILE);
+                console.info(`[Server] Released lock`);
+            }
+        }
+    } catch (e) {
+        // Ignore errors during cleanup
+    }
+}
+
+// Clean up on exit
+process.on('exit', releaseServerLock);
+process.on('SIGINT', () => { releaseServerLock(); process.exit(0); });
+process.on('SIGTERM', () => { releaseServerLock(); process.exit(0); });
 
 function main(config) {
     var WorldServer = World,
@@ -130,5 +186,9 @@ process.argv.forEach(function (val, index, array) {
 });
 
 getConfigFile(configPath, function(config) {
+    // Acquire singleton lock before starting
+    if (!acquireServerLock()) {
+        process.exit(1);
+    }
     main(config);
 });

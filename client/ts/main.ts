@@ -402,6 +402,7 @@ var initGame = function () {
         return false;
       }
       if (key === 68) { // D - Drop current weapon
+        console.log('[KeyPress] D key pressed, game.ready:', game.ready, 'game.started:', game.started);
         if (game.ready && game.started) {
           game.dropCurrentWeapon();
         }

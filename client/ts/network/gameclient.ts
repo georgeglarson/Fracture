@@ -243,6 +243,13 @@ export class GameClient {
       console.log('[SPAWN] Creating item entity for kind=' + kind);
       var item = EntityFactory.createEntity(kind, id);
 
+      // Check for item properties in data[5]
+      var properties = data[5];
+      if (properties && item.setProperties) {
+        console.log('[SPAWN] Setting item properties:', properties);
+        item.setProperties(properties);
+      }
+
       if (this.spawn_item_callback) {
         console.log('[SPAWN] Calling spawn_item_callback for item ' + id);
         this.spawn_item_callback(item, x, y);

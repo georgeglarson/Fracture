@@ -632,6 +632,9 @@ export class Player extends Character {
 
       // Reset to default weapon
       this.equipWeapon(Types.Entities.SWORD1);
+      // Tell the player themselves to switch weapons
+      this.send(this.equip(Types.Entities.SWORD1).serialize());
+      // Tell other players about the equipment change
       this.broadcast(this.equip(Types.Entities.SWORD1));
 
     } else if (itemType === 'armor') {
@@ -654,6 +657,9 @@ export class Player extends Character {
       // Reset to default armor
       this.equipArmor(Types.Entities.CLOTHARMOR);
       this.updateHitPoints();
+      // Tell the player themselves to switch armor
+      this.send(this.equip(Types.Entities.CLOTHARMOR).serialize());
+      // Tell other players about the equipment change
       this.broadcast(this.equip(Types.Entities.CLOTHARMOR));
       this.send(new Messages.HitPoints(this.maxHitPoints).serialize());
     }

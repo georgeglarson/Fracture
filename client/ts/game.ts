@@ -2286,9 +2286,13 @@ export class Game {
   }
 
   dropCurrentWeapon() {
+    console.log('[Drop] dropCurrentWeapon called, player:', this.player ? this.player.getWeaponName() : 'no player');
     if (this.player && this.player.getWeaponName() !== 'sword1') {
+      console.log('[Drop] Sending DROP_ITEM message for weapon');
       this.client.sendDropItem('weapon');
       this.showNotification('Dropped weapon');
+    } else {
+      console.log('[Drop] Cannot drop - either no player or weapon is default sword1');
     }
   }
 

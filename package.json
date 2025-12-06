@@ -9,6 +9,8 @@
     "build:client": "webpack --env NODE_ENV=prod --config ./webpack.config.js --mode production",
     "build:server": "tsc -p ./server",
     "start": "node dist/server/ts/main.js",
+    "restart": "pkill -f 'node dist/server' 2>/dev/null; rm -f dist/.server.pid; sleep 1 && npm start",
+    "stop": "pkill -f 'node dist/server' 2>/dev/null; rm -f dist/.server.pid",
     "dev": "concurrently \"npm run watch:client\" \"npm run watch:server\""
   },
   "dependencies": {
