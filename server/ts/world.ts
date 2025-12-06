@@ -13,6 +13,7 @@ import {Utils} from './utils';
 import {Map} from './map';
 import {getVeniceService} from './ai/venice.service';
 import {AIPlayerManager} from './ai/aiplayer';
+import {MessageBroadcaster} from './messaging/message-broadcaster';
 
 export class World {
 
@@ -35,7 +36,8 @@ export class World {
   chestAreas = [];
   groups = {};
 
-  outgoingQueues = {};
+  // Message broadcaster (initialized in run() after map is ready)
+  broadcaster: MessageBroadcaster | null = null;
 
   itemCount = 0;
   playerCount = 0;
@@ -234,6 +236,14 @@ export class World {
     this.map.ready(function () {
       self.initZoneGroups();
 
+      // Initialize message broadcaster now that groups exist
+      self.broadcaster = new MessageBroadcaster(
+        self.server,
+        self.groups,
+        self.map,
+        { getEntityById: (id) => self.getEntityById(id) }
+      );
+
       self.map.generateCollisionGrid();
 
       // Populate all mob "roaming" areas
@@ -367,68 +377,27 @@ export class World {
   }
 
   pushToPlayer(player, message) {
-    if (player && player.id in this.outgoingQueues) {
-      this.outgoingQueues[player.id].push(message.serialize());
-    } else {
-      console.error('pushToPlayer: player was undefined');
-    }
+    this.broadcaster?.pushToPlayer(player, message);
   }
 
   pushToGroup(groupId, message, ignoredPlayer?) {
-    var self = this,
-      group = this.groups[groupId];
-
-    if (group) {
-      _.each(group.players, function (playerId) {
-        if (playerId != ignoredPlayer) {
-          self.pushToPlayer(self.getEntityById(playerId), message);
-        }
-      });
-    } else {
-      console.error('groupId: ' + groupId + ' is not a valid group');
-    }
+    this.broadcaster?.pushToGroup(groupId, message, ignoredPlayer);
   }
 
   pushToAdjacentGroups(groupId, message, ignoredPlayer?) {
-    var self = this;
-    self.map.forEachAdjacentGroup(groupId, function (id) {
-      self.pushToGroup(id, message, ignoredPlayer);
-    });
+    this.broadcaster?.pushToAdjacentGroups(groupId, message, ignoredPlayer);
   }
 
   pushToPreviousGroups(player, message) {
-    var self = this;
-
-    // Push this message to all groups which are not going to be updated anymore,
-    // since the player left them.
-    _.each(player.recentlyLeftGroups, function (id) {
-      self.pushToGroup(id, message);
-    });
-    player.recentlyLeftGroups = [];
+    this.broadcaster?.pushToPreviousGroups(player, message);
   }
 
   pushBroadcast(message, ignoredPlayer?) {
-    for (var id in this.outgoingQueues) {
-      if (id != ignoredPlayer) {
-        this.outgoingQueues[id].push(message.serialize());
-      }
-    }
+    this.broadcaster?.pushBroadcast(message, ignoredPlayer);
   }
 
   processQueues() {
-    var self = this,
-      connection;
-
-    for (var id in this.outgoingQueues) {
-      if (this.outgoingQueues[id].length > 0) {
-        connection = this.server.getConnection(id);
-        // Skip AI players that don't have real connections
-        if (connection) {
-          connection.send(this.outgoingQueues[id]);
-        }
-        this.outgoingQueues[id] = [];
-      }
-    }
+    this.broadcaster?.processQueues();
   }
 
   addEntity(entity) {
@@ -460,7 +429,7 @@ export class World {
   addPlayer(player) {
     this.addEntity(player);
     this.players[player.id] = player;
-    this.outgoingQueues[player.id] = [];
+    this.broadcaster?.createQueue(player.id);
 
     //console.info("Added player : " + player.id);
   }
@@ -469,7 +438,7 @@ export class World {
     player.broadcast(player.despawn());
     this.removeEntity(player);
     delete this.players[player.id];
-    delete this.outgoingQueues[player.id];
+    this.broadcaster?.removeQueue(player.id);
   }
 
   addMob(mob) {

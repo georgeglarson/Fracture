@@ -700,7 +700,7 @@ export class AIPlayerManager {
     this.world.players[ai.id] = ai;
 
     // Create outgoing queue (empty - AI doesn't receive messages)
-    this.world.outgoingQueues[ai.id] = [];
+    this.world.broadcaster?.createQueue(ai.id);
 
     this.aiPlayers.set(ai.id, ai);
 
