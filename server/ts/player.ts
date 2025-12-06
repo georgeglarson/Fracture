@@ -254,6 +254,11 @@ export class Player extends Character {
       else if (action === Types.Messages.NEWS_REQUEST) {
         self.handleNewsRequest();
       }
+      // Drop current item
+      else if (action === Types.Messages.DROP_ITEM) {
+        var itemType = message[1]; // 'weapon' or 'armor'
+        self.handleDropItem(itemType);
+      }
       else {
         if (self.message_callback) {
           self.message_callback(message);
@@ -600,6 +605,57 @@ export class Player extends Character {
     } catch (error) {
       console.error('[TownCrier] Venice newspaper error:', error);
       this.send(new Messages.NewsResponse(['📰 No news today...']).serialize());
+    }
+  }
+
+  // Handle dropping currently equipped item
+  handleDropItem(itemType: string) {
+    console.log(`[Drop] ${this.name} dropping ${itemType}`);
+
+    if (itemType === 'weapon') {
+      // Don't allow dropping the default weapon
+      if (this.weapon === Types.Entities.SWORD1) {
+        console.log('[Drop] Cannot drop default weapon');
+        return;
+      }
+
+      const droppedKind = this.weapon;
+
+      // Create item at player's position and add to world
+      const item = this.world.createItemWithProperties(droppedKind, this.x, this.y);
+      if (item) {
+        this.world.addItem(item);
+        // Broadcast the item spawn to all nearby players
+        this.broadcast(new Messages.Spawn(item), false);
+        console.log(`[Drop] Created item ${Types.getKindAsString(droppedKind)} at (${this.x}, ${this.y})`);
+      }
+
+      // Reset to default weapon
+      this.equipWeapon(Types.Entities.SWORD1);
+      this.broadcast(this.equip(Types.Entities.SWORD1));
+
+    } else if (itemType === 'armor') {
+      // Don't allow dropping default armor
+      if (this.armor === Types.Entities.CLOTHARMOR) {
+        console.log('[Drop] Cannot drop default armor');
+        return;
+      }
+
+      const droppedKind = this.armor;
+
+      // Create item at player's position
+      const item = this.world.createItemWithProperties(droppedKind, this.x, this.y);
+      if (item) {
+        this.world.addItem(item);
+        this.broadcast(new Messages.Spawn(item), false);
+        console.log(`[Drop] Created item ${Types.getKindAsString(droppedKind)} at (${this.x}, ${this.y})`);
+      }
+
+      // Reset to default armor
+      this.equipArmor(Types.Entities.CLOTHARMOR);
+      this.updateHitPoints();
+      this.broadcast(this.equip(Types.Entities.CLOTHARMOR));
+      this.send(new Messages.HitPoints(this.maxHitPoints).serialize());
     }
   }
 

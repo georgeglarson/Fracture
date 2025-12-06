@@ -25,6 +25,9 @@ export class FormatChecker {
     this.formats[Types.Messages.NPCTALK] = ['n']; // npcKind
     this.formats[Types.Messages.REQUEST_QUEST] = ['n']; // npcKind
     this.formats[Types.Messages.NEWS_REQUEST] = []; // no params - just request newspaper
+
+    // Item management
+    this.formats[Types.Messages.DROP_ITEM] = ['s']; // itemType: 'weapon' or 'armor'
   }
 
   check(msg) {

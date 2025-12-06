@@ -401,6 +401,12 @@ var initGame = function () {
         }
         return false;
       }
+      if (key === 68) { // D - Drop current weapon
+        if (game.ready && game.started) {
+          game.dropCurrentWeapon();
+        }
+        return false;
+      }
     } else {
       if (key === 13 && game.ready) {
         $chat.focus();

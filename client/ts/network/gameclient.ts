@@ -765,4 +765,9 @@ export class GameClient {
     this.sendMessage([Types.Messages.REQUEST_QUEST,
       npcKind]);
   }
+
+  sendDropItem(itemType: string) {
+    this.sendMessage([Types.Messages.DROP_ITEM,
+      itemType]);
+  }
 }

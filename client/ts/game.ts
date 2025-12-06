@@ -29,6 +29,7 @@ import {MapQueryService} from './world/map-query';
 import {EntityManager} from './entities/entity-manager';
 import {InputManager} from './input/input-manager';
 import {UIManager} from './ui/ui-manager';
+import {ItemTooltip} from './ui/item-tooltip';
 
 export class Game {
 
@@ -53,6 +54,7 @@ export class Game {
   inputManager: InputManager | null = null;
   mapQueryService: MapQueryService | null = null;
   uiManager: UIManager | null = null;
+  itemTooltip: ItemTooltip | null = null;
 
   // Entity accessors (delegate to entityManager)
   get entities() { return this.entityManager?.entities ?? {}; }
@@ -548,6 +550,9 @@ export class Game {
             self.client.sendNewsRequest();
           }
         });
+
+        // Initialize item tooltip
+        self.itemTooltip = new ItemTooltip();
 
         self.setPathfinder(new Pathfinder(self.map.width, self.map.height));
 
@@ -1795,6 +1800,34 @@ export class Game {
    */
   movecursor() {
     this.inputManager?.updateHoverState();
+    this.updateItemTooltip();
+  }
+
+  /**
+   * Update item tooltip based on hover state
+   */
+  updateItemTooltip() {
+    if (!this.itemTooltip || !this.inputManager || !this.gridManager) return;
+
+    if (this.hoveringItem) {
+      const pos = this.inputManager.getMouseGridPosition();
+      const item = this.gridManager.getItemAt(pos.x, pos.y);
+
+      if (item && item.properties) {
+        const equippedWeaponKind = this.player
+          ? Types.getKindFromString(this.player.getWeaponName())
+          : null;
+        this.itemTooltip.show(
+          item,
+          equippedWeaponKind,
+          this.mouse.x,
+          this.mouse.y
+        );
+        return;
+      }
+    }
+
+    this.itemTooltip.hide();
   }
 
   /**
@@ -2250,6 +2283,13 @@ export class Game {
 
   toggleNewspaper() {
     this.uiManager?.toggleNewspaper();
+  }
+
+  dropCurrentWeapon() {
+    if (this.player && this.player.getWeaponName() !== 'sword1') {
+      this.client.sendDropItem('weapon');
+      this.showNotification('Dropped weapon');
+    }
   }
 
   requestNews() {

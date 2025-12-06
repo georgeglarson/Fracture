@@ -43,7 +43,8 @@ export const Types: any = {
     ENTITY_THOUGHT: 36,  // AI thought bubbles above entities
     WORLD_EVENT: 37,  // Faction director announcements
     NEWS_REQUEST: 38,  // Player requests town crier newspaper
-    NEWS_RESPONSE: 39  // Server sends newspaper headlines
+    NEWS_RESPONSE: 39,  // Server sends newspaper headlines
+    DROP_ITEM: 40  // Player drops currently equipped item
   },
 
   Entities: {
