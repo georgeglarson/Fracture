@@ -15,6 +15,7 @@ import {getVeniceService} from './ai/venice.service';
 import {AIPlayerManager} from './ai/aiplayer';
 import {MessageBroadcaster} from './messaging/message-broadcaster';
 import {CombatSystem} from './combat/combat-system';
+import {EntityManager} from './entities/entity-manager';
 
 export class World {
 
@@ -25,14 +26,20 @@ export class World {
 
   map = null;
 
-  entities = {};
-  players = {};
-  mobs = {};
+  // Entity manager (initialized in run() after map is ready)
+  entityManager: EntityManager | null = null;
+
+  // Accessors for backward compatibility - delegate to entityManager
+  get entities() { return this.entityManager?.entities ?? {}; }
+  get players() { return this.entityManager?.players ?? {}; }
+  get mobs() { return this.entityManager?.mobs ?? {}; }
+  get items() { return this.entityManager?.items ?? {}; }
+  get npcs() { return this.entityManager?.npcs ?? {}; }
+  get itemCount() { return this.entityManager?.itemCount ?? 0; }
+
   attackers = {};
-  items = {};
   equipping = {};
   hurt = {};
-  npcs = {};
   mobAreas = [];
   chestAreas = [];
   groups = {};
@@ -43,7 +50,6 @@ export class World {
   // Combat system (initialized in run() after map is ready)
   combatSystem: CombatSystem | null = null;
 
-  itemCount = 0;
   playerCount = 0;
 
   zoneGroupsReady = false;
@@ -240,6 +246,13 @@ export class World {
     this.map.ready(function () {
       self.initZoneGroups();
 
+      // Initialize entity manager
+      self.entityManager = new EntityManager();
+      self.entityManager.setGroupContext({
+        handleEntityGroupMembership: (entity) => self.handleEntityGroupMembership(entity),
+        removeFromGroups: (entity) => self.removeFromGroups(entity)
+      });
+
       // Initialize message broadcaster now that groups exist
       self.broadcaster = new MessageBroadcaster(
         self.server,
@@ -258,6 +271,10 @@ export class World {
         removeEntity: (entity) => self.removeEntity(entity),
         handleEntityGroupMembership: (entity) => self.handleEntityGroupMembership(entity)
       });
+
+      // Wire entity manager dependencies
+      self.entityManager!.setBroadcaster(self.broadcaster!);
+      self.entityManager!.setCombatSystem(self.combatSystem!);
 
       self.map.generateCollisionGrid();
 
@@ -416,96 +433,47 @@ export class World {
   }
 
   addEntity(entity) {
-    this.entities[entity.id] = entity;
-    this.handleEntityGroupMembership(entity);
+    this.entityManager?.addEntity(entity);
   }
 
   removeEntity(entity) {
-    if (entity.id in this.entities) {
-      delete this.entities[entity.id];
-    }
-    if (entity.id in this.mobs) {
-      delete this.mobs[entity.id];
-    }
-    if (entity.id in this.items) {
-      delete this.items[entity.id];
-    }
-
-    if (entity.type === 'mob') {
-      this.clearMobAggroLink(entity);
-      this.clearMobHateLinks(entity);
-    }
-
-    entity.destroy();
-    this.removeFromGroups(entity);
-    console.debug('Removed ' + Types.getKindAsString(entity.kind) + ' : ' + entity.id);
+    this.entityManager?.removeEntity(entity);
   }
 
   addPlayer(player) {
-    this.addEntity(player);
-    this.players[player.id] = player;
-    this.broadcaster?.createQueue(player.id);
-
-    //console.info("Added player : " + player.id);
+    this.entityManager?.addPlayer(player);
   }
 
   removePlayer(player) {
-    player.broadcast(player.despawn());
-    this.removeEntity(player);
-    delete this.players[player.id];
-    this.broadcaster?.removeQueue(player.id);
+    this.entityManager?.removePlayer(player);
   }
 
   addMob(mob) {
-    this.addEntity(mob);
-    this.mobs[mob.id] = mob;
+    this.entityManager?.addMob(mob);
   }
 
   addNpc(kind, x, y) {
-    var npc = new Npc('8' + x + '' + y, kind, x, y);
-    this.addEntity(npc);
-    this.npcs[npc.id] = npc;
-
-    return npc;
+    return this.entityManager?.addNpc(kind, x, y);
   }
 
   addItem(item) {
-    this.addEntity(item);
-    this.items[item.id] = item;
-
-    return item;
+    return this.entityManager?.addItem(item);
   }
 
   createItem(kind, x, y) {
-    var id = '9' + this.itemCount++,
-      item = null;
-
-    if (kind === Types.Entities.CHEST) {
-      item = new Chest(id, x, y);
-    } else {
-      item = new Item(id, kind, x, y);
-    }
-    return item;
+    return this.entityManager?.createItem(kind, x, y);
   }
 
   createChest(x, y, items) {
-    var chest = this.createItem(Types.Entities.CHEST, x, y);
-    chest.setItems(items);
-    return chest;
+    return this.entityManager?.createChest(x, y, items);
   }
 
   addStaticItem(item) {
-    item.isStatic = true;
-    item.onRespawn(this.addStaticItem.bind(this, item));
-
-    return this.addItem(item);
+    return this.entityManager?.addStaticItem(item);
   }
 
   addItemFromChest(kind, x, y) {
-    var item = this.createItem(kind, x, y);
-    item.isFromChest = true;
-
-    return this.addItem(item);
+    return this.entityManager?.addItemFromChest(kind, x, y);
   }
 
   /**
@@ -520,26 +488,19 @@ export class World {
   }
 
   forEachEntity(callback) {
-    for (var id in this.entities) {
-      callback(this.entities[id]);
-    }
+    this.entityManager?.forEachEntity(callback);
   }
 
   forEachPlayer(callback) {
-    for (var id in this.players) {
-      callback(this.players[id]);
-    }
+    this.entityManager?.forEachPlayer(callback);
   }
 
   forEachMob(callback) {
-    for (var id in this.mobs) {
-      callback(this.mobs[id]);
-    }
+    this.entityManager?.forEachMob(callback);
   }
 
   forEachCharacter(callback) {
-    this.forEachPlayer(callback);
-    this.forEachMob(callback);
+    this.entityManager?.forEachCharacter(callback);
   }
 
   handleMobHate(mobId, playerId, hatePoints) {
@@ -556,21 +517,11 @@ export class World {
   }
 
   getEntityById(id) {
-    if (id in this.entities) {
-      return this.entities[id];
-    } else {
-      console.error('Unknown entity : ' + id);
-    }
+    return this.entityManager?.getEntityById(id);
   }
 
   getPlayerCount() {
-    var count = 0;
-    for (var p in this.players) {
-      if (this.players.hasOwnProperty(p)) {
-        count += 1;
-      }
-    }
-    return count;
+    return this.entityManager?.getPlayerCount() ?? 0;
   }
 
   broadcastAttacker(character) {

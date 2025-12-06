@@ -25,6 +25,7 @@ import _ from 'lodash';
 import {Entity} from './entity/entity';
 import {Renderer} from './renderer/renderer';
 import {GridManager} from './world/grid-manager';
+import {EntityManager} from './entities/entity-manager';
 
 export class Game {
 
@@ -44,9 +45,12 @@ export class Game {
   player: Player;
 
   // Game state
-  entities = {};
-  deathpositions = {};
+  entityManager: EntityManager | null = null;
   gridManager: GridManager | null = null;
+
+  // Entity accessors (delegate to entityManager)
+  get entities() { return this.entityManager?.entities ?? {}; }
+  get deathpositions() { return this.entityManager?.deathpositions ?? {}; }
 
   // Grid accessors (delegate to gridManager)
   get entityGrid() { return this.gridManager?.entityGrid ?? null; }
@@ -114,7 +118,9 @@ export class Game {
   playerId;
   clearTarget;
   zoningOrientation;
-  obsoleteEntities;
+
+  // obsoleteEntities accessor (delegate to entityManager)
+  get obsoleteEntities() { return this.entityManager?.obsoleteEntities ?? null; }
 
   playerdeath_callback;
   equipment_callback;
@@ -357,39 +363,11 @@ export class Game {
   }
 
   addEntity(entity) {
-    var self = this;
-
-    if (this.entities[entity.id] === undefined) {
-      this.entities[entity.id] = entity;
-      this.registerEntityPosition(entity);
-
-      if (!(entity instanceof Item && entity.wasDropped)
-        && !(this.renderer.mobile || this.renderer.tablet)) {
-        entity.fadeIn(this.currentTime);
-      }
-
-      if (this.renderer.mobile || this.renderer.tablet) {
-        entity.onDirty(function (e) {
-          if (self.camera.isVisible(e)) {
-            e.dirtyRect = self.renderer.getEntityBoundingRect(e);
-            self.checkOtherDirtyRects(e.dirtyRect, e, e.gridX, e.gridY);
-          }
-        });
-      }
-    }
-    else {
-      console.error('This entity already exists : ' + entity.id + ' (' + entity.kind + ')');
-    }
+    this.entityManager?.addEntity(entity);
   }
 
   removeEntity(entity) {
-    if (entity.id in this.entities) {
-      this.unregisterEntityPosition(entity);
-      delete this.entities[entity.id];
-    }
-    else {
-      console.error('Cannot remove entity. Unknown ID : ' + entity.id);
-    }
+    this.entityManager?.removeEntity(entity);
   }
 
   addItem(item, x, y) {
@@ -407,13 +385,7 @@ export class Game {
   }
 
   removeItem(item) {
-    if (item) {
-      this.removeFromItemGrid(item, item.gridX, item.gridY);
-      this.removeFromRenderingGrid(item, item.gridX, item.gridY);
-      delete this.entities[item.id];
-    } else {
-      console.error('Cannot remove item. Unknown ID : ' + item.id);
-    }
+    this.entityManager?.removeItem(item);
   }
 
   initPathingGrid() {
@@ -550,6 +522,16 @@ export class Game {
         self.initPathingGrid();
         self.initRenderingGrid();
 
+        // Initialize entity manager
+        self.entityManager = new EntityManager();
+        self.entityManager.setGridManager(self);
+        self.entityManager.setRenderer(self.renderer);
+        self.entityManager.setCamera(self.camera);
+        self.entityManager.setCurrentTimeProvider(() => self.currentTime);
+        self.entityManager.setDirtyRectCallback((rect, entity, x, y) => {
+          self.checkOtherDirtyRects(rect, entity, x, y);
+        });
+
         self.setPathfinder(new Pathfinder(self.map.width, self.map.height));
 
         self.initPlayer();
@@ -588,16 +570,11 @@ export class Game {
   }
 
   entityIdExists(id) {
-    return id in this.entities;
+    return this.entityManager?.entityIdExists(id) ?? false;
   }
 
   getEntityById(id) {
-    if (id in this.entities) {
-      return this.entities[id];
-    }
-    else {
-      console.error('Unknown entity id : ' + id, true);
-    }
+    return this.entityManager?.getEntityById(id);
   }
 
   connect(started_callback) {
@@ -642,9 +619,9 @@ export class Game {
         knownIds = _.intersection(entityIds, list),
         newIds = _.difference(list, knownIds);
 
-      self.obsoleteEntities = _.reject(self.entities, function (entity: Entity) {
+      self.entityManager?.setObsoleteEntities(_.reject(self.entities, function (entity: Entity) {
         return _.include(knownIds, entity.id) || entity.id === self.player.id;
-      });
+      }) as Entity[]);
 
       // Destroy entities outside of the player's zone group
       self.removeObsoleteEntities();
@@ -1073,7 +1050,7 @@ export class Game {
                   if (entity instanceof Mob) {
                     // Keep track of where mobs die in order to spawn their dropped items
                     // at the right position later.
-                    self.deathpositions[entity.id] = {x: entity.gridX, y: entity.gridY};
+                    self.entityManager?.recordDeathPosition(entity.id, entity.gridX, entity.gridY);
                   }
 
                   entity.isDying = true;
@@ -1626,9 +1603,7 @@ export class Game {
    * @param {Function} callback The function to call back (must accept one entity argument).
    */
   forEachEntity(callback) {
-    _.each(this.entities, function (entity) {
-      callback(entity);
-    });
+    this.entityManager?.forEachEntity(callback);
   }
 
   /**
@@ -1636,11 +1611,7 @@ export class Game {
    * @see forEachEntity
    */
   forEachMob(callback) {
-    _.each(this.entities, function (entity) {
-      if (entity instanceof Mob) {
-        callback(entity);
-      }
-    });
+    this.entityManager?.forEachMob(callback);
   }
 
   /**
@@ -2228,7 +2199,7 @@ export class Game {
   restart() {
     console.debug('Beginning restart');
 
-    this.entities = {};
+    this.entityManager?.clearAll();
     this.initEntityGrid();
     this.initPathingGrid();
     this.initRenderingGrid();
@@ -2305,14 +2276,7 @@ export class Game {
   }
 
   getDeadMobPosition(mobId) {
-    var position;
-
-    if (mobId in this.deathpositions) {
-      position = this.deathpositions[mobId];
-      delete this.deathpositions[mobId];
-    }
-
-    return position;
+    return this.entityManager?.getDeadMobPosition(mobId);
   }
 
   onAchievementUnlock(callback) {
@@ -2518,20 +2482,7 @@ export class Game {
   }
 
   removeObsoleteEntities() {
-    var nb = _.size(this.obsoleteEntities),
-      self = this;
-
-    if (nb > 0) {
-      _.each(this.obsoleteEntities, function (entity) {
-        if (entity.id != self.player.id) { // never remove yourself
-          self.removeEntity(entity);
-        }
-      });
-      console.debug('Removed ' + nb + ' entities: ' + _.pluck(_.reject(this.obsoleteEntities, function (id) {
-        return id === self.player.id
-      }), 'id'));
-      this.obsoleteEntities = null;
-    }
+    this.entityManager?.removeObsoleteEntities(this.player.id);
   }
 
   /**
