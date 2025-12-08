@@ -2,6 +2,7 @@ import {Game} from '../game';
 import {Timer} from '../utils/timer';
 import {Player} from '../entity/character/player/player';
 import {Camera} from './camera';
+import {ParticleManager} from './particle-manager';
 import {Item} from '../entity/objects/item';
 import {Types} from '../../../shared/ts/gametypes';
 import {Detect} from '../utils/detect';
@@ -37,9 +38,11 @@ export class Renderer {
   tileset;
   scale;
   camera: Camera;
+  particles: ParticleManager;
   targetRect;
   mobile;
   lastTargetPos;
+  lastFrameTime: number = 0;
 
   constructor(game: Game, canvas, background, foreground) {
     this.game = game;
@@ -124,6 +127,7 @@ export class Renderer {
   createCamera() {
     this.camera = new Camera(this);
     this.camera.rescale();
+    this.particles = new ParticleManager();
 
     // Set canvas buffer size based on grid tiles
     this.canvas.width = this.camera.gridW * this.tilesize * this.scale;
@@ -789,7 +793,10 @@ export class Renderer {
   }
 
   setCameraView(ctx) {
-    ctx.translate(-this.camera.x * this.scale, -this.camera.y * this.scale);
+    // Apply camera position plus any active shake offset
+    const shakeX = this.camera.shakeOffsetX * this.scale;
+    const shakeY = this.camera.shakeOffsetY * this.scale;
+    ctx.translate(-this.camera.x * this.scale + shakeX, -this.camera.y * this.scale + shakeY);
   }
 
   clearScreen(ctx) {
@@ -849,6 +856,17 @@ export class Renderer {
   }
 
   renderFrame() {
+    // Calculate delta time for particle updates
+    const now = Date.now();
+    const dt = this.lastFrameTime ? now - this.lastFrameTime : 16;
+    this.lastFrameTime = now;
+
+    // Update screen shake each frame
+    this.camera.updateShake();
+
+    // Update particles
+    this.particles.update(dt);
+
     if (this.mobile || this.tablet) {
       this.renderFrameMobile();
     }
@@ -873,6 +891,8 @@ export class Renderer {
     this.drawPathingCells();
     this.drawEntities();
     this.drawCombatInfo();
+    // Render particles on top of entities
+    this.particles.render(this.context, this.scale, this.camera.x, this.camera.y);
     this.drawHighTiles(this.context);
     this.context.restore();
 

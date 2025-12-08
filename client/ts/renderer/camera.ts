@@ -11,6 +11,13 @@ export class Camera {
   gridW;
   gridH;
 
+  // Screen shake properties
+  shakeOffsetX: number = 0;
+  shakeOffsetY: number = 0;
+  shakeIntensity: number = 0;
+  shakeDuration: number = 0;
+  shakeStartTime: number = 0;
+
   constructor(renderer) {
     this.renderer = renderer;
     this.x = 0;
@@ -19,6 +26,43 @@ export class Camera {
     this.gridY = 0;
     this.offset = 0.5;
     this.rescale();
+  }
+
+  /**
+   * Trigger screen shake effect
+   * @param intensity - Max pixel offset (default 4)
+   * @param duration - Duration in ms (default 150)
+   */
+  shake(intensity: number = 4, duration: number = 150) {
+    this.shakeIntensity = intensity;
+    this.shakeDuration = duration;
+    this.shakeStartTime = Date.now();
+  }
+
+  /**
+   * Update shake effect - call each frame
+   */
+  updateShake() {
+    if (this.shakeIntensity === 0) {
+      return;
+    }
+
+    const elapsed = Date.now() - this.shakeStartTime;
+    if (elapsed >= this.shakeDuration) {
+      // Shake finished
+      this.shakeOffsetX = 0;
+      this.shakeOffsetY = 0;
+      this.shakeIntensity = 0;
+      return;
+    }
+
+    // Decay intensity over duration
+    const progress = elapsed / this.shakeDuration;
+    const currentIntensity = this.shakeIntensity * (1 - progress);
+
+    // Random offset within intensity range
+    this.shakeOffsetX = (Math.random() * 2 - 1) * currentIntensity;
+    this.shakeOffsetY = (Math.random() * 2 - 1) * currentIntensity;
   }
 
   rescale() {

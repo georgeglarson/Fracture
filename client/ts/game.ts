@@ -1491,6 +1491,19 @@ export class Game {
 
           if (character instanceof Player && this.camera.isVisible(character)) {
             this.audioManager.playSound('hit' + Math.floor(Math.random() * 2 + 1));
+            // Small screen shake on hit for punch feedback
+            if (character.id === this.playerId) {
+              this.renderer.camera.shake(2, 50);
+              // Spawn hit particles at target position
+              if (character.target) {
+                this.renderer.particles.spawnHitParticles(
+                  character.target.x,
+                  character.target.y - 8,
+                  4,
+                  '#ff6644'
+                );
+              }
+            }
           }
 
           if (character.hasTarget() && character.target.id === this.playerId && this.player && !this.player.invincible) {
