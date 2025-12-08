@@ -173,6 +173,9 @@ function setupCharacterCallbacks(game: Game, entity: Character): void {
 
     if (entity instanceof Mob) {
       game.entityManager?.recordDeathPosition(entity.id, entity.gridX, entity.gridY);
+      // Death particles and shake for satisfying kill feedback
+      game.renderer.particles.spawnDeathParticles(entity.x, entity.y - 8);
+      game.renderer.camera.shake(4, 100);
     }
 
     entity.isDying = true;

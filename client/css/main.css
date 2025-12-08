@@ -269,7 +269,31 @@ footer, header, hgroup, menu, nav, section {
     #statusbar #mutebutton.active::after {
         content: '🔇' !important;
     }
-    
+
+/* ========== LOW HEALTH VIGNETTE ========== */
+#low-health-vignette {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(139, 0, 0, 0.4) 100%);
+}
+
+#low-health-vignette.active {
+    opacity: 1;
+    animation: pulse-vignette 1s ease-in-out infinite;
+}
+
+@keyframes pulse-vignette {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
     .started #canvas {cursor:none;}
     
     #foreground { 

@@ -147,6 +147,14 @@ export class App {
     this.game.onPlayerHealthChange(function (hp, maxHp) {
       var percent = Math.round((hp > 0 ? hp : 0) / maxHp * 100);
       $('#hitpoints').css('width', percent + '%');
+
+      // Toggle low health vignette at 30% health
+      var $vignette = $('#low-health-vignette');
+      if (percent <= 30 && percent > 0) {
+        $vignette.addClass('active');
+      } else {
+        $vignette.removeClass('active');
+      }
     });
 
     this.game.onPlayerHurt(this.blinkHealthBar.bind(this));
