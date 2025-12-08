@@ -144,12 +144,9 @@ export class App {
   }
 
   initHealthBar() {
-    var scale = this.game.renderer.getScaleFactor(),
-      healthMaxWidth = $('#healthbar').width() - (12 * scale);
-
     this.game.onPlayerHealthChange(function (hp, maxHp) {
-      var barWidth = Math.round((healthMaxWidth / maxHp) * (hp > 0 ? hp : 0));
-      $('#hitpoints').css('width', barWidth + 'px');
+      var percent = Math.round((hp > 0 ? hp : 0) / maxHp * 100);
+      $('#hitpoints').css('width', percent + '%');
     });
 
     this.game.onPlayerHurt(this.blinkHealthBar.bind(this));
@@ -162,6 +159,14 @@ export class App {
     setTimeout(function () {
       $hitpoints.removeClass('white');
     }, 500)
+  }
+
+  initXpBar() {
+    this.game.onPlayerXpChange(function (xp, xpToNext, level) {
+      var percent = Math.round((xp / xpToNext) * 100);
+      $('#xpfill').css('width', percent + '%');
+      $('#level-display').text('Lv.' + level);
+    });
   }
 
   toggleButton() {
@@ -527,6 +532,7 @@ export class App {
       if (this.game.started) {
         this.game.resize();
         this.initHealthBar();
+        this.initXpBar();
         this.game.updateBars();
       } else {
         var newScale = this.game.renderer.getScaleFactor();

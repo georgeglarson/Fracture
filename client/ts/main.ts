@@ -244,6 +244,7 @@ var initGame = function () {
   });
 
   app.initHealthBar();
+  app.initXpBar();
 
   $('#nameinput').attr('value', '');
   $('#chatbox').attr('value', '');

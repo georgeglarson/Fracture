@@ -22,14 +22,22 @@ export class Camera {
   }
 
   rescale() {
-    var factor = this.renderer.mobile ? 1 : 2;
+    // Calculate grid size to fill the entire viewport
+    var scale = this.renderer.scale || 2;
+    var tilesize = this.renderer.tilesize || 16;
 
-    this.gridW = 15 * factor;
-    this.gridH = 7 * factor;
+    // How many tiles fit in the window?
+    this.gridW = Math.ceil(window.innerWidth / (tilesize * scale));
+    this.gridH = Math.ceil(window.innerHeight / (tilesize * scale));
+
+    // Ensure minimum size
+    this.gridW = Math.max(this.gridW, 15);
+    this.gridH = Math.max(this.gridH, 7);
 
     console.debug('---------');
-    console.debug('Factor:' + factor);
-    console.debug('W:' + this.gridW + ' H:' + this.gridH);
+    console.debug('Scale:' + scale + ' Tilesize:' + tilesize);
+    console.debug('Viewport:' + window.innerWidth + 'x' + window.innerHeight);
+    console.debug('Grid W:' + this.gridW + ' H:' + this.gridH);
   }
 
   setPosition(x, y) {

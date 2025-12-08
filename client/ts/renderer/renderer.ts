@@ -125,6 +125,7 @@ export class Renderer {
     this.camera = new Camera(this);
     this.camera.rescale();
 
+    // Set canvas buffer size based on grid tiles
     this.canvas.width = this.camera.gridW * this.tilesize * this.scale;
     this.canvas.height = this.camera.gridH * this.tilesize * this.scale;
     console.debug('#entities set to ' + this.canvas.width + ' x ' + this.canvas.height);
@@ -136,6 +137,29 @@ export class Renderer {
     this.forecanvas.width = this.canvas.width;
     this.forecanvas.height = this.canvas.height;
     console.debug('#foreground set to ' + this.forecanvas.width + ' x ' + this.forecanvas.height);
+
+    // Set CSS display size to fill viewport
+    var canvasStyle = 'width:100vw;height:100vh;position:fixed;top:0;left:0;';
+    this.canvas.style.cssText = canvasStyle;
+    this.backcanvas.style.cssText = canvasStyle;
+    this.forecanvas.style.cssText = canvasStyle;
+
+    // Set containers for fullscreen
+    var container = document.getElementById('container');
+    var canvasDiv = document.getElementById('canvas');
+    var canvasborder = document.getElementById('canvasborder');
+    if (container) container.style.cssText = 'width:100vw;height:100vh;position:fixed;top:0;left:0;margin:0;padding:0;';
+    if (canvasDiv) canvasDiv.style.cssText = 'width:100vw;height:100vh;position:fixed;top:0;left:0;';
+    if (canvasborder) canvasborder.style.cssText = 'width:100vw;height:100vh;position:fixed;top:0;left:0;padding:0;background:none;';
+
+    // Hide intro elements during gameplay
+    var instructions = document.getElementById('instructions');
+    var parchment = document.getElementById('parchment');
+    if (instructions) instructions.classList.remove('active');
+    if (parchment && document.body.classList.contains('game')) {
+      parchment.style.opacity = '0';
+      parchment.style.pointerEvents = 'none';
+    }
   }
 
   initFPS() {
