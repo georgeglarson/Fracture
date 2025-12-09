@@ -373,6 +373,38 @@ export const Messages = {
         this.bonusHP,
         this.bonusDamage];
     }
+  },
+
+  // Economy System - Gold gain notification
+  GoldGain: class {
+    constructor(
+      private amount: number,
+      private totalGold: number
+    ) {}
+
+    serialize() {
+      return [Types.Messages.GOLD_GAIN,
+        this.amount,
+        this.totalGold];
+    }
+  },
+
+  // Daily Reward System - daily login reward notification
+  DailyReward: class {
+    constructor(
+      private gold: number,
+      private xp: number,
+      private streak: number,
+      private isNewDay: boolean
+    ) {}
+
+    serialize() {
+      return [Types.Messages.DAILY_REWARD,
+        this.gold,
+        this.xp,
+        this.streak,
+        this.isNewDay ? 1 : 0];
+    }
   }
 };
 

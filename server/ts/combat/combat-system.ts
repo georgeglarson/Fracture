@@ -37,6 +37,7 @@ export interface Entity {
   health?(): any;
   handleKill?(mobType: string): void;
   grantXP?(amount: number): void;  // For progression system
+  grantGold?(amount: number): void;  // For economy system
 }
 
 export interface Message {
@@ -194,6 +195,12 @@ export class CombatSystem {
       if (attacker.grantXP && mob.armorLevel) {
         const xpGained = Formulas.xpFromMob(mob.armorLevel);
         attacker.grantXP(xpGained);
+      }
+
+      // Grant gold to the attacker
+      if (attacker.grantGold && mob.armorLevel) {
+        const goldGained = Formulas.goldFromMob(mob.armorLevel);
+        attacker.grantGold(goldGained);
       }
 
       // AI: Trigger kill handling for narrator and quest tracking

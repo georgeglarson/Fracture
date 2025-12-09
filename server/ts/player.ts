@@ -40,6 +40,13 @@ export class Player extends Character {
   xp: number = 0;
   xpToNext: number = 100;  // Formulas.xpToNextLevel(1)
 
+  // Economy system
+  gold: number = 0;
+
+  // Daily reward tables (streak day 1-7)
+  private static DAILY_GOLD = [10, 15, 20, 25, 35, 50, 100];
+  private static DAILY_XP = [25, 35, 50, 65, 85, 100, 200];
+
   zone_callback;
   move_callback;
   lootmove_callback;
@@ -271,6 +278,12 @@ export class Player extends Character {
         var itemType = message[1]; // 'weapon' or 'armor'
         self.handleDropItem(itemType);
       }
+      // Daily reward check
+      else if (action === Types.Messages.DAILY_CHECK) {
+        var lastLoginDate = message[1] || null; // ISO date string or empty string (treat as null)
+        var currentStreak = message[2] || 0;
+        self.handleDailyCheck(lastLoginDate === '' ? null : lastLoginDate, currentStreak);
+      }
       else {
         if (self.message_callback) {
           self.message_callback(message);
@@ -472,6 +485,104 @@ export class Player extends Character {
     this.xp = xp;
     this.xpToNext = Formulas.xpToNextLevel(this.level);
     this.updateHitPoints();
+  }
+
+  // ============================================================================
+  // ECONOMY SYSTEM
+  // ============================================================================
+
+  /**
+   * Grant gold to the player
+   */
+  grantGold(amount: number) {
+    this.gold += amount;
+    console.log(`[Gold] ${this.name} gained ${amount} gold (total: ${this.gold})`);
+
+    // Send gold gain message to player
+    this.send(new Messages.GoldGain(amount, this.gold).serialize());
+  }
+
+  /**
+   * Set player gold directly (for restoring from save)
+   */
+  setGold(gold: number) {
+    this.gold = Math.max(0, gold);
+  }
+
+  // ============================================================================
+  // DAILY REWARD SYSTEM
+  // ============================================================================
+
+  /**
+   * Handle daily reward check from client
+   */
+  handleDailyCheck(lastLoginDate: string | null, clientStreak: number) {
+    const today = this.getTodayUTC();
+
+    // First time player - grant day 1 reward
+    if (!lastLoginDate) {
+      console.log(`[Daily] ${this.name} first login - granting day 1 reward`);
+      this.grantDailyReward(1, true);
+      return;
+    }
+
+    // Check if it's a new day
+    if (lastLoginDate === today) {
+      console.log(`[Daily] ${this.name} already claimed today`);
+      // Send response with 0 rewards (not a new day)
+      this.send(new Messages.DailyReward(0, 0, clientStreak, false).serialize());
+      return;
+    }
+
+    // Calculate streak
+    const yesterday = this.getYesterdayUTC();
+    let newStreak: number;
+
+    if (lastLoginDate === yesterday) {
+      // Consecutive day - increment streak (max 7, then wrap to 1)
+      newStreak = clientStreak >= 7 ? 1 : clientStreak + 1;
+      console.log(`[Daily] ${this.name} consecutive login - streak: ${newStreak}`);
+    } else {
+      // Missed a day - reset to day 1
+      newStreak = 1;
+      console.log(`[Daily] ${this.name} missed day(s) - streak reset to 1`);
+    }
+
+    this.grantDailyReward(newStreak, true);
+  }
+
+  /**
+   * Grant daily reward based on streak
+   */
+  private grantDailyReward(streak: number, isNewDay: boolean) {
+    const index = Math.min(streak, 7) - 1; // 0-indexed
+    const goldReward = Player.DAILY_GOLD[index];
+    const xpReward = Player.DAILY_XP[index];
+
+    console.log(`[Daily] Granting ${this.name} day ${streak} reward: +${goldReward} gold, +${xpReward} XP`);
+
+    // Grant the rewards using existing systems
+    this.grantGold(goldReward);
+    this.grantXP(xpReward);
+
+    // Send daily reward notification for popup
+    this.send(new Messages.DailyReward(goldReward, xpReward, streak, isNewDay).serialize());
+  }
+
+  /**
+   * Get today's date in UTC as ISO string (YYYY-MM-DD)
+   */
+  private getTodayUTC(): string {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  /**
+   * Get yesterday's date in UTC as ISO string (YYYY-MM-DD)
+   */
+  private getYesterdayUTC(): string {
+    const yesterday = new Date();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    return yesterday.toISOString().split('T')[0];
   }
 
   onRequestPosition(callback) {

@@ -71,4 +71,17 @@ export class Formulas {
   static levelBonusDamage(level: number): number {
     return (level - 1) * 2;
   }
+
+  // ============================================================================
+  // ECONOMY FORMULAS
+  // ============================================================================
+
+  /**
+   * Gold dropped from killing a mob, based on mob's armor level (toughness)
+   * Includes random variance for excitement
+   */
+  static goldFromMob(mobArmorLevel: number): number {
+    const baseGold = mobArmorLevel * 5;
+    return baseGold + Utils.randomInt(1, mobArmorLevel * 2);
+  }
 }

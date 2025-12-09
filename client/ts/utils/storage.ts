@@ -32,6 +32,15 @@ export class Storage {
         level: 1,
         xp: 0,
         xpToNext: 100
+      },
+      economy: {
+        gold: 0
+      },
+      daily: {
+        lastLoginDate: '',
+        currentStreak: 0,
+        longestStreak: 0,
+        totalDailyLogins: 0
       }
     };
   }
@@ -204,6 +213,58 @@ export class Storage {
 
   getXpToNext() {
     return this.getProgression().xpToNext;
+  }
+
+  // Economy System
+
+  getGold(): number {
+    // Initialize economy if it doesn't exist (for existing players)
+    if (!this.data.economy) {
+      this.data.economy = { gold: 0 };
+    }
+    return this.data.economy.gold;
+  }
+
+  saveGold(gold: number) {
+    if (!this.data.economy) {
+      this.data.economy = { gold: 0 };
+    }
+    this.data.economy.gold = gold;
+    this.save();
+  }
+
+  // Daily Reward System
+
+  getDailyData() {
+    // Initialize daily data if it doesn't exist
+    if (!this.data.daily) {
+      this.data.daily = {
+        lastLoginDate: '',
+        currentStreak: 0,
+        longestStreak: 0,
+        totalDailyLogins: 0
+      };
+    }
+    return this.data.daily;
+  }
+
+  getLastLoginDate(): string {
+    return this.getDailyData().lastLoginDate;
+  }
+
+  getCurrentStreak(): number {
+    return this.getDailyData().currentStreak;
+  }
+
+  saveDailyLogin(date: string, streak: number) {
+    const daily = this.getDailyData();
+    daily.lastLoginDate = date;
+    daily.currentStreak = streak;
+    daily.totalDailyLogins++;
+    if (streak > daily.longestStreak) {
+      daily.longestStreak = streak;
+    }
+    this.save();
   }
 
 }

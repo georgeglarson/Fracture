@@ -245,6 +245,7 @@ var initGame = function () {
 
   app.initHealthBar();
   app.initXpBar();
+  app.initGoldDisplay();
 
   $('#nameinput').attr('value', '');
   $('#chatbox').attr('value', '');

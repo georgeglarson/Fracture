@@ -147,6 +147,10 @@ export class Game {
   playerXp: number = 0;
   playerXpToNext: number = 100;
 
+  // Economy system
+  playergold_callback;
+  playerGold: number = 0;
+
   constructor(app: App) {
     this.app = app;
     this.player = new Warrior('player', '');
@@ -672,6 +676,10 @@ export class Game {
           self.playerxp_callback(self.playerXp, self.playerXpToNext, self.playerLevel);
         }
       }
+
+      // Send daily check to server
+      var dailyData = self.storage.getDailyData();
+      self.client.sendDailyCheck(dailyData.lastLoginDate || '', dailyData.currentStreak);
 
       self.player.onStartPathing(function (path) {
         var i = path.length - 1,
@@ -1660,6 +1668,10 @@ export class Game {
     this.levelup_callback = callback;
   }
 
+  onPlayerGoldChange(callback) {
+    this.playergold_callback = callback;
+  }
+
   resize() {
     var x = this.camera.x,
       y = this.camera.y,
@@ -1821,5 +1833,39 @@ export class Game {
         this.renderer.targetRect = targetRect;
       }
     }
+  }
+
+  /**
+   * Shows the daily reward popup with streak flames
+   */
+  showDailyRewardPopup(gold: number, xp: number, streak: number) {
+    const popup = document.getElementById('daily-reward-popup');
+    if (!popup) return;
+
+    // Update the popup content
+    const streakEl = document.getElementById('daily-streak');
+    const goldEl = document.getElementById('daily-gold-amount');
+    const xpEl = document.getElementById('daily-xp-amount');
+    const flamesEl = document.getElementById('streak-flames');
+
+    if (streakEl) streakEl.textContent = streak.toString();
+    if (goldEl) goldEl.textContent = gold.toString();
+    if (xpEl) xpEl.textContent = xp.toString();
+
+    // Add flames based on streak (cap at 7)
+    if (flamesEl) {
+      const flameCount = Math.min(streak, 7);
+      flamesEl.innerHTML = Array(flameCount).fill('🔥').join('');
+    }
+
+    // Show the popup
+    popup.classList.add('show');
+
+    // Hide after 3 seconds
+    setTimeout(() => {
+      popup.classList.remove('show');
+    }, 3000);
+
+    console.info('[Daily] Reward popup shown: +' + gold + 'g, +' + xp + ' XP, streak: ' + streak);
   }
 }

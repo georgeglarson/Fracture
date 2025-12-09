@@ -177,6 +177,24 @@ export class App {
     });
   }
 
+  initGoldDisplay() {
+    var self = this;
+    this.game.onPlayerGoldChange(function (gold) {
+      var $display = $('#gold-display');
+      $display.text(gold + 'g');
+      // Flash animation for visual feedback
+      $display.addClass('flash');
+      setTimeout(function() {
+        $display.removeClass('flash');
+      }, 300);
+    });
+
+    // Initialize with saved gold on startup
+    var savedGold = this.game.storage.getGold();
+    this.game.playerGold = savedGold;
+    $('#gold-display').text(savedGold + 'g');
+  }
+
   toggleButton() {
     var name = $('#parchment input').val() as string,
       $play = $('#createcharacter .play');

@@ -553,6 +553,37 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
       game.levelup_callback(newLevel, bonusHP, bonusDamage);
     }
   });
+
+  // Economy system - gold gain
+  client.onGoldGain(function (amount, totalGold) {
+    game.playerGold = totalGold;
+
+    game.storage.saveGold(totalGold);
+
+    if (game.player) {
+      game.infoManager.addDamageInfo('+' + amount + 'g', game.player.x, game.player.y - 25, 'gold');
+    }
+
+    if (game.playergold_callback) {
+      game.playergold_callback(totalGold);
+    }
+  });
+
+  // Daily reward system
+  client.onDailyReward(function (gold, xp, streak, isNewDay) {
+    if (!isNewDay) {
+      // Not a new day, reward already claimed
+      console.log('[Daily] Already claimed today');
+      return;
+    }
+
+    // Save the new streak data
+    const today = new Date().toISOString().split('T')[0];
+    game.storage.saveDailyLogin(today, streak);
+
+    // Show the daily reward popup
+    game.showDailyRewardPopup(gold, xp, streak);
+  });
 }
 
 function setupMiscHandlers(game: Game, client: GameClient): void {

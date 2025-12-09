@@ -14,6 +14,10 @@ const damageInfoColors = {
   'xp': {
     fill: 'rgb(255, 215, 0)',  // Gold color for XP
     stroke: 'rgb(180, 150, 0)'
+  },
+  'gold': {
+    fill: 'rgb(255, 223, 0)',  // Bright gold for gold gains
+    stroke: 'rgb(139, 117, 0)'
   }
 };
 

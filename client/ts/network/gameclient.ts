@@ -57,6 +57,12 @@ export class GameClient {
   xp_gain_callback;
   level_up_callback;
 
+  // Economy system callbacks
+  gold_gain_callback;
+
+  // Daily reward callbacks
+  daily_reward_callback;
+
   constructor(host, port) {
 
     this.host = host;
@@ -97,6 +103,12 @@ export class GameClient {
     // Progression system handlers
     this.handlers[Types.Messages.XP_GAIN] = this.receiveXpGain;
     this.handlers[Types.Messages.LEVEL_UP] = this.receiveLevelUp;
+
+    // Economy system handlers
+    this.handlers[Types.Messages.GOLD_GAIN] = this.receiveGoldGain;
+
+    // Daily reward handlers
+    this.handlers[Types.Messages.DAILY_REWARD] = this.receiveDailyReward;
 
     this.enable();
   }
@@ -817,5 +829,43 @@ export class GameClient {
 
   onLevelUp(callback) {
     this.level_up_callback = callback;
+  }
+
+  // Economy system receive methods
+  receiveGoldGain(data) {
+    var amount = data[1],
+      totalGold = data[2];
+
+    console.log('[Gold] Gained ' + amount + ' gold (total: ' + totalGold + ')');
+
+    if (this.gold_gain_callback) {
+      this.gold_gain_callback(amount, totalGold);
+    }
+  }
+
+  onGoldGain(callback) {
+    this.gold_gain_callback = callback;
+  }
+
+  // Daily reward receive methods
+  receiveDailyReward(data) {
+    var gold = data[1],
+      xp = data[2],
+      streak = data[3],
+      isNewDay = data[4] === 1;
+
+    console.log('[Daily] Reward received: ' + gold + ' gold, ' + xp + ' XP, streak: ' + streak + ', newDay: ' + isNewDay);
+
+    if (this.daily_reward_callback) {
+      this.daily_reward_callback(gold, xp, streak, isNewDay);
+    }
+  }
+
+  onDailyReward(callback) {
+    this.daily_reward_callback = callback;
+  }
+
+  sendDailyCheck(lastLoginDate: string, currentStreak: number) {
+    this.sendMessage([Types.Messages.DAILY_CHECK, lastLoginDate, currentStreak]);
   }
 }

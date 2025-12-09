@@ -46,7 +46,10 @@ export const Types: any = {
     NEWS_RESPONSE: 39,  // Server sends newspaper headlines
     DROP_ITEM: 40,  // Player drops currently equipped item
     XP_GAIN: 41,    // Player gains XP [41, amount, currentXP, xpToNext]
-    LEVEL_UP: 42    // Player levels up [42, newLevel, bonusHP, bonusDamage]
+    LEVEL_UP: 42,   // Player levels up [42, newLevel, bonusHP, bonusDamage]
+    GOLD_GAIN: 43,  // Player gains gold [43, amount, totalGold]
+    DAILY_CHECK: 44,   // Client sends lastLoginDate to check daily [44, lastLoginDate]
+    DAILY_REWARD: 45   // Server sends daily reward [45, gold, xp, streak, isNewDay]
   },
 
   Entities: {

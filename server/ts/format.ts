@@ -28,6 +28,9 @@ export class FormatChecker {
 
     // Item management
     this.formats[Types.Messages.DROP_ITEM] = ['s']; // itemType: 'weapon' or 'armor'
+
+    // Daily reward system
+    this.formats[Types.Messages.DAILY_CHECK] = ['s', 'n']; // lastLoginDate (ISO string or ""), currentStreak
   }
 
   check(msg) {

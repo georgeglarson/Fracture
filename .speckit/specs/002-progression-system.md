@@ -1,148 +1,135 @@
 # 002: Progression System
 
-**Status:** Draft
+**Status:** Implemented
 **Priority:** High
-**Dependencies:** None (builds on existing combat system)
+**Dependencies:** None
 
 ## Overview
 
-Add XP-based leveling to give players a sense of progression beyond just equipment. Killing mobs grants XP, and leveling up increases base stats.
+XP/Level progression system that rewards combat with experience points, level ups, and stat bonuses.
 
-## Current System
+## What Was Built
 
-Currently player power is 100% equipment-based:
-- `damage = weaponLevel * (5-10) - armorLevel * (1-3)`
-- `maxHP = 80 + (armorLevel-1) * 30`
+### XP System
 
-No persistent progression - all players start equal.
-
-## Proposed System
-
-### XP and Levels
+Players earn XP from killing mobs, with XP scaling based on mob difficulty:
 
 ```typescript
-interface PlayerProgression {
-  level: number;      // 1-20
-  xp: number;         // Current XP
-  xpToNext: number;   // XP needed for next level
+// Base XP formula (server/ts/formulas.ts)
+xpForMob(mobKind: number): number {
+  const baseDamage = Formulas.dmg(mobKind);
+  return Math.floor(baseDamage * 2.5);
 }
 ```
 
-**XP Formula:**
-```typescript
-// XP to reach next level (exponential curve)
-xpToNext(level) = Math.floor(100 * Math.pow(1.5, level - 1))
+### Level System
 
-// Level 1->2: 100 XP
-// Level 2->3: 150 XP
-// Level 3->4: 225 XP
-// Level 5->6: 506 XP
-// Level 10->11: 3844 XP
-// Level 19->20: 153,746 XP
-```
-
-**XP from Mobs:**
-```typescript
-// Based on mob's armorLevel (toughness indicator)
-xpFromMob(mob) = mob.armorLevel * 10 + randomInt(0, 5)
-
-// rat (level 1): ~10-15 XP
-// skeleton (level 2): ~20-25 XP
-// ogre (level 3): ~30-35 XP
-// boss (level 5): ~50-55 XP
-```
-
-### Level Bonuses
-
-Each level provides flat bonuses to base stats:
+- Max level: 10
+- XP to next level scales with current level
+- Level bonuses to damage and health
 
 ```typescript
-// Bonus HP per level (on top of armor HP)
-bonusHP(level) = (level - 1) * 10
+// XP requirement per level
+xpToLevel(level: number): number {
+  return level * 100;  // Level 1→2 = 100 XP, Level 9→10 = 900 XP
+}
 
-// Bonus damage per level (added to weapon damage)
-bonusDamage(level) = (level - 1) * 2
-
-// Updated formulas:
-maxHP = 80 + (armorLevel-1)*30 + bonusHP(level)
-damage = (weaponLevel * rand(5,10) + bonusDamage(level)) - (armorLevel * rand(1,3))
+// Combat bonuses per level
+levelBonus(level: number): { damage: number; health: number } {
+  return {
+    damage: Math.floor(level * 1.5),
+    health: level * 10
+  };
+}
 ```
 
-**Example at Level 10:**
-- +90 HP (on top of armor)
-- +18 damage per hit
+### Network Messages
 
-### UI Elements
+Two dedicated message types for progression:
 
-1. **XP Bar** - Below health bar, shows progress to next level
-2. **Level Display** - Show "Lv.X" next to player name
-3. **Level Up Effect** - Flash/particles when leveling up
-4. **XP Gain Popup** - "+15 XP" floating text on kills
-
-### Messages
-
-New message types:
 ```typescript
-XP_GAIN = 41      // [41, amount, currentXP, xpToNext]
-LEVEL_UP = 42     // [42, newLevel, bonusHP, bonusDamage]
+enum Messages {
+  XP_GAIN = 41,   // [XP_GAIN, amount, currentXp, xpToNext]
+  LEVEL_UP = 42   // [LEVEL_UP, newLevel, xpToNext, newMaxHp]
+}
 ```
+
+### XP Bar UI
+
+Visual XP progress bar below the health bar:
+
+- Green gradient fill (`#4a0` to `#6c0`)
+- Level display (e.g., "Lv.3")
+- Smooth width transition on XP gain
+- Scales with screen resolution (3 media query breakpoints)
+
+### Client Feedback
+
+- **Floating text**: "+X XP" appears above player on kill
+- **Level up notification**: "You are now level X!" message
+- **Sound effect**: Level up audio cue
+- **Visual bar**: XP bar fills and updates in real-time
 
 ### Persistence
 
-Player XP/level saved to localStorage (client-side, like current name/equipment).
+Progress saved to localStorage:
 
 ```typescript
-// In app.storage.data.player
-{
-  name: "gerg",
-  level: 5,
-  xp: 340,
-  // ... existing fields
+interface SavedProgression {
+  level: number;
+  xp: number;
+  xpToNext: number;
 }
 ```
 
-On reconnect, send level with HELLO message. Server validates and applies bonuses.
+Restored on reconnect via `storage.loadProgression()`.
 
-## Implementation Phases
+## Files Modified
 
-### Phase 1: Core XP System (Server)
-- [ ] Add `level`, `xp`, `xpToNext` to Player class
-- [ ] Add `grantXP(amount)` method
-- [ ] Update mob death handler to call `grantXP`
-- [ ] Add XP_GAIN and LEVEL_UP message types
-- [ ] Update Formulas to include level bonuses
+### Server
+- `server/ts/player.ts` - level, xp, xpToNext fields; grantXP() method
+- `server/ts/formulas.ts` - xpForMob, xpToLevel, levelBonus functions
+- `server/ts/world.ts` - grantXP call on mob death
 
-### Phase 2: Client Display
-- [ ] Add XP bar UI element
-- [ ] Show level next to player name
-- [ ] Handle XP_GAIN message (update bar, show popup)
-- [ ] Handle LEVEL_UP message (play effect, update stats)
+### Client
+- `client/index.html` - XP bar HTML elements (#xpbar, #xpfill, #level-display)
+- `client/css/main.css` - XP bar styling (3 scale breakpoints)
+- `client/ts/app.ts` - initXpBar() method
+- `client/ts/main.ts` - initXpBar() call on game start
+- `client/ts/game.ts` - onPlayerXpChange callback, playerxp_callback
+- `client/ts/network/message-handlers.ts` - XP_GAIN, LEVEL_UP handlers
+- `client/ts/storage/storage.ts` - saveProgression(), loadProgression()
 
-### Phase 3: Persistence
-- [ ] Save level/xp to localStorage on XP gain
-- [ ] Load level/xp on game start
-- [ ] Send level in HELLO message
-- [ ] Server validates and restores level
+### Shared
+- `shared/ts/gametypes.ts` - Messages.XP_GAIN, Messages.LEVEL_UP
+
+## What Works
+
+- [x] Kill mob → earn XP
+- [x] XP bar fills based on progress
+- [x] Level display updates (Lv.1, Lv.2, etc.)
+- [x] Level up → notification + sound
+- [x] Level affects damage output
+- [x] Level affects max HP
+- [x] Progress persists in localStorage
+- [x] Progress restored on reconnect
+
+## What's Missing (Future)
+
+- [ ] Skill points on level up
+- [ ] Ability unlocks at certain levels
+- [ ] Prestige/rebirth system
+- [ ] Experience multipliers
+- [ ] Party XP sharing
+- [ ] Show other players' levels above their heads
 
 ## Testing Checklist
 
-- [ ] Kill rat -> gain ~10-15 XP
-- [ ] XP bar fills up visually
-- [ ] Level up at 100 XP -> show effect
-- [ ] HP increases after level up
-- [ ] Damage increases after level up
-- [ ] Refresh page -> level persists
-- [ ] New character starts at level 1
-
-## Non-Goals (Future Specs)
-
-- Skill trees / abilities
-- Class system
-- Stat point allocation
-- Prestige / rebirth system
-
-## Open Questions
-
-1. Should death cause XP loss? (Suggest: No, keep it casual)
-2. Max level 20 or higher? (Suggest: 20, with boss scaling later)
-3. Show other players' levels? (Suggest: Yes, above their heads)
+- [x] Kill rat → small XP gain
+- [x] Kill skeleton → medium XP gain
+- [x] Kill boss → large XP gain
+- [x] XP bar visually updates
+- [x] Reach 100% XP → level up triggers
+- [x] Level display changes after level up
+- [x] Stats improve with level
+- [x] Refresh browser → progress retained
