@@ -534,6 +534,9 @@ export class Game {
 
         self.setPathfinder(new Pathfinder(self.map.width, self.map.height));
 
+        // Set camera map bounds to prevent rendering outside the map
+        self.camera.setMapSize(self.map.width, self.map.height);
+
         self.initPlayer();
         self.setCursor('hand');
 

@@ -11,6 +11,10 @@ export class Camera {
   gridW;
   gridH;
 
+  // Map bounds for clamping
+  mapWidth: number = 0;
+  mapHeight: number = 0;
+
   // Screen shake properties
   shakeOffsetX: number = 0;
   shakeOffsetY: number = 0;
@@ -85,6 +89,14 @@ export class Camera {
   }
 
   setPosition(x, y) {
+    // Clamp to map bounds if we know them
+    if (this.mapWidth > 0 && this.mapHeight > 0) {
+      const maxX = Math.max(0, (this.mapWidth - this.gridW) * 16);
+      const maxY = Math.max(0, (this.mapHeight - this.gridH) * 16);
+      x = Math.max(0, Math.min(x, maxX));
+      y = Math.max(0, Math.min(y, maxY));
+    }
+
     this.x = x;
     this.y = y;
 
@@ -93,11 +105,27 @@ export class Camera {
   }
 
   setGridPosition(x, y) {
+    // Clamp to map bounds if we know them
+    if (this.mapWidth > 0 && this.mapHeight > 0) {
+      // Don't let camera go negative
+      x = Math.max(0, x);
+      y = Math.max(0, y);
+      // Don't let camera go past map edge minus viewport
+      x = Math.min(x, Math.max(0, this.mapWidth - this.gridW));
+      y = Math.min(y, Math.max(0, this.mapHeight - this.gridH));
+    }
+
     this.gridX = x;
     this.gridY = y;
 
     this.x = this.gridX * 16;
     this.y = this.gridY * 16;
+  }
+
+  setMapSize(width: number, height: number) {
+    this.mapWidth = width;
+    this.mapHeight = height;
+    console.debug('Camera map bounds set to ' + width + 'x' + height);
   }
 
   lookAt(entity) {

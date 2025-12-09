@@ -144,12 +144,18 @@ export class App {
   }
 
   initHealthBar() {
+    var $hitpoints = $('#statusbar #hitpoints');
+    var $vignette = $('#low-health-vignette');
+
+    // Set initial width to 100%
+    $hitpoints.css('width', '100%');
+
     this.game.onPlayerHealthChange(function (hp, maxHp) {
       var percent = Math.round((hp > 0 ? hp : 0) / maxHp * 100);
-      $('#hitpoints').css('width', percent + '%');
+      console.debug('Health update: ' + hp + '/' + maxHp + ' = ' + percent + '%');
+      $hitpoints.css('width', percent + '%');
 
       // Toggle low health vignette at 30% health
-      var $vignette = $('#low-health-vignette');
       if (percent <= 30 && percent > 0) {
         $vignette.addClass('active');
       } else {
@@ -161,7 +167,7 @@ export class App {
   }
 
   blinkHealthBar() {
-    var $hitpoints = $('#hitpoints');
+    var $hitpoints = $('#statusbar #hitpoints');
 
     $hitpoints.addClass('white');
     setTimeout(function () {
@@ -170,10 +176,17 @@ export class App {
   }
 
   initXpBar() {
+    var $xpfill = $('#statusbar #xpfill');
+    var $levelDisplay = $('#statusbar #level-display');
+
+    // Set initial width to 0%
+    $xpfill.css('width', '0%');
+
     this.game.onPlayerXpChange(function (xp, xpToNext, level) {
       var percent = Math.round((xp / xpToNext) * 100);
-      $('#xpfill').css('width', percent + '%');
-      $('#level-display').text('Lv.' + level);
+      console.debug('XP update: ' + xp + '/' + xpToNext + ' = ' + percent + '% (Lv.' + level + ')');
+      $xpfill.css('width', percent + '%');
+      $levelDisplay.text('Lv.' + level);
     });
   }
 

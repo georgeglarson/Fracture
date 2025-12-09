@@ -2,11 +2,11 @@
 
 > A living document tracking the path from foundation to addictive, successful game.
 
-## Current State: Foundation Complete
+## Current State: Core Loop In Progress
 
-We have a modular game engine with AI integration. The architecture supports scale.
+We have a modular game engine with AI integration, player progression, and basic economy.
 
-**Tag:** `v1.0.0-engine-foundation`
+**Tag:** `v1.1.0-spec-kit`
 
 **What exists:**
 - Real-time multiplayer browser game
@@ -16,13 +16,17 @@ We have a modular game engine with AI integration. The architecture supports sca
 - Town Crier newspaper aggregating world events
 - Entity thought bubbles
 - Typed EventBus for decoupled systems
+- **XP/Level progression system** (002 complete)
+- **Gold economy from mob drops** (003 MVP complete)
+- **Daily login rewards with streak bonuses** (004 partial)
+- **Combat polish** (screen shake, particles, death effects)
+- **Fullscreen responsive UI** with status bar
 
 **What's missing for a "real game":**
 - Item depth (properties, rarity, comparison)
-- Player progression (levels, XP, skills)
-- Economy (gold, shops, trading)
-- Persistence (save progress)
-- Content (more areas, mobs, bosses)
+- NPC shops and trading
+- Skill trees
+- More content (areas, mobs, bosses)
 
 ---
 
@@ -40,23 +44,26 @@ We have a modular game engine with AI integration. The architecture supports sca
 - Inventory system
 - Drop tables per mob/area
 
-### 002: Progression System
+### 002: Progression System ✅
 **Impact:** High - Levels = goals = retention
-**Status:** Draft spec ready
+**Status:** Complete (MVP)
 
-- XP from kills and quests
-- Level-up with stat increases
-- Skill point allocation
-- Player progression persistence
+- [x] XP from kills
+- [x] Level-up with stat increases
+- [x] XP bar UI with level display
+- [x] Persistence in localStorage
+- [ ] Skill point allocation (future)
 
-### 003: Economy System
+### 003: Economy System ✅
 **Impact:** Medium - Enables trading, adds gold sink/source
-**Status:** Draft spec ready
+**Status:** Complete (MVP)
 
-- Gold currency from drops
-- NPC merchant shops
-- Item buying/selling
-- Player-to-player trading
+- [x] Gold currency from mob drops
+- [x] Gold display in status bar
+- [x] Gold persistence in localStorage
+- [ ] NPC merchant shops (future)
+- [ ] Item buying/selling (future)
+- [ ] Player-to-player trading (future)
 
 ---
 
@@ -64,10 +71,14 @@ We have a modular game engine with AI integration. The architecture supports sca
 
 > Goal: Daily engagement hooks and social features.
 
-### 004: Daily Systems
-- Daily login rewards with streak bonuses
-- Daily quests with bonus XP/gold
-- Weekend events with special rewards
+### 004: Daily Systems ✅
+**Status:** Partial (login rewards complete)
+
+- [x] Daily login rewards with streak bonuses
+- [x] Login UI popup with reward display
+- [x] Streak persistence in localStorage
+- [ ] Daily quests with bonus XP/gold (future)
+- [ ] Weekend events with special rewards (future)
 
 ### 005: Achievements & Titles
 - Achievement system with tiers
@@ -107,15 +118,26 @@ We have a modular game engine with AI integration. The architecture supports sca
 
 > Goal: Juice, polish, delight.
 
-### 010: Combat Feel
-- Hit feedback (screen shake, particles)
-- Combat sound effects
-- Ability animations
+### 010: Combat Feel ✅
+**Status:** Complete (MVP)
 
-### 011: UI Overhaul
-- Modern, responsive UI
-- Mobile-friendly controls
-- Accessibility options
+- [x] Screen shake on hit
+- [x] Hit particles (blood splatter)
+- [x] Death particles
+- [x] Low-health vignette effect
+- [ ] Combat sound effects (future)
+- [ ] Ability animations (future)
+
+### 011: UI Overhaul ✅
+**Status:** Complete (MVP)
+
+- [x] Fullscreen responsive canvas
+- [x] Floating status bar with health/XP/gold
+- [x] Equipment icons display
+- [x] Click-through status bar for zone transitions
+- [x] Camera bounds clamping for indoor areas
+- [ ] Mobile-friendly controls (future)
+- [ ] Accessibility options (future)
 
 ### 012: Audio
 - Ambient music per zone
@@ -166,4 +188,4 @@ We have a modular game engine with AI integration. The architecture supports sca
 ---
 
 *This roadmap is not a timeline. It's a direction.*
-*Last updated: 2025-12-06*
+*Last updated: 2025-12-09*

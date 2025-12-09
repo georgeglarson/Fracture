@@ -130,6 +130,15 @@ footer, header, hgroup, menu, nav, section {
         z-index: 10000 !important;
         font-family: 'GraphicPixel', sans-serif !important;
         box-sizing: border-box !important;
+        pointer-events: none !important; /* Allow clicks to pass through to canvas */
+    }
+    /* Re-enable pointer events on interactive elements */
+    #statusbar .barbutton,
+    #statusbar #healthbar,
+    #statusbar #xpbar,
+    #statusbar .equipment-icon,
+    #statusbar #gold-display {
+        pointer-events: auto !important;
     }
     /* Show statusbar only during game */
     .game #statusbar {
@@ -166,7 +175,7 @@ footer, header, hgroup, menu, nav, section {
     #statusbar #hitpoints {
         height: 100% !important;
         background: linear-gradient(to bottom, #e44, #a22) !important;
-        width: 100% !important;
+        /* width set by JavaScript - no !important here */
         transition: width 0.3s ease !important;
         position: relative !important;
         top: auto !important;
@@ -187,7 +196,7 @@ footer, header, hgroup, menu, nav, section {
     #statusbar #xpfill {
         height: 100% !important;
         background: linear-gradient(to right, #4a0, #8f0) !important;
-        width: 0% !important;
+        /* width set by JavaScript - no !important here */
         transition: width 0.3s ease !important;
     }
     #statusbar #level-display {
@@ -199,16 +208,25 @@ footer, header, hgroup, menu, nav, section {
         font-size: 10px !important;
         text-shadow: 1px 1px 0 #000 !important;
     }
-    /* Equipment icons */
-    #statusbar .equipment-icon {
+    /* Equipment icons - sprite sheets need to show only first frame, scaled up */
+    #statusbar .equipment-icon,
+    #statusbar #weapon,
+    #statusbar #armor {
         width: 32px !important;
         height: 32px !important;
-        background-size: contain !important;
+        background-size: auto 150% !important; /* Scale up 1.5x so small items are visible but fit */
         background-repeat: no-repeat !important;
-        background-position: center !important;
+        background-position: 0 center !important; /* Show first (leftmost) frame */
         border: 2px solid #5a4a3a !important;
         border-radius: 4px !important;
         background-color: rgba(0,0,0,0.5) !important;
+        overflow: hidden !important; /* Clip anything outside the box */
+        /* Override legacy absolute positioning */
+        position: relative !important;
+        left: auto !important;
+        top: auto !important;
+        margin-right: 4px !important;
+        image-rendering: pixelated !important; /* Keep pixel art crisp */
     }
     /* Gold display */
     #statusbar #gold-display {
