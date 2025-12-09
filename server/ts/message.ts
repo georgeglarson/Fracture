@@ -405,6 +405,40 @@ export const Messages = {
         this.streak,
         this.isNewDay ? 1 : 0];
     }
+  },
+
+  // Shop System - send shop inventory to player
+  ShopOpen: class {
+    constructor(
+      private npcKind: number,
+      private shopName: string,
+      private items: Array<{ itemKind: number; price: number; stock: number }>
+    ) {}
+
+    serialize() {
+      return [Types.Messages.SHOP_OPEN,
+        this.npcKind,
+        this.shopName,
+        this.items];
+    }
+  },
+
+  // Shop System - result of purchase attempt
+  ShopBuyResult: class {
+    constructor(
+      private success: boolean,
+      private itemKind: number,
+      private newGold: number,
+      private message: string
+    ) {}
+
+    serialize() {
+      return [Types.Messages.SHOP_BUY_RESULT,
+        this.success ? 1 : 0,
+        this.itemKind,
+        this.newGold,
+        this.message];
+    }
   }
 };
 

@@ -13,6 +13,7 @@ import {Chest} from './chest';
 import {getVeniceService} from './ai';
 import {EquipmentManager} from './equipment/equipment-manager';
 import {EquipmentSlot, getSlotForKind} from '../../shared/ts/equipment/equipment-types';
+import {shopService, isMerchant, getShopInventory} from './shop/shop.service';
 
 export class Player extends Character {
 
@@ -96,6 +97,7 @@ export class Player extends Character {
         self.kind = Types.Entities.WARRIOR;
         self.equipArmor(message[2]);
         self.equipWeapon(message[3]);
+        self.setGold(message[4] || 0);
         self.orientation = Utils.randomOrientation();
         self.updateHitPoints();
         self.updatePosition();
@@ -283,6 +285,12 @@ export class Player extends Character {
         var lastLoginDate = message[1] || null; // ISO date string or empty string (treat as null)
         var currentStreak = message[2] || 0;
         self.handleDailyCheck(lastLoginDate === '' ? null : lastLoginDate, currentStreak);
+      }
+      // Shop system - buy item
+      else if (action === Types.Messages.SHOP_BUY) {
+        var npcKind = message[1];
+        var itemKind = message[2];
+        self.handleShopBuy(npcKind, itemKind);
       }
       else {
         if (self.message_callback) {
@@ -609,6 +617,16 @@ export class Player extends Character {
     const npcType = Types.getKindAsString(npcKind);
     console.log(`[Venice] npcType resolved to: ${npcType}, venice service: ${venice ? 'available' : 'null'}`);
 
+    // Check if this NPC is a merchant - if so, send shop data too
+    if (isMerchant(npcKind)) {
+      const shop = getShopInventory(npcKind);
+      if (shop) {
+        console.log(`[Shop] Opening shop: ${shop.name}`);
+        const items = shopService.getInventoryWithStock(npcKind);
+        this.send(new Messages.ShopOpen(npcKind, shop.name, items || []).serialize());
+      }
+    }
+
     if (!venice || !npcType) {
       // Fallback: send empty response
       console.log('[Venice] Sending fallback response (no venice or npcType)');
@@ -757,6 +775,66 @@ export class Player extends Character {
     if (venice) {
       venice.cleanupPlayer(this.id.toString());
     }
+  }
+
+  // ============================================================================
+  // SHOP SYSTEM HANDLERS
+  // ============================================================================
+
+  /**
+   * Handle a shop purchase request
+   */
+  handleShopBuy(npcKind: number, itemKind: number) {
+    console.log(`[Shop] ${this.name} attempting to buy item ${itemKind} from NPC ${npcKind}`);
+
+    const result = shopService.processPurchase(npcKind, itemKind, this.gold);
+
+    if (result.success) {
+      // Deduct gold
+      this.gold -= result.cost;
+      console.log(`[Shop] ${this.name} purchased item ${itemKind} for ${result.cost}g (new balance: ${this.gold}g)`);
+
+      // Give item to player (equip it)
+      if (Types.isWeapon(itemKind)) {
+        this.equipWeapon(itemKind);
+        this.broadcast(new Messages.EquipItem(this, itemKind).serialize());
+      } else if (Types.isArmor(itemKind)) {
+        this.equipArmor(itemKind);
+        this.broadcast(new Messages.EquipItem(this, itemKind).serialize());
+      } else if (Types.isHealingItem(itemKind)) {
+        // Consumables heal immediately
+        // Use ConsumableStats from item-tables
+        const healAmount = this.getConsumableHealAmount(itemKind);
+        if (healAmount > 0 && this.hitPoints < this.maxHitPoints) {
+          this.regenHealthBy(healAmount);
+          this.broadcast(new Messages.Health(this.hitPoints).serialize(), false);
+        }
+      }
+
+      // Send success response with new gold total
+      this.send(new Messages.ShopBuyResult(true, itemKind, this.gold, result.message).serialize());
+
+      // Also send gold update
+      this.send(new Messages.GoldGain(0, this.gold).serialize());
+    } else {
+      // Send failure response
+      console.log(`[Shop] ${this.name} failed to buy: ${result.message}`);
+      this.send(new Messages.ShopBuyResult(false, itemKind, this.gold, result.message).serialize());
+    }
+  }
+
+  /**
+   * Get heal amount for consumable items
+   */
+  private getConsumableHealAmount(itemKind: number): number {
+    // Based on ConsumableStats in item-tables.ts
+    const healAmounts: Record<number, number> = {
+      [Types.Entities.FLASK]: 40,
+      [Types.Entities.BURGER]: 100,
+      [Types.Entities.CAKE]: 60,
+      [Types.Entities.FIREPOTION]: 0 // Fire potion is special effect, not heal
+    };
+    return healAmounts[itemKind] || 0;
   }
 
   // Town Crier: Handle newspaper request

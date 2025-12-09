@@ -63,6 +63,10 @@ export class GameClient {
   // Daily reward callbacks
   daily_reward_callback;
 
+  // Shop system callbacks
+  shop_open_callback;
+  shop_buy_result_callback;
+
   constructor(host, port) {
 
     this.host = host;
@@ -109,6 +113,10 @@ export class GameClient {
 
     // Daily reward handlers
     this.handlers[Types.Messages.DAILY_REWARD] = this.receiveDailyReward;
+
+    // Shop system handlers
+    this.handlers[Types.Messages.SHOP_OPEN] = this.receiveShopOpen;
+    this.handlers[Types.Messages.SHOP_BUY_RESULT] = this.receiveShopBuyResult;
 
     this.enable();
   }
@@ -707,11 +715,12 @@ export class GameClient {
     this.sendMessage([Types.Messages.NEWS_REQUEST]);
   }
 
-  sendHello(player) {
+  sendHello(player, gold: number = 0) {
     this.sendMessage([Types.Messages.HELLO,
       player.name,
       Types.getKindFromString(player.getSpriteName()),
-      Types.getKindFromString(player.getWeaponName())]);
+      Types.getKindFromString(player.getWeaponName()),
+      gold]);
   }
 
   sendMove(x, y) {
@@ -867,5 +876,43 @@ export class GameClient {
 
   sendDailyCheck(lastLoginDate: string, currentStreak: number) {
     this.sendMessage([Types.Messages.DAILY_CHECK, lastLoginDate, currentStreak]);
+  }
+
+  // Shop system receive methods
+  receiveShopOpen(data) {
+    var npcKind = data[1],
+      shopName = data[2],
+      items = data[3]; // Array of {itemKind, price, stock}
+
+    console.log('[Shop] Opening shop:', shopName, 'items:', items);
+
+    if (this.shop_open_callback) {
+      this.shop_open_callback(npcKind, shopName, items);
+    }
+  }
+
+  receiveShopBuyResult(data) {
+    var success = data[1] === 1,
+      itemKind = data[2],
+      newGold = data[3],
+      message = data[4];
+
+    console.log('[Shop] Purchase result:', success ? 'SUCCESS' : 'FAILED', message);
+
+    if (this.shop_buy_result_callback) {
+      this.shop_buy_result_callback(success, itemKind, newGold, message);
+    }
+  }
+
+  onShopOpen(callback) {
+    this.shop_open_callback = callback;
+  }
+
+  onShopBuyResult(callback) {
+    this.shop_buy_result_callback = callback;
+  }
+
+  sendShopBuy(npcKind: number, itemKind: number) {
+    this.sendMessage([Types.Messages.SHOP_BUY, npcKind, itemKind]);
   }
 }

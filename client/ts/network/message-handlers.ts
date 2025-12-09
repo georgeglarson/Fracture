@@ -40,6 +40,9 @@ export function setupNetworkHandlers(game: Game, client: GameClient): void {
 
   // Misc handlers
   setupMiscHandlers(game, client);
+
+  // Shop handlers
+  setupShopHandlers(game, client);
 }
 
 function setupSpawnHandlers(game: Game, client: GameClient): void {
@@ -334,7 +337,12 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
 
     if (player) {
       if (Types.isArmor(itemKind)) {
-        player.setSprite(game.sprites[itemName]);
+        var sprite = game.sprites[itemName];
+        if (sprite) {
+          player.setSprite(sprite);
+        } else {
+          console.error('[Equip] Missing sprite for armor:', itemName);
+        }
       } else if (Types.isWeapon(itemKind)) {
         player.setWeaponName(itemName);
       }
@@ -588,4 +596,14 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
 
 function setupMiscHandlers(game: Game, client: GameClient): void {
   // Any additional handlers can be added here
+}
+
+function setupShopHandlers(game: Game, client: GameClient): void {
+  client.onShopOpen(function (npcKind, shopName, items) {
+    game.showShop(npcKind, shopName, items);
+  });
+
+  client.onShopBuyResult(function (success, itemKind, newGold, message) {
+    game.handleShopBuyResult(success, itemKind, newGold, message);
+  });
 }

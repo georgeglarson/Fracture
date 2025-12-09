@@ -49,7 +49,12 @@ export const Types: any = {
     LEVEL_UP: 42,   // Player levels up [42, newLevel, bonusHP, bonusDamage]
     GOLD_GAIN: 43,  // Player gains gold [43, amount, totalGold]
     DAILY_CHECK: 44,   // Client sends lastLoginDate to check daily [44, lastLoginDate]
-    DAILY_REWARD: 45   // Server sends daily reward [45, gold, xp, streak, isNewDay]
+    DAILY_REWARD: 45,  // Server sends daily reward [45, gold, xp, streak, isNewDay]
+
+    // Shop system
+    SHOP_OPEN: 46,     // Server sends shop inventory [46, npcKind, shopName, items[{itemKind, price, stock}]]
+    SHOP_BUY: 47,      // Client requests purchase [47, npcKind, itemKind]
+    SHOP_BUY_RESULT: 48 // Server confirms purchase [48, success, itemKind, newGold, message]
   },
 
   Entities: {

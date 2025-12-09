@@ -7,7 +7,7 @@ export class FormatChecker {
 
   constructor() {
 
-    this.formats[Types.Messages.HELLO] = ['s', 'n', 'n'];
+    this.formats[Types.Messages.HELLO] = ['s', 'n', 'n', 'n']; // name, armor, weapon, gold
     this.formats[Types.Messages.MOVE] = ['n', 'n'];
     this.formats[Types.Messages.LOOTMOVE] = ['n', 'n', 'n'];
     this.formats[Types.Messages.AGGRO] = ['n'];
@@ -31,6 +31,9 @@ export class FormatChecker {
 
     // Daily reward system
     this.formats[Types.Messages.DAILY_CHECK] = ['s', 'n']; // lastLoginDate (ISO string or ""), currentStreak
+
+    // Shop system
+    this.formats[Types.Messages.SHOP_BUY] = ['n', 'n']; // npcKind, itemKind
   }
 
   check(msg) {

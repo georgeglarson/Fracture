@@ -990,7 +990,8 @@ export class Game {
    * @see GameClient.sendHello
    */
   sendHello(player?) {
-    this.client.sendHello(player || this.player);
+    const gold = this.storage.getGold();
+    this.client.sendHello(player || this.player, gold);
   }
 
   /**
@@ -1870,5 +1871,172 @@ export class Game {
     }, 3000);
 
     console.info('[Daily] Reward popup shown: +' + gold + 'g, +' + xp + ' XP, streak: ' + streak);
+  }
+
+  // Shop system
+  currentShopNpcKind: number | null = null;
+  currentShopItems: Array<{ itemKind: number; price: number; stock: number }> = [];
+
+  showShop(npcKind: number, shopName: string, items: Array<{ itemKind: number; price: number; stock: number }>) {
+    const popup = document.getElementById('shop-popup');
+    if (!popup) return;
+
+    this.currentShopNpcKind = npcKind;
+    this.currentShopItems = items;
+
+    // Update shop name
+    const nameEl = document.getElementById('shop-name');
+    if (nameEl) nameEl.textContent = shopName;
+
+    // Update player gold
+    const goldEl = document.getElementById('shop-player-gold');
+    if (goldEl) goldEl.textContent = this.playerGold.toString();
+
+    // Populate items
+    const itemsList = document.getElementById('shop-items-list');
+    if (itemsList) {
+      itemsList.innerHTML = '';
+
+      items.forEach(item => {
+        const itemName = Types.getKindAsString(item.itemKind);
+        const displayName = this.getItemDisplayName(item.itemKind);
+        const canAfford = this.playerGold >= item.price;
+        const inStock = item.stock !== 0;
+
+        const itemEl = document.createElement('div');
+        itemEl.className = 'shop-item';
+        itemEl.innerHTML = `
+          <div class="shop-item-icon" style="background-image: url('img/2/item-${itemName}.png')"></div>
+          <div class="shop-item-info">
+            <div class="shop-item-name">${displayName}</div>
+            <div class="shop-item-stock ${item.stock !== -1 && item.stock <= 2 ? 'limited' : ''}">
+              ${item.stock === -1 ? 'In Stock' : item.stock === 0 ? 'Out of Stock' : `${item.stock} left`}
+            </div>
+          </div>
+          <div class="shop-item-price">${item.price}g</div>
+          <button class="shop-buy-btn" data-item="${item.itemKind}" ${!canAfford || !inStock ? 'disabled' : ''}>
+            ${!inStock ? 'Sold' : !canAfford ? 'Need Gold' : 'Buy'}
+          </button>
+        `;
+        itemsList.appendChild(itemEl);
+      });
+
+      // Add click handlers for buy buttons
+      itemsList.querySelectorAll('.shop-buy-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const target = e.target as HTMLButtonElement;
+          const itemKind = parseInt(target.dataset.item || '0', 10);
+          if (itemKind && this.currentShopNpcKind !== null) {
+            this.client.sendShopBuy(this.currentShopNpcKind, itemKind);
+          }
+        });
+      });
+    }
+
+    // Clear message
+    const msgEl = document.getElementById('shop-message');
+    if (msgEl) {
+      msgEl.textContent = '';
+      msgEl.className = '';
+    }
+
+    // Show popup
+    popup.classList.add('active');
+
+    // Add close button handler
+    const closeBtn = popup.querySelector('.shop-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.hideShop(), { once: true });
+    }
+
+    // Close on clicking outside
+    popup.addEventListener('click', (e) => {
+      if (e.target === popup) this.hideShop();
+    }, { once: true });
+
+    console.info('[Shop] Opened:', shopName, 'with', items.length, 'items');
+  }
+
+  hideShop() {
+    const popup = document.getElementById('shop-popup');
+    if (popup) {
+      popup.classList.remove('active');
+    }
+    this.currentShopNpcKind = null;
+    this.currentShopItems = [];
+  }
+
+  handleShopBuyResult(success: boolean, itemKind: number, newGold: number, message: string) {
+    try {
+      const msgEl = document.getElementById('shop-message');
+      if (msgEl) {
+        msgEl.textContent = message;
+        msgEl.className = success ? '' : 'error';
+      }
+
+      if (success) {
+        // Update gold
+        this.playerGold = newGold;
+        if (this.playergold_callback) {
+          this.playergold_callback(newGold);
+        }
+        this.storage.saveGold(newGold);
+
+        // Update gold display in shop
+        const goldEl = document.getElementById('shop-player-gold');
+        if (goldEl) goldEl.textContent = newGold.toString();
+
+        // Refresh shop to update button states and stock
+        if (this.currentShopNpcKind !== null) {
+          // Update local stock
+          const item = this.currentShopItems.find(i => i.itemKind === itemKind);
+          if (item && item.stock > 0) {
+            item.stock--;
+          }
+
+          // Re-render buttons
+          this.updateShopButtons();
+        }
+
+        // Play sound
+        if (this.audioManager) {
+          this.audioManager.playSound('loot');
+        }
+      }
+    } catch (e) {
+      console.error('[Shop] Error handling buy result:', e);
+    }
+  }
+
+  updateShopButtons() {
+    const itemsList = document.getElementById('shop-items-list');
+    if (!itemsList) return;
+
+    itemsList.querySelectorAll('.shop-item').forEach((itemEl, index) => {
+      const item = this.currentShopItems[index];
+      if (!item) return;
+
+      const btn = itemEl.querySelector('.shop-buy-btn') as HTMLButtonElement;
+      const stockEl = itemEl.querySelector('.shop-item-stock');
+
+      if (btn) {
+        const canAfford = this.playerGold >= item.price;
+        const inStock = item.stock !== 0;
+        btn.disabled = !canAfford || !inStock;
+        btn.textContent = !inStock ? 'Sold' : !canAfford ? 'Need Gold' : 'Buy';
+      }
+
+      if (stockEl) {
+        stockEl.textContent = item.stock === -1 ? 'In Stock' : item.stock === 0 ? 'Out of Stock' : `${item.stock} left`;
+        stockEl.className = 'shop-item-stock' + (item.stock !== -1 && item.stock <= 2 ? ' limited' : '');
+      }
+    });
+  }
+
+  getItemDisplayName(itemKind: number): string {
+    const kindString = Types.getKindAsString(itemKind);
+    // Convert camelCase/lowercase to Title Case
+    const words = kindString.replace(/([A-Z])/g, ' $1').toLowerCase().split(/[\s_-]+/);
+    return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   }
 }

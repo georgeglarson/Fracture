@@ -1577,3 +1577,159 @@ footer, header, hgroup, menu, nav, section {
     70% { transform: scale(1.1); }
     100% { transform: scale(1); opacity: 1; }
 }
+
+/* Shop Popup Styles */
+#shop-popup {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+#shop-popup.active {
+    display: flex;
+}
+
+.shop-content {
+    background: linear-gradient(135deg, #2a1f0f 0%, #1a1208 100%);
+    border: 3px solid #8B7355;
+    border-radius: 8px;
+    padding: 0;
+    min-width: 300px;
+    max-width: 400px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(139, 115, 85, 0.3);
+    font-family: 'GraphicPixel', sans-serif;
+}
+
+.shop-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: linear-gradient(180deg, #3d2c14 0%, #2a1f0f 100%);
+    border-bottom: 2px solid #8B7355;
+    border-radius: 5px 5px 0 0;
+}
+
+#shop-name {
+    font-size: 18px;
+    color: #FFD700;
+    text-shadow: 1px 1px 2px #000;
+}
+
+#shop-gold {
+    font-size: 14px;
+    color: #FFD700;
+}
+
+.shop-close {
+    font-size: 24px;
+    color: #AAA;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 5px;
+}
+
+.shop-close:hover {
+    color: #FFF;
+}
+
+.shop-items {
+    padding: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.shop-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid #555;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.shop-item:hover {
+    background: rgba(139, 115, 85, 0.3);
+    border-color: #8B7355;
+}
+
+.shop-item-icon {
+    width: 32px;
+    height: 32px;
+    margin-right: 10px;
+    image-rendering: pixelated;
+    background: url('../img/2/item-sword1.png') no-repeat center;
+    background-size: contain;
+}
+
+.shop-item-info {
+    flex: 1;
+}
+
+.shop-item-name {
+    font-size: 14px;
+    color: #FFF;
+    margin-bottom: 2px;
+}
+
+.shop-item-stock {
+    font-size: 11px;
+    color: #888;
+}
+
+.shop-item-stock.limited {
+    color: #FF6B6B;
+}
+
+.shop-item-price {
+    font-size: 14px;
+    color: #FFD700;
+    margin-right: 10px;
+}
+
+.shop-buy-btn {
+    padding: 5px 12px;
+    background: linear-gradient(180deg, #4CAF50 0%, #388E3C 100%);
+    border: 1px solid #2E7D32;
+    border-radius: 3px;
+    color: #FFF;
+    font-family: 'GraphicPixel', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.shop-buy-btn:hover {
+    background: linear-gradient(180deg, #66BB6A 0%, #4CAF50 100%);
+}
+
+.shop-buy-btn:disabled {
+    background: linear-gradient(180deg, #666 0%, #444 100%);
+    border-color: #333;
+    cursor: not-allowed;
+    color: #888;
+}
+
+.shop-footer {
+    padding: 8px 15px;
+    border-top: 1px solid #555;
+    min-height: 20px;
+}
+
+#shop-message {
+    font-size: 12px;
+    color: #8AE68A;
+}
+
+#shop-message.error {
+    color: #FF6B6B;
+}
