@@ -67,6 +67,12 @@ export class GameClient {
   shop_open_callback;
   shop_buy_result_callback;
 
+  // Achievement system callbacks
+  achievement_init_callback;
+  achievement_unlock_callback;
+  achievement_progress_callback;
+  player_title_update_callback;
+
   constructor(host, port) {
 
     this.host = host;
@@ -117,6 +123,12 @@ export class GameClient {
     // Shop system handlers
     this.handlers[Types.Messages.SHOP_OPEN] = this.receiveShopOpen;
     this.handlers[Types.Messages.SHOP_BUY_RESULT] = this.receiveShopBuyResult;
+
+    // Achievement system handlers
+    this.handlers[Types.Messages.ACHIEVEMENT_INIT] = this.receiveAchievementInit;
+    this.handlers[Types.Messages.ACHIEVEMENT_UNLOCK] = this.receiveAchievementUnlock;
+    this.handlers[Types.Messages.ACHIEVEMENT_PROGRESS] = this.receiveAchievementProgress;
+    this.handlers[Types.Messages.PLAYER_TITLE_UPDATE] = this.receivePlayerTitleUpdate;
 
     this.enable();
   }
@@ -914,5 +926,72 @@ export class GameClient {
 
   sendShopBuy(npcKind: number, itemKind: number) {
     this.sendMessage([Types.Messages.SHOP_BUY, npcKind, itemKind]);
+  }
+
+  // Achievement system receive methods
+  receiveAchievementInit(data) {
+    // data: [ACHIEVEMENT_INIT, unlockedIds[], progressMap{}, selectedTitle]
+    var unlockedIds = data[1] || [];
+    var progressMap = data[2] || {};
+    var selectedTitle = data[3] || null;
+
+    console.log('[Achievements] Init received:', unlockedIds.length, 'unlocked, title:', selectedTitle);
+
+    if (this.achievement_init_callback) {
+      this.achievement_init_callback(unlockedIds, progressMap, selectedTitle);
+    }
+  }
+
+  receiveAchievementUnlock(data) {
+    var achievementId = data[1];
+
+    console.log('[Achievements] Unlocked:', achievementId);
+
+    if (this.achievement_unlock_callback) {
+      this.achievement_unlock_callback(achievementId);
+    }
+  }
+
+  receiveAchievementProgress(data) {
+    var achievementId = data[1],
+      current = data[2],
+      target = data[3];
+
+    console.log('[Achievements] Progress:', achievementId, current + '/' + target);
+
+    if (this.achievement_progress_callback) {
+      this.achievement_progress_callback(achievementId, current, target);
+    }
+  }
+
+  receivePlayerTitleUpdate(data) {
+    var playerId = data[1],
+      title = data[2] || null;
+
+    console.log('[Achievements] Player', playerId, 'title updated to:', title);
+
+    if (this.player_title_update_callback) {
+      this.player_title_update_callback(playerId, title);
+    }
+  }
+
+  onAchievementInit(callback) {
+    this.achievement_init_callback = callback;
+  }
+
+  onAchievementUnlock(callback) {
+    this.achievement_unlock_callback = callback;
+  }
+
+  onAchievementProgress(callback) {
+    this.achievement_progress_callback = callback;
+  }
+
+  onPlayerTitleUpdate(callback) {
+    this.player_title_update_callback = callback;
+  }
+
+  sendSelectTitle(achievementId: string) {
+    this.sendMessage([Types.Messages.ACHIEVEMENT_SELECT_TITLE, achievementId]);
   }
 }

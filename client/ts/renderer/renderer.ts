@@ -623,9 +623,24 @@ export class Renderer {
     this.context.save();
     if (entity.name && entity instanceof Player) {
       var color = (entity.id === this.game.playerId) ? '#fcda5c' : 'white';
+      var nameY = (entity.y + entity.nameOffsetY) * this.scale;
+
+      // Draw player title above name (if they have one)
+      var title = this.game.getPlayerTitle(entity.id);
+      if (title) {
+        // Draw title in gold/purple color above the name
+        var titleColor = '#bb88ff'; // Light purple for titles
+        this.drawText('<' + title + '>',
+          (entity.x + 8) * this.scale,
+          nameY - (8 * this.scale),
+          true,
+          titleColor,
+          true); // smaller font for title
+      }
+
       this.drawText(entity.name,
         (entity.x + 8) * this.scale,
-        (entity.y + entity.nameOffsetY) * this.scale,
+        nameY,
         true,
         color);
     }

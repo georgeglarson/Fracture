@@ -54,7 +54,14 @@ export const Types: any = {
     // Shop system
     SHOP_OPEN: 46,     // Server sends shop inventory [46, npcKind, shopName, items[{itemKind, price, stock}]]
     SHOP_BUY: 47,      // Client requests purchase [47, npcKind, itemKind]
-    SHOP_BUY_RESULT: 48 // Server confirms purchase [48, success, itemKind, newGold, message]
+    SHOP_BUY_RESULT: 48, // Server confirms purchase [48, success, itemKind, newGold, message]
+
+    // Achievement system
+    ACHIEVEMENT_INIT: 49,         // Server sends achievement state on connect [49, unlocked[], progress{}, selectedTitle]
+    ACHIEVEMENT_SELECT_TITLE: 50, // Client selects title [50, achievementId or null]
+    ACHIEVEMENT_UNLOCK: 51,       // Server notifies achievement unlocked [51, achievementId]
+    ACHIEVEMENT_PROGRESS: 52,     // Server sends progress update [52, achievementId, current, target]
+    PLAYER_TITLE_UPDATE: 53       // Server broadcasts title change [53, playerId, title or null]
   },
 
   Entities: {

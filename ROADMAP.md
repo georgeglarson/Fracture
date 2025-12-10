@@ -2,11 +2,11 @@
 
 > A living document tracking the path from foundation to addictive, successful game.
 
-## Current State: Core Loop In Progress
+## Current State: Phase 1 Complete! 🎉
 
-We have a modular game engine with AI integration, player progression, and basic economy.
+We have a fully playable core game loop with items, progression, economy, and shops.
 
-**Tag:** `v1.1.0-spec-kit`
+**Tag:** `v1.3.0-achievements`
 
 **What exists:**
 - Real-time multiplayer browser game
@@ -16,16 +16,17 @@ We have a modular game engine with AI integration, player progression, and basic
 - Town Crier newspaper aggregating world events
 - Entity thought bubbles
 - Typed EventBus for decoupled systems
-- **XP/Level progression system** (002 complete)
-- **Gold economy from mob drops** (003 MVP complete)
-- **Daily login rewards with streak bonuses** (004 partial)
-- **Combat polish** (screen shake, particles, death effects)
-- **Fullscreen responsive UI** with status bar
+- **Item System** with rarity, properties, tooltips (001 ✅)
+- **XP/Level progression system** (002 ✅)
+- **Gold economy + NPC shops** (003 ✅)
+- **Daily login rewards with streak bonuses** (004 ✅)
+- **Achievements & titles** with progress tracking (005 ✅)
+- **Combat polish** - screen shake, particles, death effects (010 ✅)
+- **Fullscreen responsive UI** with status bar (011 ✅)
 
 **What's missing for a "real game":**
-- Item depth (properties, rarity, comparison)
-- NPC shops and trading
-- Skill trees
+- Inventory system (carry multiple items)
+- Social features (friends, parties)
 - More content (areas, mobs, bosses)
 
 ---
@@ -34,15 +35,16 @@ We have a modular game engine with AI integration, player progression, and basic
 
 > Goal: Create the compulsion loop that keeps players coming back.
 
-### 001: Item System
+### 001: Item System ✅
 **Impact:** High - Loot is the heartbeat of an RPG
-**Status:** Draft spec ready
+**Status:** Complete (MVP)
 
-- Random item properties (damage rolls, bonus stats)
-- Rarity tiers with visual distinction
-- Item comparison tooltips
-- Inventory system
-- Drop tables per mob/area
+- [x] Random item properties (damage rolls, bonus stats)
+- [x] Rarity tiers (Common/Uncommon/Rare/Epic/Legendary)
+- [x] Item comparison tooltips
+- [x] Drop key (D) to drop equipped weapon
+- [ ] Inventory system (future)
+- [ ] Drop tables per mob/area (future)
 
 ### 002: Progression System ✅
 **Impact:** High - Levels = goals = retention
@@ -56,13 +58,15 @@ We have a modular game engine with AI integration, player progression, and basic
 
 ### 003: Economy System ✅
 **Impact:** Medium - Enables trading, adds gold sink/source
-**Status:** Complete (MVP)
+**Status:** Complete
 
 - [x] Gold currency from mob drops
 - [x] Gold display in status bar
 - [x] Gold persistence in localStorage
-- [ ] NPC merchant shops (future)
-- [ ] Item buying/selling (future)
+- [x] NPC merchant shops
+- [x] Item buying from shops
+- [x] Gold sync on player connect
+- [ ] Item selling to shops (future)
 - [ ] Player-to-player trading (future)
 
 ---
@@ -80,10 +84,16 @@ We have a modular game engine with AI integration, player progression, and basic
 - [ ] Daily quests with bonus XP/gold (future)
 - [ ] Weekend events with special rewards (future)
 
-### 005: Achievements & Titles
-- Achievement system with tiers
-- Unlockable titles (displayed on character)
-- Achievement-linked rewards
+### 005: Achievements & Titles ✅
+**Status:** Complete (MVP)
+
+- [x] 14 achievements across 4 categories (combat, wealth, progression, exploration)
+- [x] Achievement progress tracking (kills, gold, levels, streaks)
+- [x] Unlockable titles displayed above player names
+- [x] Title selection and broadcasting to other players
+- [x] Achievement unlock notifications
+- [x] LocalStorage persistence
+- [ ] Achievement panel UI (future)
 
 ### 006: Social Features
 - Friends list
@@ -188,4 +198,4 @@ We have a modular game engine with AI integration, player progression, and basic
 ---
 
 *This roadmap is not a timeline. It's a direction.*
-*Last updated: 2025-12-09*
+*Last updated: 2025-12-10*

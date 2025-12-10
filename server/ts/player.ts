@@ -14,6 +14,8 @@ import {getVeniceService} from './ai';
 import {EquipmentManager} from './equipment/equipment-manager';
 import {EquipmentSlot, getSlotForKind} from '../../shared/ts/equipment/equipment-types';
 import {shopService, isMerchant, getShopInventory} from './shop/shop.service';
+import {getAchievementService} from './achievements/achievement.service';
+import {PlayerAchievements} from '../../shared/ts/achievements';
 
 export class Player extends Character {
 
@@ -43,6 +45,9 @@ export class Player extends Character {
 
   // Economy system
   gold: number = 0;
+
+  // Achievement system
+  title: string | null = null;
 
   // Daily reward tables (streak day 1-7)
   private static DAILY_GOLD = [10, 15, 20, 25, 35, 50, 100];
@@ -108,6 +113,9 @@ export class Player extends Character {
         self.send([Types.Messages.WELCOME, self.id, self.name, self.x, self.y, self.hitPoints]);
         self.hasEnteredGame = true;
         self.isDead = false;
+
+        // Initialize achievement system
+        self.initAchievements();
 
         // AI Narrator: Welcome the player
         self.triggerNarration('join');
@@ -291,6 +299,11 @@ export class Player extends Character {
         var npcKind = message[1];
         var itemKind = message[2];
         self.handleShopBuy(npcKind, itemKind);
+      }
+      // Achievement system - select title
+      else if (action === Types.Messages.ACHIEVEMENT_SELECT_TITLE) {
+        var achievementId = message[1];
+        self.handleSelectTitle(achievementId === '' ? null : achievementId);
       }
       else {
         if (self.message_callback) {
@@ -483,6 +496,9 @@ export class Player extends Character {
     // Send level up message
     this.send(new Messages.LevelUp(this.level, bonusHP, bonusDamage).serialize());
     this.send(new Messages.HitPoints(this.maxHitPoints).serialize());
+
+    // Check level achievements
+    this.checkLevelAchievements(this.level);
   }
 
   /**
@@ -508,6 +524,11 @@ export class Player extends Character {
 
     // Send gold gain message to player
     this.send(new Messages.GoldGain(amount, this.gold).serialize());
+
+    // Check wealth achievements
+    if (amount > 0) {
+      this.checkGoldAchievements(amount);
+    }
   }
 
   /**
@@ -575,6 +596,9 @@ export class Player extends Character {
 
     // Send daily reward notification for popup
     this.send(new Messages.DailyReward(goldReward, xpReward, streak, isNewDay).serialize());
+
+    // Check streak achievements
+    this.checkStreakAchievements(streak);
   }
 
   /**
@@ -816,6 +840,9 @@ export class Player extends Character {
 
       // Also send gold update
       this.send(new Messages.GoldGain(0, this.gold).serialize());
+
+      // Check purchase achievements
+      this.checkPurchaseAchievements(result.cost);
     } else {
       // Send failure response
       console.log(`[Shop] ${this.name} failed to buy: ${result.message}`);
@@ -940,5 +967,134 @@ export class Player extends Character {
       const fallback = venice.getStaticNarration(event, this.name, details);
       this.send(new Messages.Narrator(fallback.text, fallback.style).serialize());
     }
+  }
+
+  // ============================================================================
+  // ACHIEVEMENT SYSTEM
+  // ============================================================================
+
+  /**
+   * Initialize achievements for this player
+   */
+  initAchievements(savedData?: PlayerAchievements) {
+    const achievementService = getAchievementService();
+
+    // Set up callback for sending messages to this player
+    achievementService.setSendCallback((playerId, message) => {
+      if (playerId === this.id.toString()) {
+        this.send(message);
+      }
+    });
+
+    // Initialize player achievements
+    const achievements = achievementService.initPlayer(this.id.toString(), savedData);
+
+    // Set title from saved data
+    this.title = achievementService.getSelectedTitle(this.id.toString());
+
+    // Send initial achievement state to client
+    this.send([
+      Types.Messages.ACHIEVEMENT_INIT,
+      achievements.unlocked,
+      JSON.stringify(achievements.progress),
+      achievements.selectedTitle || ''
+    ]);
+
+    // Unlock "First Steps" achievement for new players
+    if (!achievements.unlocked.includes('first_steps')) {
+      const rewards = achievementService.recordFirstSteps(this.id.toString());
+      if (rewards) {
+        if (rewards.gold > 0) this.grantGold(rewards.gold);
+        if (rewards.xp > 0) this.grantXP(rewards.xp);
+      }
+    }
+  }
+
+  /**
+   * Handle title selection from client
+   */
+  handleSelectTitle(achievementId: string | null) {
+    const achievementService = getAchievementService();
+    const newTitle = achievementService.selectTitle(this.id.toString(), achievementId);
+    this.title = newTitle;
+
+    // Broadcast title change to all players
+    this.broadcast(new Messages.PlayerTitleUpdate(this.id, newTitle));
+  }
+
+  /**
+   * Called when player kills a mob - check kill achievements
+   */
+  checkKillAchievements(mobKind: number) {
+    const achievementService = getAchievementService();
+    const rewards = achievementService.recordKill(this.id.toString(), mobKind);
+    if (rewards) {
+      if (rewards.gold > 0) this.grantGold(rewards.gold);
+      if (rewards.xp > 0) this.grantXP(rewards.xp);
+    }
+  }
+
+  /**
+   * Called when player earns gold - check wealth achievements
+   */
+  checkGoldAchievements(amount: number) {
+    const achievementService = getAchievementService();
+    const rewards = achievementService.recordGoldEarned(this.id.toString(), amount);
+    if (rewards) {
+      if (rewards.gold > 0) this.grantGold(rewards.gold);
+      if (rewards.xp > 0) this.grantXP(rewards.xp);
+    }
+  }
+
+  /**
+   * Called when player spends gold - check first purchase achievement
+   */
+  checkPurchaseAchievements(amount: number) {
+    const achievementService = getAchievementService();
+    const rewards = achievementService.recordGoldSpent(this.id.toString(), amount);
+    if (rewards) {
+      if (rewards.gold > 0) this.grantGold(rewards.gold);
+      if (rewards.xp > 0) this.grantXP(rewards.xp);
+    }
+  }
+
+  /**
+   * Called when player levels up - check level achievements
+   */
+  checkLevelAchievements(level: number) {
+    const achievementService = getAchievementService();
+    const rewards = achievementService.recordLevel(this.id.toString(), level);
+    if (rewards) {
+      if (rewards.gold > 0) this.grantGold(rewards.gold);
+      if (rewards.xp > 0) this.grantXP(rewards.xp);
+    }
+  }
+
+  /**
+   * Called after daily reward streak - check streak achievements
+   */
+  checkStreakAchievements(streak: number) {
+    const achievementService = getAchievementService();
+    const rewards = achievementService.recordStreak(this.id.toString(), streak);
+    if (rewards) {
+      if (rewards.gold > 0) this.grantGold(rewards.gold);
+      if (rewards.xp > 0) this.grantXP(rewards.xp);
+    }
+  }
+
+  /**
+   * Get serializable achievement state for persistence
+   */
+  getAchievementState(): PlayerAchievements | null {
+    const achievementService = getAchievementService();
+    return achievementService.getSerializableState(this.id.toString());
+  }
+
+  /**
+   * Cleanup achievement data on disconnect
+   */
+  cleanupAchievements() {
+    const achievementService = getAchievementService();
+    achievementService.cleanupPlayer(this.id.toString());
   }
 }

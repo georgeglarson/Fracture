@@ -43,6 +43,9 @@ export function setupNetworkHandlers(game: Game, client: GameClient): void {
 
   // Shop handlers
   setupShopHandlers(game, client);
+
+  // Achievement handlers
+  setupAchievementHandlers(game, client);
 }
 
 function setupSpawnHandlers(game: Game, client: GameClient): void {
@@ -605,5 +608,23 @@ function setupShopHandlers(game: Game, client: GameClient): void {
 
   client.onShopBuyResult(function (success, itemKind, newGold, message) {
     game.handleShopBuyResult(success, itemKind, newGold, message);
+  });
+}
+
+function setupAchievementHandlers(game: Game, client: GameClient): void {
+  client.onAchievementInit(function (unlocked, progress, selectedTitle) {
+    game.handleAchievementInit(unlocked, progress, selectedTitle);
+  });
+
+  client.onAchievementUnlock(function (achievementId) {
+    game.handleAchievementUnlock(achievementId);
+  });
+
+  client.onAchievementProgress(function (achievementId, current, target) {
+    game.handleAchievementProgress(achievementId, current, target);
+  });
+
+  client.onPlayerTitleUpdate(function (playerId, title) {
+    game.handlePlayerTitleUpdate(playerId, title);
   });
 }

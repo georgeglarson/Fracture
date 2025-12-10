@@ -439,6 +439,20 @@ export const Messages = {
         this.newGold,
         this.message];
     }
+  },
+
+  // Achievement System - broadcast title change to all players
+  PlayerTitleUpdate: class {
+    constructor(
+      private playerId: number,
+      private title: string | null
+    ) {}
+
+    serialize() {
+      return [Types.Messages.PLAYER_TITLE_UPDATE,
+        this.playerId,
+        this.title || ''];
+    }
   }
 };
 

@@ -38,6 +38,7 @@ export interface Entity {
   handleKill?(mobType: string): void;
   grantXP?(amount: number): void;  // For progression system
   grantGold?(amount: number): void;  // For economy system
+  checkKillAchievements?(mobKind: number): void;  // For achievement system
 }
 
 export interface Message {
@@ -207,6 +208,11 @@ export class CombatSystem {
       const mobType = Types.getKindAsString(mob.kind);
       if (attacker.handleKill && mobType) {
         attacker.handleKill(mobType);
+      }
+
+      // Check kill achievements
+      if (attacker.checkKillAchievements) {
+        attacker.checkKillAchievements(mob.kind);
       }
 
       // Record world event for Town Crier

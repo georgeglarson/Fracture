@@ -34,6 +34,9 @@ export class FormatChecker {
 
     // Shop system
     this.formats[Types.Messages.SHOP_BUY] = ['n', 'n']; // npcKind, itemKind
+
+    // Achievement system
+    this.formats[Types.Messages.ACHIEVEMENT_SELECT_TITLE] = ['s']; // achievementId (can be empty string for clear)
   }
 
   check(msg) {

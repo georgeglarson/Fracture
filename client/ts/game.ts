@@ -32,6 +32,7 @@ import {ItemTooltip} from './ui/item-tooltip';
 import {setupNetworkHandlers} from './network/message-handlers';
 import {ZoningManager} from './world/zoning-manager';
 import {SpriteLoader} from './assets/sprite-loader';
+import {getAchievementById} from '../../shared/ts/achievements/achievement-data';
 
 export class Game {
 
@@ -150,6 +151,15 @@ export class Game {
   // Economy system
   playergold_callback;
   playerGold: number = 0;
+
+  // Achievement system
+  achievementunlock_callback;
+  achievementprogress_callback;
+  playertitleupdate_callback;
+  unlockedAchievements: string[] = [];
+  achievementProgress: Record<string, { current: number; target: number }> = {};
+  selectedTitle: string | null = null;
+  playerTitles: Record<number, string | null> = {};
 
   constructor(app: App) {
     this.app = app;
@@ -1674,6 +1684,102 @@ export class Game {
 
   onPlayerGoldChange(callback) {
     this.playergold_callback = callback;
+  }
+
+  // Achievement system callbacks
+  onAchievementUnlockNotify(callback) {
+    this.achievementunlock_callback = callback;
+  }
+
+  onAchievementProgress(callback) {
+    this.achievementprogress_callback = callback;
+  }
+
+  onPlayerTitleChange(callback) {
+    this.playertitleupdate_callback = callback;
+  }
+
+  // Achievement handlers
+  handleAchievementInit(unlockedIds: string[], progressMap: Record<string, { current: number; target: number }>, selectedTitle: string | null) {
+    this.unlockedAchievements = unlockedIds;
+    this.achievementProgress = progressMap;
+    this.selectedTitle = selectedTitle;
+
+    // Store own title
+    if (this.player && this.player.id) {
+      this.playerTitles[this.player.id] = selectedTitle;
+    }
+
+    // Save to storage
+    this.storage.saveAchievements(unlockedIds, selectedTitle);
+
+    console.info('[Achievements] Initialized:', unlockedIds.length, 'unlocked, title:', selectedTitle);
+  }
+
+  handleAchievementUnlock(achievementId: string) {
+    if (!this.unlockedAchievements.includes(achievementId)) {
+      this.unlockedAchievements.push(achievementId);
+    }
+
+    // Save to storage
+    this.storage.saveAchievements(this.unlockedAchievements, this.selectedTitle);
+
+    // Look up achievement data for name
+    const achievement = getAchievementById(achievementId);
+    const achievementName = achievement ? achievement.name : achievementId;
+
+    // Show achievement notification through app
+    if (this.app) {
+      this.app.showAchievementNotification(achievementId, achievementName);
+    }
+
+    // Trigger unlock callback for UI notification
+    if (this.achievementunlock_callback) {
+      this.achievementunlock_callback(achievementId);
+    }
+
+    // Play achievement sound
+    if (this.audioManager) {
+      this.audioManager.playSound('achievement');
+    }
+
+    console.info('[Achievements] Unlocked:', achievementId, '(' + achievementName + ')');
+  }
+
+  handleAchievementProgress(achievementId: string, current: number, target: number) {
+    this.achievementProgress[achievementId] = { current, target };
+
+    if (this.achievementprogress_callback) {
+      this.achievementprogress_callback(achievementId, current, target);
+    }
+
+    console.debug('[Achievements] Progress:', achievementId, current + '/' + target);
+  }
+
+  handlePlayerTitleUpdate(playerId: number, title: string | null) {
+    this.playerTitles[playerId] = title;
+
+    // Update own selected title if it's for this player
+    if (this.player && playerId === this.player.id) {
+      this.selectedTitle = title;
+      this.storage.saveAchievements(this.unlockedAchievements, title);
+    }
+
+    if (this.playertitleupdate_callback) {
+      this.playertitleupdate_callback(playerId, title);
+    }
+
+    console.info('[Achievements] Player', playerId, 'title changed to:', title);
+  }
+
+  selectTitle(achievementId: string) {
+    if (this.client) {
+      this.client.sendSelectTitle(achievementId);
+    }
+  }
+
+  getPlayerTitle(playerId: number): string | null {
+    return this.playerTitles[playerId] || null;
   }
 
   resize() {

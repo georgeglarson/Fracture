@@ -26,7 +26,10 @@ export class Storage {
         skeletonCount: 0,
         totalKills: 0,
         totalDmg: 0,
-        totalRevives: 0
+        totalRevives: 0,
+        // New achievement system
+        unlockedIds: [],
+        selectedTitle: null
       },
       progression: {
         level: 1,
@@ -264,6 +267,43 @@ export class Storage {
     if (streak > daily.longestStreak) {
       daily.longestStreak = streak;
     }
+    this.save();
+  }
+
+  // New Achievement System
+
+  getAchievements(): { unlockedIds: string[]; selectedTitle: string | null } {
+    // Initialize new achievement fields if they don't exist
+    if (!this.data.achievements.unlockedIds) {
+      this.data.achievements.unlockedIds = [];
+    }
+    if (this.data.achievements.selectedTitle === undefined) {
+      this.data.achievements.selectedTitle = null;
+    }
+    return {
+      unlockedIds: this.data.achievements.unlockedIds,
+      selectedTitle: this.data.achievements.selectedTitle
+    };
+  }
+
+  saveAchievements(unlockedIds: string[], selectedTitle: string | null) {
+    if (!this.data.achievements.unlockedIds) {
+      this.data.achievements.unlockedIds = [];
+    }
+    this.data.achievements.unlockedIds = unlockedIds;
+    this.data.achievements.selectedTitle = selectedTitle;
+    this.save();
+  }
+
+  getSelectedTitle(): string | null {
+    return this.getAchievements().selectedTitle;
+  }
+
+  saveSelectedTitle(title: string | null) {
+    if (this.data.achievements.selectedTitle === undefined) {
+      this.data.achievements.selectedTitle = null;
+    }
+    this.data.achievements.selectedTitle = title;
     this.save();
   }
 
