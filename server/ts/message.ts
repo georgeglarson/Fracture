@@ -453,6 +453,105 @@ export const Messages = {
         this.playerId,
         this.title || ''];
     }
+  },
+
+  // Party System - invite received notification
+  PartyInviteReceived: class {
+    constructor(
+      private inviterId: number,
+      private inviterName: string
+    ) {}
+
+    serialize() {
+      return [Types.Messages.PARTY_INVITE_RECEIVED,
+        this.inviterId,
+        this.inviterName];
+    }
+  },
+
+  // Party System - player joined party
+  PartyJoin: class {
+    constructor(
+      private partyId: string,
+      private members: Array<{ id: number; name: string; level: number; hp: number; maxHp: number }>,
+      private leaderId: number
+    ) {}
+
+    serialize() {
+      return [Types.Messages.PARTY_JOIN,
+        this.partyId,
+        this.members,
+        this.leaderId];
+    }
+  },
+
+  // Party System - player left party
+  PartyLeave: class {
+    constructor(
+      private playerId: number
+    ) {}
+
+    serialize() {
+      return [Types.Messages.PARTY_LEAVE,
+        this.playerId];
+    }
+  },
+
+  // Party System - party disbanded
+  PartyDisband: class {
+    serialize() {
+      return [Types.Messages.PARTY_DISBAND];
+    }
+  },
+
+  // Party System - party member update (HP, position)
+  PartyUpdate: class {
+    constructor(
+      private members: Array<{ id: number; name: string; level: number; hp: number; maxHp: number }>
+    ) {}
+
+    serialize() {
+      return [Types.Messages.PARTY_UPDATE,
+        this.members];
+    }
+  },
+
+  // Party System - party chat message
+  PartyChat: class {
+    constructor(
+      private senderId: number,
+      private senderName: string,
+      private message: string
+    ) {}
+
+    serialize() {
+      return [Types.Messages.PARTY_CHAT,
+        this.senderId,
+        this.senderName,
+        this.message];
+    }
+  },
+
+  // Player Inspect - result of inspecting another player
+  PlayerInspectResult: class {
+    constructor(
+      private playerId: number,
+      private name: string,
+      private title: string | null,
+      private level: number,
+      private weapon: number,
+      private armor: number
+    ) {}
+
+    serialize() {
+      return [Types.Messages.PLAYER_INSPECT_RESULT,
+        this.playerId,
+        this.name,
+        this.title || '',
+        this.level,
+        this.weapon,
+        this.armor];
+    }
   }
 };
 

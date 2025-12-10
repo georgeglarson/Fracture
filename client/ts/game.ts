@@ -29,6 +29,9 @@ import {EntityManager} from './entities/entity-manager';
 import {InputManager} from './input/input-manager';
 import {UIManager} from './ui/ui-manager';
 import {ItemTooltip} from './ui/item-tooltip';
+import {PartyUI, PartyMember} from './ui/party-ui';
+import {PlayerInspect} from './ui/player-inspect';
+import {ContextMenu} from './ui/context-menu';
 import {setupNetworkHandlers} from './network/message-handlers';
 import {ZoningManager} from './world/zoning-manager';
 import {SpriteLoader} from './assets/sprite-loader';
@@ -58,6 +61,9 @@ export class Game {
   mapQueryService: MapQueryService | null = null;
   uiManager: UIManager | null = null;
   itemTooltip: ItemTooltip | null = null;
+  partyUI: PartyUI | null = null;
+  playerInspect: PlayerInspect | null = null;
+  contextMenu: ContextMenu | null = null;
   zoningManager: ZoningManager | null = null;
   spriteLoader: SpriteLoader | null = null;
 
@@ -529,6 +535,9 @@ export class Game {
 
         // Initialize item tooltip
         self.itemTooltip = new ItemTooltip();
+
+        // Initialize party UI (context menu, party panel, inspect popup)
+        self.initPartyUI();
 
         // Initialize zoning manager
         self.zoningManager = new ZoningManager();
@@ -2144,5 +2153,136 @@ export class Game {
     // Convert camelCase/lowercase to Title Case
     const words = kindString.replace(/([A-Z])/g, ' $1').toLowerCase().split(/[\s_-]+/);
     return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+
+  // Party System
+  initPartyUI() {
+    this.partyUI = new PartyUI();
+    this.playerInspect = new PlayerInspect();
+    this.contextMenu = new ContextMenu();
+
+    // Set player ID when available
+    if (this.player) {
+      this.partyUI.setPlayerId(this.player.id);
+    }
+
+    // Set up party callbacks
+    this.partyUI.setCallbacks({
+      onAcceptInvite: (inviterId) => this.client?.sendPartyAccept(inviterId),
+      onDeclineInvite: (inviterId) => this.client?.sendPartyDecline(inviterId),
+      onLeaveParty: () => this.client?.sendPartyLeave(),
+      onKickMember: (memberId) => this.client?.sendPartyKick(memberId),
+      onSendChat: (message) => this.client?.sendPartyChat(message)
+    });
+
+    // Set up inspect callbacks
+    this.playerInspect.setCallbacks({
+      onInviteToParty: (playerId) => this.client?.sendPartyInvite(playerId)
+    });
+    this.playerInspect.setPartyStatusChecker(() => this.partyUI?.isInParty() ?? false);
+
+    // Set up context menu callbacks
+    this.contextMenu.setCallbacks({
+      onInspect: (entityId) => this.client?.sendPlayerInspect(entityId),
+      onInvite: (playerId) => this.client?.sendPartyInvite(playerId)
+    });
+    this.contextMenu.setPartyStatusChecker(() => this.partyUI?.isInParty() ?? false);
+  }
+
+  handlePartyInvite(inviterId: number, inviterName: string) {
+    if (this.partyUI) {
+      this.partyUI.showInvite(inviterId, inviterName);
+    }
+    console.info('[Party] Received invite from', inviterName);
+  }
+
+  handlePartyJoin(partyId: string, members: PartyMember[], leaderId: number) {
+    if (this.partyUI) {
+      this.partyUI.joinParty(partyId, members, leaderId);
+      // Update renderer with party member IDs
+      this.renderer?.setPartyMembers(members.map(m => m.id));
+    }
+    this.showNotification('Joined party');
+    console.info('[Party] Joined party', partyId);
+  }
+
+  handlePartyLeave(playerId: number) {
+    if (this.partyUI) {
+      this.partyUI.memberLeft(playerId);
+      // Update renderer
+      this.renderer?.setPartyMembers(this.partyUI.getPartyMemberIds());
+    }
+    console.info('[Party] Player left:', playerId);
+  }
+
+  handlePartyDisband() {
+    if (this.partyUI) {
+      this.partyUI.leaveParty();
+      this.renderer?.setPartyMembers([]);
+    }
+    this.showNotification('Party disbanded');
+    console.info('[Party] Party disbanded');
+  }
+
+  handlePartyUpdate(members: PartyMember[]) {
+    if (this.partyUI) {
+      this.partyUI.updateMembers(members);
+      this.renderer?.setPartyMembers(members.map(m => m.id));
+    }
+  }
+
+  handlePartyChat(senderId: number, senderName: string, message: string) {
+    // Show party chat in regular chat with [Party] prefix
+    if (this.partyUI) {
+      this.partyUI.addChatMessage(senderName, message);
+    }
+    // Create chat bubble
+    const entity = this.getEntityById(senderId);
+    if (entity) {
+      this.createBubble(senderId, '[P] ' + message);
+      this.assignBubbleTo(entity);
+    }
+    console.info('[Party Chat]', senderName + ':', message);
+  }
+
+  handlePlayerInspectResult(playerId: number, name: string, title: string | null, level: number, weapon: number, armor: number) {
+    if (this.playerInspect) {
+      this.playerInspect.show({
+        playerId,
+        name,
+        title,
+        level,
+        weapon,
+        armor
+      });
+    }
+  }
+
+  showPlayerContextMenu(playerId: number, playerName: string, screenX: number, screenY: number) {
+    if (this.contextMenu && playerId !== this.playerId) {
+      this.contextMenu.showForPlayer(playerId, playerName, screenX, screenY);
+    }
+  }
+
+  /**
+   * Handle right-click on the game canvas.
+   * Checks if a player is at the clicked position and shows context menu.
+   * @param screenX - Screen X coordinate
+   * @param screenY - Screen Y coordinate
+   * @returns true if context menu was shown
+   */
+  rightClick(screenX: number, screenY: number): boolean {
+    if (!this.started || !this.contextMenu) return false;
+
+    const pos = this.getMouseGridPosition();
+    const entity = this.getEntityAt(pos.x, pos.y);
+
+    // Check if entity is a player (not NPC, not mob, not self)
+    if (entity && entity instanceof Player && entity.id !== this.playerId) {
+      this.showPlayerContextMenu(entity.id, entity.name, screenX, screenY);
+      return true;
+    }
+
+    return false;
   }
 }

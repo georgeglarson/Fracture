@@ -2,11 +2,11 @@
 
 > A living document tracking the path from foundation to addictive, successful game.
 
-## Current State: Phase 1 Complete! 🎉
+## Current State: Phase 2 In Progress! 🎉
 
-We have a fully playable core game loop with items, progression, economy, and shops.
+We have a fully playable core game loop with items, progression, economy, shops, and social features.
 
-**Tag:** `v1.3.0-achievements`
+**Tag:** `v1.4.0-party-system`
 
 **What exists:**
 - Real-time multiplayer browser game
@@ -21,13 +21,14 @@ We have a fully playable core game loop with items, progression, economy, and sh
 - **Gold economy + NPC shops** (003 ✅)
 - **Daily login rewards with streak bonuses** (004 ✅)
 - **Achievements & titles** with progress tracking (005 ✅)
+- **Party system + player inspect** (006 ✅)
 - **Combat polish** - screen shake, particles, death effects (010 ✅)
 - **Fullscreen responsive UI** with status bar (011 ✅)
 
 **What's missing for a "real game":**
 - Inventory system (carry multiple items)
-- Social features (friends, parties)
 - More content (areas, mobs, bosses)
+- Persistent accounts (for friends/guilds)
 
 ---
 
@@ -95,10 +96,18 @@ We have a fully playable core game loop with items, progression, economy, and sh
 - [x] LocalStorage persistence
 - [ ] Achievement panel UI (future)
 
-### 006: Social Features
-- Friends list
-- Party system (shared XP, group quests)
-- Guild foundations
+### 006: Social Features ✅
+**Status:** Partial (Party + Inspect complete)
+
+- [x] Party system with invite/accept/decline/leave
+- [x] Shared XP distribution (equal split + 10% bonus per member)
+- [x] Party chat channel
+- [x] Party member indicators (green diamond + name color)
+- [x] Party UI panel with member HP bars
+- [x] Player inspect popup (right-click on players)
+- [x] Context menu for player interactions
+- [ ] Friends list (requires persistent accounts)
+- [ ] Guild system (requires persistent accounts)
 
 ---
 

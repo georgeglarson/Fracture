@@ -9,6 +9,7 @@ import { Types } from '../../../shared/ts/gametypes.js';
 import { Formulas } from '../formulas.js';
 import { getVeniceService } from '../ai/venice.service.js';
 import { getServerEventBus } from '../../../shared/ts/events/index.js';
+import { PartyService } from '../party/index.js';
 
 export interface Entity {
   id: string | number;
@@ -18,6 +19,8 @@ export interface Entity {
   group?: string;
   hitPoints: number;
   armorLevel?: number;  // For XP calculation
+  x?: number;  // Pixel position X
+  y?: number;  // Pixel position Y
   target?: string | number;
   hatelist?: Array<{ id: string | number }>;
   attackers?: Record<string | number, any>;
@@ -192,16 +195,9 @@ export class CombatSystem {
     if (attacker) {
       this.world.pushToPlayer(attacker, new Messages.Kill(mob));
 
-      // Grant XP to the attacker
-      if (attacker.grantXP && mob.armorLevel) {
-        const xpGained = Formulas.xpFromMob(mob.armorLevel);
-        attacker.grantXP(xpGained);
-      }
-
-      // Grant gold to the attacker
-      if (attacker.grantGold && mob.armorLevel) {
-        const goldGained = Formulas.goldFromMob(mob.armorLevel);
-        attacker.grantGold(goldGained);
+      // Grant XP and gold with party sharing
+      if (mob.armorLevel) {
+        this.distributePartyRewards(attacker, mob);
       }
 
       // AI: Trigger kill handling for narrator and quest tracking
@@ -303,5 +299,58 @@ export class CombatSystem {
     });
 
     this.world.handleEntityGroupMembership(player);
+  }
+
+  /**
+   * Distribute XP and gold rewards, with party sharing if applicable
+   * Party members within 15 tiles get a share of XP with a bonus per member
+   */
+  private distributePartyRewards(attacker: Entity, mob: Entity): void {
+    const partyService = PartyService.getInstance();
+    const attackerId = attacker.id as number;
+    const attackerX = attacker.x ?? 0;
+    const attackerY = attacker.y ?? 0;
+    const attackerGridX = Math.floor(attackerX / 16);
+    const attackerGridY = Math.floor(attackerY / 16);
+
+    const baseXp = Formulas.xpFromMob(mob.armorLevel!);
+    const baseGold = Formulas.goldFromMob(mob.armorLevel!);
+
+    // Check if attacker is in a party
+    if (partyService.isInParty(attackerId)) {
+      // Get nearby party members (within 15 tiles)
+      const nearbyMembers = partyService.getMembersInRange(attackerId, attackerGridX, attackerGridY, 15);
+
+      if (nearbyMembers.length > 1) {
+        // Calculate party bonus
+        const xpBonus = partyService.calculatePartyXpBonus(nearbyMembers.length);
+        const totalXp = Math.floor(baseXp * xpBonus);
+        const xpPerMember = Math.floor(totalXp / nearbyMembers.length);
+
+        console.log(`[Party XP] ${nearbyMembers.length} members share ${totalXp} XP (${baseXp} base × ${xpBonus.toFixed(2)} bonus), ${xpPerMember} each`);
+
+        // Distribute XP to all nearby party members
+        for (const memberId of nearbyMembers) {
+          const member = this.world.getEntityById(memberId);
+          if (member && member.grantXP) {
+            member.grantXP(xpPerMember);
+          }
+        }
+
+        // Gold only goes to the killer (no party gold sharing for now)
+        if (attacker.grantGold) {
+          attacker.grantGold(baseGold);
+        }
+        return;
+      }
+    }
+
+    // No party or solo - give full rewards to attacker
+    if (attacker.grantXP) {
+      attacker.grantXP(baseXp);
+    }
+    if (attacker.grantGold) {
+      attacker.grantGold(baseGold);
+    }
   }
 }

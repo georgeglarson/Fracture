@@ -16,6 +16,7 @@ import {EquipmentSlot, getSlotForKind} from '../../shared/ts/equipment/equipment
 import {shopService, isMerchant, getShopInventory} from './shop/shop.service';
 import {getAchievementService} from './achievements/achievement.service';
 import {PlayerAchievements} from '../../shared/ts/achievements';
+import {PartyService} from './party';
 
 export class Player extends Character {
 
@@ -304,6 +305,43 @@ export class Player extends Character {
       else if (action === Types.Messages.ACHIEVEMENT_SELECT_TITLE) {
         var achievementId = message[1];
         self.handleSelectTitle(achievementId === '' ? null : achievementId);
+      }
+      // Party system - invite player
+      else if (action === Types.Messages.PARTY_INVITE) {
+        var targetId = message[1];
+        self.handlePartyInvite(targetId);
+      }
+      // Party system - accept invite
+      else if (action === Types.Messages.PARTY_ACCEPT) {
+        var inviterId = message[1];
+        self.handlePartyAccept(inviterId);
+      }
+      // Party system - decline invite
+      else if (action === Types.Messages.PARTY_DECLINE) {
+        var inviterId = message[1];
+        self.handlePartyDecline(inviterId);
+      }
+      // Party system - leave party
+      else if (action === Types.Messages.PARTY_LEAVE) {
+        self.handlePartyLeave();
+      }
+      // Party system - kick member
+      else if (action === Types.Messages.PARTY_KICK) {
+        var targetId = message[1];
+        self.handlePartyKick(targetId);
+      }
+      // Party system - party chat
+      else if (action === Types.Messages.PARTY_CHAT) {
+        var chatMsg = Utils.sanitize(message[1]);
+        if (chatMsg && chatMsg !== '') {
+          chatMsg = chatMsg.substr(0, 100); // Enforce maxlength
+          self.handlePartyChat(chatMsg);
+        }
+      }
+      // Player inspect
+      else if (action === Types.Messages.PLAYER_INSPECT) {
+        var targetId = message[1];
+        self.handlePlayerInspect(targetId);
       }
       else {
         if (self.message_callback) {
@@ -1096,5 +1134,270 @@ export class Player extends Character {
   cleanupAchievements() {
     const achievementService = getAchievementService();
     achievementService.cleanupPlayer(this.id.toString());
+  }
+
+  // ============================================================================
+  // PARTY SYSTEM
+  // ============================================================================
+
+  /**
+   * Handle party invite request
+   */
+  handlePartyInvite(targetId: number) {
+    const partyService = PartyService.getInstance();
+    const targetPlayer = this.world.getEntityById(targetId) as Player;
+
+    if (!targetPlayer || !(targetPlayer instanceof Player)) {
+      console.log(`[Party] ${this.name} tried to invite invalid player ${targetId}`);
+      return;
+    }
+
+    // Create player reference for PartyService (x/y are pixel coords, divide by 16 for grid)
+    const inviterRef = {
+      id: this.id,
+      name: this.name,
+      level: this.level,
+      hitPoints: this.hitPoints,
+      maxHitPoints: this.maxHitPoints,
+      gridX: Math.floor(this.x / 16),
+      gridY: Math.floor(this.y / 16),
+      send: (msg: any[]) => this.send(msg)
+    };
+
+    const targetRef = {
+      id: targetPlayer.id,
+      name: targetPlayer.name,
+      level: targetPlayer.level,
+      hitPoints: targetPlayer.hitPoints,
+      maxHitPoints: targetPlayer.maxHitPoints,
+      gridX: Math.floor(targetPlayer.x / 16),
+      gridY: Math.floor(targetPlayer.y / 16),
+      send: (msg: any[]) => targetPlayer.send(msg)
+    };
+
+    const error = partyService.sendInvite(inviterRef, targetId, targetRef);
+    if (error) {
+      console.log(`[Party] Invite failed: ${error}`);
+    }
+  }
+
+  /**
+   * Handle accepting a party invite
+   */
+  handlePartyAccept(inviterId: number) {
+    const partyService = PartyService.getInstance();
+    const inviterPlayer = this.world.getEntityById(inviterId) as Player;
+
+    const accepterRef = {
+      id: this.id,
+      name: this.name,
+      level: this.level,
+      hitPoints: this.hitPoints,
+      maxHitPoints: this.maxHitPoints,
+      gridX: Math.floor(this.x / 16),
+      gridY: Math.floor(this.y / 16),
+      send: (msg: any[]) => this.send(msg)
+    };
+
+    const inviterRef = inviterPlayer ? {
+      id: inviterPlayer.id,
+      name: inviterPlayer.name,
+      level: inviterPlayer.level,
+      hitPoints: inviterPlayer.hitPoints,
+      maxHitPoints: inviterPlayer.maxHitPoints,
+      gridX: Math.floor(inviterPlayer.x / 16),
+      gridY: Math.floor(inviterPlayer.y / 16),
+      send: (msg: any[]) => inviterPlayer.send(msg)
+    } : undefined;
+
+    const result = partyService.acceptInvite(accepterRef, inviterId, inviterRef);
+
+    if (typeof result === 'string') {
+      console.log(`[Party] Accept failed: ${result}`);
+      return;
+    }
+
+    // Send PARTY_JOIN to all party members
+    const members = result.getMemberData();
+    for (const memberId of result.getMemberIds()) {
+      const memberPlayer = this.world.getEntityById(memberId) as Player;
+      if (memberPlayer) {
+        memberPlayer.send(new Messages.PartyJoin(result.id, members, result.leaderId).serialize());
+      }
+    }
+  }
+
+  /**
+   * Handle declining a party invite
+   */
+  handlePartyDecline(inviterId: number) {
+    const partyService = PartyService.getInstance();
+    partyService.declineInvite(this.id, inviterId);
+  }
+
+  /**
+   * Handle leaving the party
+   */
+  handlePartyLeave() {
+    const partyService = PartyService.getInstance();
+    const result = partyService.leaveParty(this.id);
+
+    if (!result) {
+      return;
+    }
+
+    // Notify remaining party members
+    const remainingMembers = result.party.getMemberIds();
+    const memberData = result.party.getMemberData();
+
+    if (result.disbanded) {
+      // Notify all remaining members that party disbanded
+      for (const memberId of remainingMembers) {
+        const memberPlayer = this.world.getEntityById(memberId) as Player;
+        if (memberPlayer) {
+          memberPlayer.send(new Messages.PartyDisband().serialize());
+        }
+      }
+    } else {
+      // Notify remaining members
+      for (const memberId of remainingMembers) {
+        const memberPlayer = this.world.getEntityById(memberId) as Player;
+        if (memberPlayer) {
+          memberPlayer.send(new Messages.PartyLeave(this.id).serialize());
+          if (result.newLeaderId) {
+            // Leadership changed, send full update
+            memberPlayer.send(new Messages.PartyUpdate(memberData).serialize());
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Handle kicking a member from the party
+   */
+  handlePartyKick(targetId: number) {
+    const partyService = PartyService.getInstance();
+    const result = partyService.kickMember(this.id, targetId);
+
+    if (!result || !result.success) {
+      console.log(`[Party] Kick failed: ${result?.message || 'Unknown error'}`);
+      return;
+    }
+
+    // Notify the kicked player
+    const kickedPlayer = this.world.getEntityById(targetId) as Player;
+    if (kickedPlayer) {
+      kickedPlayer.send(new Messages.PartyDisband().serialize());
+    }
+
+    // Notify remaining party members
+    const memberData = result.party.getMemberData();
+    for (const memberId of result.party.getMemberIds()) {
+      const memberPlayer = this.world.getEntityById(memberId) as Player;
+      if (memberPlayer) {
+        memberPlayer.send(new Messages.PartyLeave(targetId).serialize());
+        memberPlayer.send(new Messages.PartyUpdate(memberData).serialize());
+      }
+    }
+  }
+
+  /**
+   * Handle party chat message
+   */
+  handlePartyChat(message: string) {
+    const partyService = PartyService.getInstance();
+    const party = partyService.getPlayerParty(this.id);
+
+    if (!party) {
+      return;
+    }
+
+    // Send chat to all party members
+    for (const memberId of party.getMemberIds()) {
+      const memberPlayer = this.world.getEntityById(memberId) as Player;
+      if (memberPlayer) {
+        memberPlayer.send(new Messages.PartyChat(this.id, this.name, message).serialize());
+      }
+    }
+  }
+
+  /**
+   * Handle player inspect request
+   */
+  handlePlayerInspect(targetId: number) {
+    const targetPlayer = this.world.getEntityById(targetId) as Player;
+
+    if (!targetPlayer || !(targetPlayer instanceof Player)) {
+      console.log(`[Inspect] ${this.name} tried to inspect invalid player ${targetId}`);
+      return;
+    }
+
+    this.send(new Messages.PlayerInspectResult(
+      targetPlayer.id,
+      targetPlayer.name,
+      targetPlayer.title,
+      targetPlayer.level,
+      targetPlayer.weapon,
+      targetPlayer.armor
+    ).serialize());
+  }
+
+  /**
+   * Cleanup party data on disconnect
+   */
+  cleanupParty() {
+    const partyService = PartyService.getInstance();
+    const party = partyService.handlePlayerDisconnect(this.id);
+
+    if (party) {
+      // Notify remaining party members
+      const remainingMembers = party.getMemberIds();
+      const memberData = party.getMemberData();
+
+      if (remainingMembers.length === 0) {
+        return;
+      }
+
+      for (const memberId of remainingMembers) {
+        const memberPlayer = this.world.getEntityById(memberId) as Player;
+        if (memberPlayer) {
+          memberPlayer.send(new Messages.PartyLeave(this.id).serialize());
+          if (remainingMembers.length > 1) {
+            memberPlayer.send(new Messages.PartyUpdate(memberData).serialize());
+          } else {
+            // Last member, disband
+            memberPlayer.send(new Messages.PartyDisband().serialize());
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Update party position (for shared XP proximity checks)
+   */
+  updatePartyPosition() {
+    const partyService = PartyService.getInstance();
+    partyService.updateMemberPosition(this.id, Math.floor(this.x / 16), Math.floor(this.y / 16));
+  }
+
+  /**
+   * Update party HP (for party UI)
+   */
+  updatePartyHp() {
+    const partyService = PartyService.getInstance();
+    const party = partyService.updateMemberHp(this.id, this.hitPoints, this.maxHitPoints);
+
+    if (party) {
+      // Broadcast HP update to all party members
+      const memberData = party.getMemberData();
+      for (const memberId of party.getMemberIds()) {
+        const memberPlayer = this.world.getEntityById(memberId) as Player;
+        if (memberPlayer && memberId !== this.id) {
+          memberPlayer.send(new Messages.PartyUpdate(memberData).serialize());
+        }
+      }
+    }
   }
 }

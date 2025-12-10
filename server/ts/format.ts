@@ -37,6 +37,17 @@ export class FormatChecker {
 
     // Achievement system
     this.formats[Types.Messages.ACHIEVEMENT_SELECT_TITLE] = ['s']; // achievementId (can be empty string for clear)
+
+    // Party system
+    this.formats[Types.Messages.PARTY_INVITE] = ['n']; // targetPlayerId
+    this.formats[Types.Messages.PARTY_ACCEPT] = ['n']; // inviterId
+    this.formats[Types.Messages.PARTY_DECLINE] = ['n']; // inviterId
+    this.formats[Types.Messages.PARTY_LEAVE] = []; // no params
+    this.formats[Types.Messages.PARTY_KICK] = ['n']; // targetId
+    this.formats[Types.Messages.PARTY_CHAT] = ['s']; // message
+
+    // Player inspect
+    this.formats[Types.Messages.PLAYER_INSPECT] = ['n']; // targetId
   }
 
   check(msg) {

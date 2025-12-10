@@ -267,6 +267,15 @@ var initGame = function () {
       app.hideWindows();
       // $('#chatinput').focus();
     });
+
+    // Right-click handler for player context menu
+    $('#foreground').on('contextmenu', function (event) {
+      event.preventDefault();
+      app.setMouseCoordinates(event);
+      if (game) {
+        game.rightClick(event.pageX, event.pageY);
+      }
+    });
   }
 
   $('body').unbind('click');

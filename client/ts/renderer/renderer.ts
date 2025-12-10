@@ -43,6 +43,7 @@ export class Renderer {
   mobile;
   lastTargetPos;
   lastFrameTime: number = 0;
+  partyMemberIds: Set<number> = new Set();
 
   constructor(game: Game, canvas, background, foreground) {
     this.game = game;
@@ -619,11 +620,57 @@ export class Renderer {
       (rect2.bottom < rect1.top));
   }
 
+  /**
+   * Set which players are in the party (for visual indicators)
+   */
+  setPartyMembers(memberIds: number[]): void {
+    this.partyMemberIds = new Set(memberIds);
+  }
+
+  /**
+   * Check if a player is in our party
+   */
+  isPartyMember(playerId: number): boolean {
+    return this.partyMemberIds.has(playerId);
+  }
+
+  /**
+   * Draw party indicator (green diamond) above a player
+   */
+  drawPartyIndicator(entity) {
+    const x = (entity.x + 8) * this.scale;
+    const y = (entity.y - 16) * this.scale;
+    const size = 4 * this.scale;
+
+    this.context.save();
+    this.context.fillStyle = '#4a7c4a';
+    this.context.strokeStyle = '#6a9c6a';
+    this.context.lineWidth = 1;
+
+    // Draw diamond shape
+    this.context.beginPath();
+    this.context.moveTo(x, y - size);
+    this.context.lineTo(x + size, y);
+    this.context.lineTo(x, y + size);
+    this.context.lineTo(x - size, y);
+    this.context.closePath();
+    this.context.fill();
+    this.context.stroke();
+
+    this.context.restore();
+  }
+
   drawEntityName(entity) {
     this.context.save();
     if (entity.name && entity instanceof Player) {
       var color = (entity.id === this.game.playerId) ? '#fcda5c' : 'white';
       var nameY = (entity.y + entity.nameOffsetY) * this.scale;
+
+      // Draw party indicator for party members (except self)
+      if (entity.id !== this.game.playerId && this.isPartyMember(entity.id)) {
+        this.drawPartyIndicator(entity);
+        color = '#7fdf7f'; // Light green for party members
+      }
 
       // Draw player title above name (if they have one)
       var title = this.game.getPlayerTitle(entity.id);

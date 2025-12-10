@@ -46,6 +46,9 @@ export function setupNetworkHandlers(game: Game, client: GameClient): void {
 
   // Achievement handlers
   setupAchievementHandlers(game, client);
+
+  // Party handlers
+  setupPartyHandlers(game, client);
 }
 
 function setupSpawnHandlers(game: Game, client: GameClient): void {
@@ -626,5 +629,35 @@ function setupAchievementHandlers(game: Game, client: GameClient): void {
 
   client.onPlayerTitleUpdate(function (playerId, title) {
     game.handlePlayerTitleUpdate(playerId, title);
+  });
+}
+
+function setupPartyHandlers(game: Game, client: GameClient): void {
+  client.onPartyInviteReceived(function (inviterId, inviterName) {
+    game.handlePartyInvite(inviterId, inviterName);
+  });
+
+  client.onPartyJoin(function (partyId, members, leaderId) {
+    game.handlePartyJoin(partyId, members, leaderId);
+  });
+
+  client.onPartyLeave(function (playerId) {
+    game.handlePartyLeave(playerId);
+  });
+
+  client.onPartyDisband(function () {
+    game.handlePartyDisband();
+  });
+
+  client.onPartyUpdate(function (members) {
+    game.handlePartyUpdate(members);
+  });
+
+  client.onPartyChat(function (senderId, senderName, message) {
+    game.handlePartyChat(senderId, senderName, message);
+  });
+
+  client.onPlayerInspectResult(function (playerId, name, title, level, weapon, armor) {
+    game.handlePlayerInspectResult(playerId, name, title, level, weapon, armor);
   });
 }

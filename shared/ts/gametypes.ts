@@ -61,7 +61,23 @@ export const Types: any = {
     ACHIEVEMENT_SELECT_TITLE: 50, // Client selects title [50, achievementId or null]
     ACHIEVEMENT_UNLOCK: 51,       // Server notifies achievement unlocked [51, achievementId]
     ACHIEVEMENT_PROGRESS: 52,     // Server sends progress update [52, achievementId, current, target]
-    PLAYER_TITLE_UPDATE: 53       // Server broadcasts title change [53, playerId, title or null]
+    PLAYER_TITLE_UPDATE: 53,      // Server broadcasts title change [53, playerId, title or null]
+
+    // Party system
+    PARTY_INVITE: 54,             // Client: [54, targetPlayerId]
+    PARTY_INVITE_RECEIVED: 55,    // Server: [55, inviterId, inviterName]
+    PARTY_ACCEPT: 56,             // Client: [56, inviterId]
+    PARTY_DECLINE: 57,            // Client: [57, inviterId]
+    PARTY_JOIN: 58,               // Server: [58, partyId, members[], leaderId]
+    PARTY_LEAVE: 59,              // Client: [59] / Server: [59, playerId]
+    PARTY_KICK: 60,               // Client: [60, targetId]
+    PARTY_DISBAND: 61,            // Server: [61]
+    PARTY_UPDATE: 62,             // Server: [62, members[]]
+    PARTY_CHAT: 63,               // Client: [63, msg] / Server: [63, senderId, name, msg]
+
+    // Player inspect
+    PLAYER_INSPECT: 64,           // Client: [64, targetId]
+    PLAYER_INSPECT_RESULT: 65     // Server: [65, id, name, title, level, weapon, armor]
   },
 
   Entities: {

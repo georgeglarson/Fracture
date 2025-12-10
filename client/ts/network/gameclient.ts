@@ -73,6 +73,17 @@ export class GameClient {
   achievement_progress_callback;
   player_title_update_callback;
 
+  // Party system callbacks
+  party_invite_received_callback;
+  party_join_callback;
+  party_leave_callback;
+  party_disband_callback;
+  party_update_callback;
+  party_chat_callback;
+
+  // Player inspect callback
+  player_inspect_result_callback;
+
   constructor(host, port) {
 
     this.host = host;
@@ -129,6 +140,17 @@ export class GameClient {
     this.handlers[Types.Messages.ACHIEVEMENT_UNLOCK] = this.receiveAchievementUnlock;
     this.handlers[Types.Messages.ACHIEVEMENT_PROGRESS] = this.receiveAchievementProgress;
     this.handlers[Types.Messages.PLAYER_TITLE_UPDATE] = this.receivePlayerTitleUpdate;
+
+    // Party system handlers
+    this.handlers[Types.Messages.PARTY_INVITE_RECEIVED] = this.receivePartyInviteReceived;
+    this.handlers[Types.Messages.PARTY_JOIN] = this.receivePartyJoin;
+    this.handlers[Types.Messages.PARTY_LEAVE] = this.receivePartyLeave;
+    this.handlers[Types.Messages.PARTY_DISBAND] = this.receivePartyDisband;
+    this.handlers[Types.Messages.PARTY_UPDATE] = this.receivePartyUpdate;
+    this.handlers[Types.Messages.PARTY_CHAT] = this.receivePartyChat;
+
+    // Player inspect handler
+    this.handlers[Types.Messages.PLAYER_INSPECT_RESULT] = this.receivePlayerInspectResult;
 
     this.enable();
   }
@@ -993,5 +1015,143 @@ export class GameClient {
 
   sendSelectTitle(achievementId: string) {
     this.sendMessage([Types.Messages.ACHIEVEMENT_SELECT_TITLE, achievementId]);
+  }
+
+  // Party system receive methods
+  receivePartyInviteReceived(data) {
+    var inviterId = data[1],
+      inviterName = data[2];
+
+    console.log('[Party] Invite received from:', inviterName, '(id:', inviterId + ')');
+
+    if (this.party_invite_received_callback) {
+      this.party_invite_received_callback(inviterId, inviterName);
+    }
+  }
+
+  receivePartyJoin(data) {
+    var partyId = data[1],
+      members = data[2], // Array of {id, name, level, hp, maxHp}
+      leaderId = data[3];
+
+    console.log('[Party] Joined party:', partyId, 'leader:', leaderId, 'members:', members);
+
+    if (this.party_join_callback) {
+      this.party_join_callback(partyId, members, leaderId);
+    }
+  }
+
+  receivePartyLeave(data) {
+    var playerId = data[1];
+
+    console.log('[Party] Player left party:', playerId);
+
+    if (this.party_leave_callback) {
+      this.party_leave_callback(playerId);
+    }
+  }
+
+  receivePartyDisband(data) {
+    console.log('[Party] Party disbanded');
+
+    if (this.party_disband_callback) {
+      this.party_disband_callback();
+    }
+  }
+
+  receivePartyUpdate(data) {
+    var members = data[1]; // Array of {id, name, level, hp, maxHp}
+
+    if (this.party_update_callback) {
+      this.party_update_callback(members);
+    }
+  }
+
+  receivePartyChat(data) {
+    var senderId = data[1],
+      senderName = data[2],
+      message = data[3];
+
+    console.log('[Party Chat]', senderName + ':', message);
+
+    if (this.party_chat_callback) {
+      this.party_chat_callback(senderId, senderName, message);
+    }
+  }
+
+  // Player inspect receive method
+  receivePlayerInspectResult(data) {
+    var playerId = data[1],
+      name = data[2],
+      title = data[3] || null,
+      level = data[4],
+      weapon = data[5],
+      armor = data[6];
+
+    console.log('[Inspect] Player:', name, 'level:', level, 'title:', title);
+
+    if (this.player_inspect_result_callback) {
+      this.player_inspect_result_callback(playerId, name, title, level, weapon, armor);
+    }
+  }
+
+  // Party system callback setters
+  onPartyInviteReceived(callback) {
+    this.party_invite_received_callback = callback;
+  }
+
+  onPartyJoin(callback) {
+    this.party_join_callback = callback;
+  }
+
+  onPartyLeave(callback) {
+    this.party_leave_callback = callback;
+  }
+
+  onPartyDisband(callback) {
+    this.party_disband_callback = callback;
+  }
+
+  onPartyUpdate(callback) {
+    this.party_update_callback = callback;
+  }
+
+  onPartyChat(callback) {
+    this.party_chat_callback = callback;
+  }
+
+  // Player inspect callback setter
+  onPlayerInspectResult(callback) {
+    this.player_inspect_result_callback = callback;
+  }
+
+  // Party system send methods
+  sendPartyInvite(targetPlayerId: number) {
+    this.sendMessage([Types.Messages.PARTY_INVITE, targetPlayerId]);
+  }
+
+  sendPartyAccept(inviterId: number) {
+    this.sendMessage([Types.Messages.PARTY_ACCEPT, inviterId]);
+  }
+
+  sendPartyDecline(inviterId: number) {
+    this.sendMessage([Types.Messages.PARTY_DECLINE, inviterId]);
+  }
+
+  sendPartyLeave() {
+    this.sendMessage([Types.Messages.PARTY_LEAVE]);
+  }
+
+  sendPartyKick(targetId: number) {
+    this.sendMessage([Types.Messages.PARTY_KICK, targetId]);
+  }
+
+  sendPartyChat(message: string) {
+    this.sendMessage([Types.Messages.PARTY_CHAT, message]);
+  }
+
+  // Player inspect send method
+  sendPlayerInspect(targetId: number) {
+    this.sendMessage([Types.Messages.PLAYER_INSPECT, targetId]);
   }
 }
