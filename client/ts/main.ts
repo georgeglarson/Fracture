@@ -1,10 +1,12 @@
 import {App} from './app';
 import {Game} from './game';
 import {Detect} from './utils/detect';
+import {VolumeUI} from './ui/volume-ui';
 import * as _ from 'lodash';
 
 
 var app, game;
+var volumeUI: VolumeUI;
 
 var initApp = function () {
   $(function () {
@@ -372,13 +374,23 @@ var initGame = function () {
     }
   });
 
-  $('#mutebutton').click(function () {
-    game.audioManager.toggle();
+  // Initialize volume UI
+  volumeUI = new VolumeUI();
+  volumeUI.setCallbacks({
+    getAudioManager: () => game.audioManager,
+    getStorage: () => game.storage
+  });
+
+  $('#mutebutton').click(function (e) {
+    e.stopPropagation();
+    volumeUI.toggle();
   });
 
   $(document).bind('keydown', function (e) {
     var key = e.which,
       $chat = $('#chatinput');
+
+    console.log('[KeyDown] Key pressed:', key, 'chatinput focused:', $('#chatinput:focus').length, 'nameinput focused:', $('#nameinput:focus').length);
 
     if ($('#chatinput:focus').length == 0 && $('#nameinput:focus').length == 0) {
       if (key === 13) { // Enter
@@ -420,9 +432,9 @@ var initGame = function () {
         return false;
       }
       if (key === 73) { // I - Toggle inventory
-        if (game.ready && game.started) {
-          game.toggleInventory();
-        }
+        console.log('[KeyPress] I key pressed, game.ready:', game.ready, 'game.started:', game.started);
+        // Toggle inventory even if game isn't ready - the UI should still show
+        game.toggleInventory();
         return false;
       }
     } else {

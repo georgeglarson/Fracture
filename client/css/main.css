@@ -302,10 +302,10 @@ footer, header, hgroup, menu, nav, section {
         content: '❓' !important;
     }
     #statusbar #mutebutton::after {
-        content: '🔊' !important;
+        content: '🔇' !important;
     }
     #statusbar #mutebutton.active::after {
-        content: '🔇' !important;
+        content: '🔊' !important;
     }
 
 /* ========== LOW HEALTH VIGNETTE ========== */
@@ -1732,4 +1732,100 @@ footer, header, hgroup, menu, nav, section {
 
 #shop-message.error {
     color: #FF6B6B;
+}
+
+/* Volume Panel */
+.volume-panel {
+    display: none;
+    position: fixed;
+    right: 150px;
+    bottom: 60px;
+    width: 200px;
+    background: linear-gradient(180deg, rgba(40, 40, 40, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%);
+    border: 2px solid #555;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    z-index: 5001;
+    font-family: 'GraphicPixel', sans-serif;
+}
+
+.volume-panel.active {
+    display: block;
+}
+
+.volume-header {
+    padding: 10px;
+    border-bottom: 1px solid #555;
+    font-size: 14px;
+    color: #FFF;
+    text-align: center;
+}
+
+.volume-control {
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.volume-control label {
+    width: 50px;
+    font-size: 11px;
+    color: #AAA;
+}
+
+.volume-control input[type="range"] {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #333;
+    border-radius: 2px;
+    outline: none;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #E8C565;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.volume-control input[type="range"]::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: #E8C565;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+.volume-control span {
+    width: 35px;
+    font-size: 10px;
+    color: #888;
+    text-align: right;
+}
+
+.volume-mute {
+    padding: 8px 10px;
+    border-top: 1px solid #444;
+}
+
+.volume-mute label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #AAA;
+    cursor: pointer;
+}
+
+.volume-mute input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
 }

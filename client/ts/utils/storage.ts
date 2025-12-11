@@ -47,6 +47,12 @@ export class Storage {
       },
       inventory: {
         slots: []
+      },
+      audio: {
+        masterVolume: 1.0,
+        musicVolume: 1.0,
+        sfxVolume: 1.0,
+        muted: false
       }
     };
   }
@@ -330,6 +336,31 @@ export class Storage {
 
   getInventorySlots(): any[] {
     return this.getInventory().slots;
+  }
+
+  // Audio Settings
+
+  getAudioSettings(): { masterVolume: number; musicVolume: number; sfxVolume: number; muted: boolean } {
+    if (!this.data.audio) {
+      this.data.audio = {
+        masterVolume: 1.0,
+        musicVolume: 1.0,
+        sfxVolume: 1.0,
+        muted: false
+      };
+    }
+    return this.data.audio;
+  }
+
+  saveAudioSettings(masterVolume: number, musicVolume: number, sfxVolume: number, muted: boolean) {
+    if (!this.data.audio) {
+      this.data.audio = { masterVolume: 1.0, musicVolume: 1.0, sfxVolume: 1.0, muted: false };
+    }
+    this.data.audio.masterVolume = masterVolume;
+    this.data.audio.musicVolume = musicVolume;
+    this.data.audio.sfxVolume = sfxVolume;
+    this.data.audio.muted = muted;
+    this.save();
   }
 
 }

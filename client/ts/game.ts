@@ -2172,8 +2172,16 @@ export class Game {
   }
 
   toggleInventory() {
+    console.log('[Inventory] Toggle called, inventoryUI exists:', !!this.inventoryUI);
+    if (!this.inventoryUI) {
+      // Create inventory UI on demand if not initialized yet
+      console.log('[Inventory] Creating InventoryUI on demand');
+      this.initInventory();
+    }
     if (this.inventoryUI) {
       this.inventoryUI.toggle();
+    } else {
+      console.error('[Inventory] inventoryUI is null - initialization failed');
     }
   }
 
@@ -2212,6 +2220,37 @@ export class Game {
     if (this.client && item && item.id) {
       console.log('[Inventory] Requesting pickup of item', item.id);
       this.client.sendInventoryPickup(item.id);
+    }
+  }
+
+  // ============================================================================
+  // ZONE SYSTEM HANDLERS
+  // ============================================================================
+
+  // Current zone tracking
+  currentZone: { id: string; name: string; minLevel: number; maxLevel: number } | null = null;
+
+  handleZoneEnter(zoneId: string, zoneName: string, minLevel: number, maxLevel: number, warning: string | null) {
+    this.currentZone = { id: zoneId, name: zoneName, minLevel, maxLevel };
+
+    // Show zone enter notification using narrator style for epic feel
+    const levelRange = `Level ${minLevel}-${maxLevel}`;
+    this.showNarratorText(`Entering ${zoneName}`, 'zone');
+
+    // Show warning if under-leveled
+    if (warning) {
+      setTimeout(() => {
+        this.showNotification(warning);
+      }, 2000);
+    }
+
+    console.info(`[Zone] Entered ${zoneName} (${levelRange})`);
+  }
+
+  handleZoneInfo(zoneId: string, rarityBonus: number, goldBonus: number, xpBonus: number) {
+    // Store zone bonuses for UI display
+    if (this.currentZone && this.currentZone.id === zoneId) {
+      console.info(`[Zone] Bonuses - Rarity: +${rarityBonus}%, Gold: +${goldBonus}%, XP: +${xpBonus}%`);
     }
   }
 }

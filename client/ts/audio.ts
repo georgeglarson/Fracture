@@ -12,7 +12,18 @@ export class AudioManager {
   currentMusic = null;
   areas = [];
   musicNames = ['village', 'beach', 'forest', 'cave', 'desert', 'lavaland', 'boss'];
-  soundNames = ['loot', 'hit1', 'hit2', 'hurt', 'heal', 'chat', 'revive', 'death', 'firefox', 'achievement', 'kill1', 'kill2', 'noloot', 'teleport', 'chest', 'npc', 'npc-end'];
+  soundNames = ['loot', 'hit1', 'hit2', 'hurt', 'heal', 'chat', 'revive', 'death', 'firefox', 'achievement', 'kill1', 'kill2', 'noloot', 'teleport', 'chest', 'npc', 'npc-end', 'levelup', 'gold', 'equip', 'quest'];
+
+  // Combat music state
+  inCombat = false;
+  combatTimeout: ReturnType<typeof setTimeout> | null = null;
+  savedZoneMusic = null;
+  combatMusicName = 'boss'; // Use boss music for combat
+
+  // Volume controls
+  masterVolume = 1.0;
+  musicVolume = 1.0;
+  sfxVolume = 1.0;
 
 
   constructor(game) {
@@ -132,6 +143,7 @@ export class AudioManager {
   playSound(name) {
     var sound = this.enabled && this.getSound(name);
     if (sound) {
+      sound.volume = this.getSfxVolume();
       sound.play();
     }
   }
@@ -180,7 +192,7 @@ export class AudioManager {
       if (music.sound.fadingOut) {
         this.fadeInMusic(music);
       } else {
-        music.sound.volume = 1;
+        music.sound.volume = this.getMusicVolume();
         music.sound.play();
       }
       this.currentMusic = music;
@@ -253,5 +265,147 @@ export class AudioManager {
       });
       this.currentMusic = null;
     }
+  }
+
+  /**
+   * Called when player enters combat (attacks or is attacked)
+   */
+  enterCombat() {
+    if (!this.enabled) return;
+
+    // Clear any pending combat exit
+    if (this.combatTimeout) {
+      clearTimeout(this.combatTimeout);
+      this.combatTimeout = null;
+    }
+
+    // If already in combat, just reset the timer
+    if (this.inCombat) return;
+
+    this.inCombat = true;
+
+    // Save current zone music to restore later
+    if (this.currentMusic && this.currentMusic.name !== this.combatMusicName) {
+      this.savedZoneMusic = this.currentMusic;
+    }
+
+    // Fade to combat music
+    const combatSound = this.getSound(this.combatMusicName);
+    if (combatSound) {
+      const combatMusic = { sound: combatSound, name: this.combatMusicName };
+      if (this.currentMusic && this.currentMusic.name !== this.combatMusicName) {
+        this.fadeOutMusic(this.currentMusic, () => {
+          this.resetMusic(this.currentMusic);
+        });
+      }
+      this.playMusic(combatMusic);
+      console.debug('[Audio] Combat music started');
+    }
+  }
+
+  /**
+   * Called when combat ends (5s after last combat action)
+   */
+  exitCombat() {
+    if (!this.enabled || !this.inCombat) return;
+
+    // Clear any pending timeout
+    if (this.combatTimeout) {
+      clearTimeout(this.combatTimeout);
+    }
+
+    // Delay exit to allow for continuous combat
+    this.combatTimeout = setTimeout(() => {
+      this.inCombat = false;
+      this.combatTimeout = null;
+
+      // Fade back to zone music
+      if (this.currentMusic && this.currentMusic.name === this.combatMusicName) {
+        this.fadeOutMusic(this.currentMusic, () => {
+          this.resetMusic(this.currentMusic);
+          this.currentMusic = null;
+          // Restore zone music
+          this.updateMusic();
+        });
+      }
+      console.debug('[Audio] Combat music ended');
+    }, 5000); // 5 second delay after last combat action
+  }
+
+  /**
+   * Reset combat timeout when combat continues
+   */
+  refreshCombat() {
+    if (this.inCombat) {
+      // Clear existing timeout and set new one
+      if (this.combatTimeout) {
+        clearTimeout(this.combatTimeout);
+        this.combatTimeout = null;
+      }
+      this.exitCombat(); // This sets a new 5s timeout
+    }
+  }
+
+  /**
+   * Set master volume (0-1)
+   */
+  setMasterVolume(volume: number) {
+    this.masterVolume = Math.max(0, Math.min(1, volume));
+    this.applyVolumes();
+  }
+
+  /**
+   * Set music volume (0-1)
+   */
+  setMusicVolume(volume: number) {
+    this.musicVolume = Math.max(0, Math.min(1, volume));
+    this.applyVolumes();
+  }
+
+  /**
+   * Set SFX volume (0-1)
+   */
+  setSfxVolume(volume: number) {
+    this.sfxVolume = Math.max(0, Math.min(1, volume));
+  }
+
+  /**
+   * Apply volume settings to currently playing music
+   */
+  applyVolumes() {
+    if (this.currentMusic && this.currentMusic.sound) {
+      const effectiveVolume = this.masterVolume * this.musicVolume;
+      // Don't override volume if fading
+      if (!this.currentMusic.sound.fadingIn && !this.currentMusic.sound.fadingOut) {
+        this.currentMusic.sound.volume = effectiveVolume;
+      }
+    }
+  }
+
+  /**
+   * Get effective music volume
+   */
+  getMusicVolume(): number {
+    return this.masterVolume * this.musicVolume;
+  }
+
+  /**
+   * Get effective SFX volume
+   */
+  getSfxVolume(): number {
+    return this.masterVolume * this.sfxVolume;
+  }
+
+  /**
+   * Initialize volume settings from storage
+   */
+  initVolumeSettings(masterVolume: number, musicVolume: number, sfxVolume: number, muted: boolean) {
+    this.masterVolume = masterVolume;
+    this.musicVolume = musicVolume;
+    this.sfxVolume = sfxVolume;
+    if (muted) {
+      this.enabled = false;
+    }
+    this.applyVolumes();
   }
 }
