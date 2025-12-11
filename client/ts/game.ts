@@ -18,13 +18,13 @@ import {Npc} from './entity/character/npc/npc';
 import {AudioManager} from './audio';
 import {InfoManager} from './interface/info.manager';
 import {GameClient} from './network/gameclient';
+import {ClientEvents} from './network/client-events';
 import {Mobs} from './entity/character/mob/mobs';
 import {Exceptions} from './exceptions';
 import _ from 'lodash';
 import {Entity} from './entity/entity';
 import {Renderer} from './renderer/renderer';
 import {GridManager} from './world/grid-manager';
-import {MapQueryService} from './world/map-query';
 import {EntityManager} from './entities/entity-manager';
 import {InputManager} from './input/input-manager';
 import {UIManager} from './ui/ui-manager';
@@ -32,6 +32,10 @@ import {ItemTooltip} from './ui/item-tooltip';
 import {PartyUI, PartyMember} from './ui/party-ui';
 import {PlayerInspect} from './ui/player-inspect';
 import {ContextMenu} from './ui/context-menu';
+import {InventoryUI} from './ui/inventory-ui';
+import {ShopUI} from './ui/shop-ui';
+import {InventoryManager} from './inventory/inventory-manager';
+import {deserializeInventory, InventorySlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
 import {setupNetworkHandlers} from './network/message-handlers';
 import {ZoningManager} from './world/zoning-manager';
 import {SpriteLoader} from './assets/sprite-loader';
@@ -58,12 +62,14 @@ export class Game {
   entityManager: EntityManager | null = null;
   gridManager: GridManager | null = null;
   inputManager: InputManager | null = null;
-  mapQueryService: MapQueryService | null = null;
   uiManager: UIManager | null = null;
   itemTooltip: ItemTooltip | null = null;
   partyUI: PartyUI | null = null;
   playerInspect: PlayerInspect | null = null;
   contextMenu: ContextMenu | null = null;
+  inventoryManager: InventoryManager | null = null;
+  inventoryUI: InventoryUI | null = null;
+  shopUI: ShopUI | null = null;
   zoningManager: ZoningManager | null = null;
   spriteLoader: SpriteLoader | null = null;
 
@@ -497,14 +503,6 @@ export class Game {
           self.checkOtherDirtyRects(rect, entity, x, y);
         });
 
-        // Initialize map query service
-        self.mapQueryService = new MapQueryService();
-        self.mapQueryService.setMap(self.map);
-        self.mapQueryService.setGridProvider(() => ({
-          entityGrid: self.entityGrid,
-          itemGrid: self.itemGrid
-        }));
-
         // Initialize input manager
         self.inputManager = new InputManager();
         self.inputManager.setRenderer(self.renderer);
@@ -538,6 +536,12 @@ export class Game {
 
         // Initialize party UI (context menu, party panel, inspect popup)
         self.initPartyUI();
+
+        // Initialize inventory system
+        self.initInventory();
+
+        // Initialize shop UI
+        self.initShop();
 
         // Initialize zoning manager
         self.zoningManager = new ZoningManager();
@@ -619,15 +623,8 @@ export class Game {
     }
     //>>includeEnd("prodHost");
 
-    this.client.onDispatched(function (host, port) {
-      console.debug('Dispatched to game server ' + host + ':' + port);
-
-      self.client.host = host;
-      self.client.port = port;
-      self.client.connect(); // connect to actual game server
-    });
-
-    this.client.onConnected(function () {
+    // EventEmitter pattern: handle connection
+    this.client.on(ClientEvents.CONNECTED, function () {
       console.info('Starting client/server handshake');
 
       self.player.name = self.username;
@@ -636,7 +633,7 @@ export class Game {
       self.sendHello(self.player);
     });
 
-    this.client.onEntityList(function (list) {
+    this.client.on(ClientEvents.LIST, function (list: number[]) {
       var entityIds = _.pluck(self.entities, 'id'),
         knownIds = _.intersection(entityIds, list),
         newIds = _.difference(list, knownIds);
@@ -654,7 +651,7 @@ export class Game {
       }
     });
 
-    this.client.onWelcome(function (id, name, x, y, hp) {
+    this.client.on(ClientEvents.WELCOME, function (id: number, name: string, x: number, y: number, hp: number) {
       console.info('Received player ID from server : ' + id);
       self.player.id = id;
       self.playerId = id;
@@ -806,46 +803,9 @@ export class Game {
         if (self.isItemAt(x, y)) {
           var item = self.getItemAt(x, y);
 
-          try {
-            self.player.loot(item);
-            self.client.sendLoot(item); // Notify the server that this item has been looted
-            self.removeItem(item);
-            self.showNotification(item.getLootMessage());
-
-            if (item.type === 'armor') {
-              self.tryUnlockingAchievement('FAT_LOOT');
-            }
-
-            if (item.type === 'weapon') {
-              self.tryUnlockingAchievement('A_TRUE_WARRIOR');
-            }
-
-            if (item.kind === Types.Entities.CAKE) {
-              self.tryUnlockingAchievement('FOR_SCIENCE');
-            }
-
-            if (item.kind === Types.Entities.FIREPOTION) {
-              self.tryUnlockingAchievement('FOXY');
-              self.audioManager.playSound('firefox');
-            }
-
-            if (Types.isHealingItem(item.kind)) {
-              self.audioManager.playSound('heal');
-            } else {
-              self.audioManager.playSound('loot');
-            }
-
-            if (item.wasDropped && !_(item.playersInvolved).include(self.playerId)) {
-              self.tryUnlockingAchievement('NINJA_LOOT');
-            }
-          } catch (e) {
-            if (e instanceof Exceptions.LootException) {
-              self.showNotification(e.message);
-              self.audioManager.playSound('noloot');
-            } else {
-              throw e;
-            }
-          }
+          // Send pickup request to server - item goes to inventory
+          self.pickupItemToInventory(item);
+          self.audioManager.playSound('loot');
         }
 
         if (!self.player.hasTarget() && self.map.isDoor(x, y)) {
@@ -857,17 +817,33 @@ export class Game {
           self.player.turnTo(dest.orientation);
           self.client.sendTeleport(dest.x, dest.y);
 
-          if (self.renderer.mobile && dest.cameraX && dest.cameraY) {
+          // Determine if entering or exiting a building interior
+          // Doors with cameraX/cameraY are entry points to interiors
+          var enteringInterior = dest.cameraX !== undefined && dest.cameraY !== undefined;
+          var modeChanged = self.camera.indoorMode !== enteringInterior;
+          self.camera.setIndoorMode(enteringInterior);
+
+          // Clear all canvases when switching between indoor/outdoor mode
+          if (modeChanged) {
+            self.renderer.clearScreen(self.renderer.context);
+            self.renderer.clearScreen(self.renderer.background);
+            self.renderer.clearScreen(self.renderer.foreground);
+          }
+
+          if (enteringInterior) {
+            // Use explicit camera position from door definition
             self.camera.setGridPosition(dest.cameraX, dest.cameraY);
-            self.resetZone();
           } else {
             if (dest.portal) {
               self.assignBubbleTo(self.player);
             } else {
-              self.camera.focusEntity(self.player);
-              self.resetZone();
+              // Center camera on player
+              self.camera.lookAt(self.player);
             }
           }
+
+          // Always reset zone after door transition to redraw static canvases
+          self.resetZone();
 
           if (_.size(self.player.attackers) > 0) {
             setTimeout(function () {
@@ -1112,8 +1088,7 @@ export class Game {
       this.currentNpcTalk = npc;
 
       // Show thinking indicator
-      this.createBubble(npc.id, '...');
-      this.assignBubbleTo(npc);
+      this.showBubbleFor(npc, '...');
 
       // Request AI-generated dialogue from server
       this.client.sendNpcTalk(npc.kind);
@@ -1124,8 +1099,7 @@ export class Game {
           self.currentNpcTalk = null;
           var msg = npc.talk();
           if (msg) {
-            self.createBubble(npc.id, msg);
-            self.assignBubbleTo(npc);
+            self.showBubbleFor(npc, msg);
           }
           self.audioManager.playSound('npc');
         }
@@ -1228,46 +1202,46 @@ export class Game {
    * Returns the entity located at the given position on the world grid.
    */
   getEntityAt(x, y) {
-    return this.mapQueryService?.getEntityAt(x, y) ?? null;
+    return this.gridManager?.getEntityAt(x, y) ?? null;
   }
 
   getMobAt(x, y) {
-    return this.mapQueryService?.getMobAt(x, y) ?? null;
+    return this.gridManager?.getMobAt(x, y) ?? null;
   }
 
   getNpcAt(x, y) {
-    return this.mapQueryService?.getNpcAt(x, y) ?? null;
+    return this.gridManager?.getNpcAt(x, y) ?? null;
   }
 
   getChestAt(x, y) {
-    return this.mapQueryService?.getChestAt(x, y) ?? null;
+    return this.gridManager?.getChestAt(x, y) ?? null;
   }
 
   getItemAt(x, y) {
-    return this.mapQueryService?.getItemAt(x, y) ?? null;
+    return this.gridManager?.getItemAt(x, y) ?? null;
   }
 
   /**
    * Returns true if an entity is located at the given position on the world grid.
    */
   isEntityAt(x, y) {
-    return this.mapQueryService?.isEntityAt(x, y) ?? false;
+    return this.gridManager?.isEntityAt(x, y) ?? false;
   }
 
   isMobAt(x, y) {
-    return this.mapQueryService?.isMobAt(x, y) ?? false;
+    return this.gridManager?.isMobAt(x, y) ?? false;
   }
 
   isItemAt(x, y) {
-    return this.mapQueryService?.isItemAt(x, y) ?? false;
+    return this.gridManager?.isItemAt(x, y) ?? false;
   }
 
   isNpcAt(x, y) {
-    return this.mapQueryService?.isNpcAt(x, y) ?? false;
+    return this.gridManager?.isNpcAt(x, y) ?? false;
   }
 
   isChestAt(x, y) {
-    return this.mapQueryService?.isChestAt(x, y) ?? false;
+    return this.gridManager?.isChestAt(x, y) ?? false;
   }
 
   /**
@@ -1588,6 +1562,15 @@ export class Game {
 
   destroyBubble(id) {
     this.bubbleManager.destroyBubble(id);
+  }
+
+  /**
+   * Creates a speech bubble for a character and positions it correctly.
+   * Consolidates the common createBubble + assignBubbleTo pattern.
+   */
+  showBubbleFor(character, message) {
+    this.createBubble(character.id, message);
+    this.assignBubbleTo(character);
   }
 
   assignBubbleTo(character) {
@@ -1989,170 +1972,40 @@ export class Game {
   }
 
   // Shop system
-  currentShopNpcKind: number | null = null;
-  currentShopItems: Array<{ itemKind: number; price: number; stock: number }> = [];
-
-  showShop(npcKind: number, shopName: string, items: Array<{ itemKind: number; price: number; stock: number }>) {
-    const popup = document.getElementById('shop-popup');
-    if (!popup) return;
-
-    this.currentShopNpcKind = npcKind;
-    this.currentShopItems = items;
-
-    // Update shop name
-    const nameEl = document.getElementById('shop-name');
-    if (nameEl) nameEl.textContent = shopName;
-
-    // Update player gold
-    const goldEl = document.getElementById('shop-player-gold');
-    if (goldEl) goldEl.textContent = this.playerGold.toString();
-
-    // Populate items
-    const itemsList = document.getElementById('shop-items-list');
-    if (itemsList) {
-      itemsList.innerHTML = '';
-
-      items.forEach(item => {
-        const itemName = Types.getKindAsString(item.itemKind);
-        const displayName = this.getItemDisplayName(item.itemKind);
-        const canAfford = this.playerGold >= item.price;
-        const inStock = item.stock !== 0;
-
-        const itemEl = document.createElement('div');
-        itemEl.className = 'shop-item';
-        itemEl.innerHTML = `
-          <div class="shop-item-icon" style="background-image: url('img/2/item-${itemName}.png')"></div>
-          <div class="shop-item-info">
-            <div class="shop-item-name">${displayName}</div>
-            <div class="shop-item-stock ${item.stock !== -1 && item.stock <= 2 ? 'limited' : ''}">
-              ${item.stock === -1 ? 'In Stock' : item.stock === 0 ? 'Out of Stock' : `${item.stock} left`}
-            </div>
-          </div>
-          <div class="shop-item-price">${item.price}g</div>
-          <button class="shop-buy-btn" data-item="${item.itemKind}" ${!canAfford || !inStock ? 'disabled' : ''}>
-            ${!inStock ? 'Sold' : !canAfford ? 'Need Gold' : 'Buy'}
-          </button>
-        `;
-        itemsList.appendChild(itemEl);
-      });
-
-      // Add click handlers for buy buttons
-      itemsList.querySelectorAll('.shop-buy-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const target = e.target as HTMLButtonElement;
-          const itemKind = parseInt(target.dataset.item || '0', 10);
-          if (itemKind && this.currentShopNpcKind !== null) {
-            this.client.sendShopBuy(this.currentShopNpcKind, itemKind);
-          }
-        });
-      });
-    }
-
-    // Clear message
-    const msgEl = document.getElementById('shop-message');
-    if (msgEl) {
-      msgEl.textContent = '';
-      msgEl.className = '';
-    }
-
-    // Show popup
-    popup.classList.add('active');
-
-    // Add close button handler
-    const closeBtn = popup.querySelector('.shop-close');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.hideShop(), { once: true });
-    }
-
-    // Close on clicking outside
-    popup.addEventListener('click', (e) => {
-      if (e.target === popup) this.hideShop();
-    }, { once: true });
-
-    console.info('[Shop] Opened:', shopName, 'with', items.length, 'items');
-  }
-
-  hideShop() {
-    const popup = document.getElementById('shop-popup');
-    if (popup) {
-      popup.classList.remove('active');
-    }
-    this.currentShopNpcKind = null;
-    this.currentShopItems = [];
-  }
-
-  handleShopBuyResult(success: boolean, itemKind: number, newGold: number, message: string) {
-    try {
-      const msgEl = document.getElementById('shop-message');
-      if (msgEl) {
-        msgEl.textContent = message;
-        msgEl.className = success ? '' : 'error';
-      }
-
-      if (success) {
-        // Update gold
+  initShop() {
+    this.shopUI = new ShopUI();
+    this.shopUI.setCallbacks({
+      onBuy: (npcKind: number, itemKind: number) => {
+        this.client.sendShopBuy(npcKind, itemKind);
+      },
+      getPlayerGold: () => this.playerGold,
+      onGoldChange: (newGold: number) => {
         this.playerGold = newGold;
         if (this.playergold_callback) {
           this.playergold_callback(newGold);
         }
-        this.storage.saveGold(newGold);
-
-        // Update gold display in shop
-        const goldEl = document.getElementById('shop-player-gold');
-        if (goldEl) goldEl.textContent = newGold.toString();
-
-        // Refresh shop to update button states and stock
-        if (this.currentShopNpcKind !== null) {
-          // Update local stock
-          const item = this.currentShopItems.find(i => i.itemKind === itemKind);
-          if (item && item.stock > 0) {
-            item.stock--;
-          }
-
-          // Re-render buttons
-          this.updateShopButtons();
-        }
-
-        // Play sound
+      },
+      saveGold: (gold: number) => {
+        this.storage.saveGold(gold);
+      },
+      playSound: (sound: string) => {
         if (this.audioManager) {
-          this.audioManager.playSound('loot');
+          this.audioManager.playSound(sound);
         }
-      }
-    } catch (e) {
-      console.error('[Shop] Error handling buy result:', e);
-    }
-  }
-
-  updateShopButtons() {
-    const itemsList = document.getElementById('shop-items-list');
-    if (!itemsList) return;
-
-    itemsList.querySelectorAll('.shop-item').forEach((itemEl, index) => {
-      const item = this.currentShopItems[index];
-      if (!item) return;
-
-      const btn = itemEl.querySelector('.shop-buy-btn') as HTMLButtonElement;
-      const stockEl = itemEl.querySelector('.shop-item-stock');
-
-      if (btn) {
-        const canAfford = this.playerGold >= item.price;
-        const inStock = item.stock !== 0;
-        btn.disabled = !canAfford || !inStock;
-        btn.textContent = !inStock ? 'Sold' : !canAfford ? 'Need Gold' : 'Buy';
-      }
-
-      if (stockEl) {
-        stockEl.textContent = item.stock === -1 ? 'In Stock' : item.stock === 0 ? 'Out of Stock' : `${item.stock} left`;
-        stockEl.className = 'shop-item-stock' + (item.stock !== -1 && item.stock <= 2 ? ' limited' : '');
       }
     });
   }
 
-  getItemDisplayName(itemKind: number): string {
-    const kindString = Types.getKindAsString(itemKind);
-    // Convert camelCase/lowercase to Title Case
-    const words = kindString.replace(/([A-Z])/g, ' $1').toLowerCase().split(/[\s_-]+/);
-    return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  showShop(npcKind: number, shopName: string, items: Array<{ itemKind: number; price: number; stock: number }>) {
+    this.shopUI?.show(npcKind, shopName, items);
+  }
+
+  hideShop() {
+    this.shopUI?.hide();
+  }
+
+  handleShopBuyResult(success: boolean, itemKind: number, newGold: number, message: string) {
+    this.shopUI?.handleBuyResult(success, itemKind, newGold, message);
   }
 
   // Party System
@@ -2239,8 +2092,7 @@ export class Game {
     // Create chat bubble
     const entity = this.getEntityById(senderId);
     if (entity) {
-      this.createBubble(senderId, '[P] ' + message);
-      this.assignBubbleTo(entity);
+      this.showBubbleFor(entity, '[P] ' + message);
     }
     console.info('[Party Chat]', senderName + ':', message);
   }
@@ -2284,5 +2136,82 @@ export class Game {
     }
 
     return false;
+  }
+
+  // Inventory System
+  initInventory() {
+    this.inventoryManager = new InventoryManager();
+    this.inventoryUI = new InventoryUI();
+
+    // Set up inventory UI callbacks
+    this.inventoryUI.setCallbacks({
+      onUse: (slotIndex: number) => {
+        console.log('[Inventory] Use slot', slotIndex);
+        this.client.sendInventoryUse(slotIndex);
+      },
+      onEquip: (slotIndex: number) => {
+        console.log('[Inventory] Equip slot', slotIndex);
+        this.client.sendInventoryEquip(slotIndex);
+      },
+      onDrop: (slotIndex: number) => {
+        console.log('[Inventory] Drop slot', slotIndex);
+        this.client.sendInventoryDrop(slotIndex);
+      }
+    });
+
+    // Sync inventory manager changes to UI
+    this.inventoryManager.onChange((slots) => {
+      if (this.inventoryUI) {
+        this.inventoryUI.updateSlots(slots);
+      }
+      // Also save to storage
+      this.storage.saveInventory(slots);
+    });
+
+    console.info('[Inventory] Initialized');
+  }
+
+  toggleInventory() {
+    if (this.inventoryUI) {
+      this.inventoryUI.toggle();
+    }
+  }
+
+  handleInventoryInit(serializedSlots: (SerializedInventorySlot | null)[]) {
+    if (this.inventoryManager) {
+      this.inventoryManager.loadFromServer(serializedSlots);
+      console.info('[Inventory] Loaded', this.inventoryManager.getFilledSlotCount(), 'items');
+    }
+  }
+
+  handleInventoryAdd(slotIndex: number, kind: number, properties: Record<string, unknown> | null, count: number) {
+    if (this.inventoryManager) {
+      this.inventoryManager.updateSlot(slotIndex, kind, properties, count);
+      // Show notification
+      const itemName = this.inventoryManager.getItemName(slotIndex);
+      this.showNotification(`Picked up ${itemName}${count > 1 ? ' x' + count : ''}`);
+    }
+  }
+
+  handleInventoryRemove(slotIndex: number) {
+    if (this.inventoryManager) {
+      this.inventoryManager.removeSlot(slotIndex);
+    }
+  }
+
+  handleInventoryUpdate(slotIndex: number, count: number) {
+    if (this.inventoryManager) {
+      this.inventoryManager.updateCount(slotIndex, count);
+    }
+  }
+
+  /**
+   * Send pickup request to server for inventory-based pickup
+   */
+  pickupItemToInventory(item: Item) {
+    if (this.client && item && item.id) {
+      console.log('[Inventory] Requesting pickup of item', item.id);
+      this.client.sendInventoryPickup(item.id);
+    }
   }
 }

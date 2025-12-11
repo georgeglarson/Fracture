@@ -26,3 +26,14 @@ export {
   ContextMenuOption,
   ContextMenuCallbacks
 } from './context-menu.js';
+
+export {
+  InventoryUI,
+  InventoryCallbacks
+} from './inventory-ui.js';
+
+export {
+  ShopUI,
+  ShopItem,
+  ShopCallbacks
+} from './shop-ui.js';

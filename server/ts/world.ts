@@ -466,8 +466,8 @@ export class World {
     return this.entityManager?.createItem(kind, x, y);
   }
 
-  createItemWithProperties(kind, x, y) {
-    return this.entityManager?.createItemWithProperties(kind, x, y);
+  createItemWithProperties(kind, x, y, existingProperties?) {
+    return this.entityManager?.createItemWithProperties(kind, x, y, existingProperties);
   }
 
   createChest(x, y, items) {

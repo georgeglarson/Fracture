@@ -77,7 +77,18 @@ export const Types: any = {
 
     // Player inspect
     PLAYER_INSPECT: 64,           // Client: [64, targetId]
-    PLAYER_INSPECT_RESULT: 65     // Server: [65, id, name, title, level, weapon, armor]
+    PLAYER_INSPECT_RESULT: 65,    // Server: [65, id, name, title, level, weapon, armor]
+
+    // Inventory system
+    INVENTORY_INIT: 66,           // Server: [66, slots[]]
+    INVENTORY_ADD: 67,            // Server: [67, slotIndex, kind, properties, count]
+    INVENTORY_REMOVE: 68,         // Server: [68, slotIndex]
+    INVENTORY_UPDATE: 69,         // Server: [69, slotIndex, count]
+    INVENTORY_USE: 70,            // Client: [70, slotIndex]
+    INVENTORY_EQUIP: 71,          // Client: [71, slotIndex]
+    INVENTORY_DROP: 72,           // Client: [72, slotIndex]
+    INVENTORY_SWAP: 73,           // Client: [73, fromSlot, toSlot]
+    INVENTORY_PICKUP: 74          // Client: [74, itemEntityId]
   },
 
   Entities: {

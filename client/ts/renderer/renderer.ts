@@ -858,7 +858,16 @@ export class Renderer {
     // Apply camera position plus any active shake offset
     const shakeX = this.camera.shakeOffsetX * this.scale;
     const shakeY = this.camera.shakeOffsetY * this.scale;
-    ctx.translate(-this.camera.x * this.scale + shakeX, -this.camera.y * this.scale + shakeY);
+
+    // When in indoor mode, center the smaller viewport within the larger canvas
+    let centerOffsetX = 0;
+    let centerOffsetY = 0;
+    if (this.camera.indoorMode && this.camera.fullGridW > 0) {
+      centerOffsetX = Math.floor((this.camera.fullGridW - this.camera.gridW) / 2) * this.tilesize * this.scale;
+      centerOffsetY = Math.floor((this.camera.fullGridH - this.camera.gridH) / 2) * this.tilesize * this.scale;
+    }
+
+    ctx.translate(-this.camera.x * this.scale + shakeX + centerOffsetX, -this.camera.y * this.scale + shakeY + centerOffsetY);
   }
 
   clearScreen(ctx) {
@@ -903,6 +912,13 @@ export class Renderer {
   }
 
   renderStaticCanvases() {
+    // In indoor mode, fill the entire canvas with black first
+    // This hides map areas outside the building interior
+    if (this.camera.indoorMode) {
+      this.background.fillStyle = '#000000';
+      this.background.fillRect(0, 0, this.background.canvas.width, this.background.canvas.height);
+    }
+
     this.background.save();
     this.setCameraView(this.background);
     this.drawTerrain();

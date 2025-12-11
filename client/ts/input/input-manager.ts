@@ -6,6 +6,11 @@
 export interface CameraContext {
   gridX: number;
   gridY: number;
+  gridW: number;
+  gridH: number;
+  fullGridW: number;
+  fullGridH: number;
+  indoorMode: boolean;
 }
 
 export interface RendererContext {
@@ -135,11 +140,21 @@ export class InputManager {
       return { x: 0, y: 0 };
     }
 
-    const mx = this.mouse.x;
-    const my = this.mouse.y;
+    let mx = this.mouse.x;
+    let my = this.mouse.y;
     const c = this.renderer.camera;
     const s = this.renderer.scale;
     const ts = this.renderer.tilesize;
+
+    // When in indoor mode, subtract the centering offset from mouse position
+    // This matches the offset applied in renderer.setCameraView()
+    if (c.indoorMode && c.fullGridW > 0) {
+      const centerOffsetX = Math.floor((c.fullGridW - c.gridW) / 2) * ts * s;
+      const centerOffsetY = Math.floor((c.fullGridH - c.gridH) / 2) * ts * s;
+      mx -= centerOffsetX;
+      my -= centerOffsetY;
+    }
+
     const offsetX = mx % (ts * s);
     const offsetY = my % (ts * s);
     const x = ((mx - offsetX) / (ts * s)) + c.gridX;

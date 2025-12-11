@@ -1,6 +1,7 @@
 /**
  * Network Message Handlers
  * Handles all incoming server messages and routes them to game actions
+ * Uses EventEmitter pattern for clean pub/sub communication
  */
 
 import { Types } from '../../../shared/ts/gametypes';
@@ -15,49 +16,32 @@ import _ from 'lodash';
 
 import type { Game } from '../game';
 import type { GameClient } from './gameclient';
+import { ClientEvents } from './client-events';
 
 /**
  * Sets up all network message handlers for the game client
  */
 export function setupNetworkHandlers(game: Game, client: GameClient): void {
-  // Spawning handlers
   setupSpawnHandlers(game, client);
-
-  // Entity state handlers
   setupEntityHandlers(game, client);
-
-  // Player-specific handlers
   setupPlayerHandlers(game, client);
-
-  // Combat handlers
   setupCombatHandlers(game, client);
-
-  // AI/Venice handlers
   setupAIHandlers(game, client);
-
-  // Progression handlers
   setupProgressionHandlers(game, client);
-
-  // Misc handlers
   setupMiscHandlers(game, client);
-
-  // Shop handlers
   setupShopHandlers(game, client);
-
-  // Achievement handlers
   setupAchievementHandlers(game, client);
-
-  // Party handlers
   setupPartyHandlers(game, client);
+  setupInventoryHandlers(game, client);
 }
 
 function setupSpawnHandlers(game: Game, client: GameClient): void {
-  client.onSpawnItem(function (item, x, y) {
+  client.on(ClientEvents.SPAWN_ITEM, function (item, x, y) {
     console.info('Spawned ' + Types.getKindAsString(item.kind) + ' (' + item.id + ') at ' + x + ', ' + y);
     game.addItem(item, x, y);
   });
 
-  client.onSpawnChest(function (chest, x, y) {
+  client.on(ClientEvents.SPAWN_CHEST, function (chest, x, y) {
     console.info('Spawned chest (' + chest.id + ') at ' + x + ', ' + y);
     chest.setSprite(game.sprites[chest.getSpriteName()]);
     chest.setGridPosition(x, y);
@@ -65,6 +49,7 @@ function setupSpawnHandlers(game: Game, client: GameClient): void {
     game.addEntity(chest);
 
     chest.onOpen(function () {
+      game.removeFromEntityGrid(chest, chest.gridX, chest.gridY);
       game.removeFromPathingGrid(chest.gridX, chest.gridY);
       chest.stopBlinking();
       chest.setSprite(game.sprites['death']);
@@ -77,7 +62,7 @@ function setupSpawnHandlers(game: Game, client: GameClient): void {
     });
   });
 
-  client.onSpawnCharacter(function (entity, x, y, orientation, targetId) {
+  client.on(ClientEvents.SPAWN_CHARACTER, function (entity, x, y, orientation, targetId) {
     if (!game.entityIdExists(entity.id)) {
       try {
         if (entity.id !== game.playerId) {
@@ -182,7 +167,6 @@ function setupCharacterCallbacks(game: Game, entity: Character): void {
 
     if (entity instanceof Mob) {
       game.entityManager?.recordDeathPosition(entity.id, entity.gridX, entity.gridY);
-      // Death particles and shake for satisfying kill feedback
       game.renderer.particles.spawnDeathParticles(entity.x, entity.y - 8);
       game.renderer.camera.shake(4, 100);
     }
@@ -219,7 +203,7 @@ function setupCharacterCallbacks(game: Game, entity: Character): void {
 }
 
 function setupEntityHandlers(game: Game, client: GameClient): void {
-  client.onDespawnEntity(function (entityId) {
+  client.on(ClientEvents.DESPAWN, function (entityId) {
     var entity = game.getEntityById(entityId);
 
     if (entity) {
@@ -247,14 +231,14 @@ function setupEntityHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.onItemBlink(function (id) {
+  client.on(ClientEvents.BLINK, function (id) {
     var item = game.getEntityById(id);
     if (item) {
       item.blink(150);
     }
   });
 
-  client.onEntityMove(function (id, x, y) {
+  client.on(ClientEvents.MOVE, function (id, x, y) {
     if (id !== game.playerId) {
       var entity = game.getEntityById(id);
 
@@ -269,7 +253,7 @@ function setupEntityHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.onEntityDestroy(function (id) {
+  client.on(ClientEvents.DESTROY, function (id) {
     var entity = game.getEntityById(id);
     if (entity) {
       if (entity instanceof Item) {
@@ -281,7 +265,7 @@ function setupEntityHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.onPlayerMoveToItem(function (playerId, itemId) {
+  client.on(ClientEvents.LOOT_MOVE, function (playerId, itemId) {
     if (playerId !== game.playerId) {
       var player = game.getEntityById(playerId);
       var item = game.getEntityById(itemId);
@@ -294,7 +278,7 @@ function setupEntityHandlers(game: Game, client: GameClient): void {
 }
 
 function setupPlayerHandlers(game: Game, client: GameClient): void {
-  client.onPlayerChangeHealth(function (points, isRegen) {
+  client.on(ClientEvents.HEALTH, function (points, isRegen) {
     var player = game.player;
 
     if (player && !player.isDead && !player.invincible) {
@@ -311,16 +295,9 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
         game.audioManager.playSound('hurt');
         game.storage.addDamage(-diff);
         game.tryUnlockingAchievement('MEATSHIELD');
-        // Screen shake on damage - intensity scales with damage taken
         const shakeIntensity = Math.min(6, 3 + Math.floor(-diff / 10));
         game.renderer.camera.shake(shakeIntensity, 120);
-        // Blood particles on player when hurt
-        game.renderer.particles.spawnHitParticles(
-          player.x,
-          player.y - 8,
-          6,
-          '#ff2222'
-        );
+        game.renderer.particles.spawnHitParticles(player.x, player.y - 8, 6, '#ff2222');
         if (game.playerhurt_callback) {
           game.playerhurt_callback();
         }
@@ -331,13 +308,13 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.onPlayerChangeMaxHitPoints(function (hp) {
+  client.on(ClientEvents.HP, function (hp) {
     game.player.maxHitPoints = hp;
     game.player.hitPoints = hp;
     game.updateBars();
   });
 
-  client.onPlayerEquipItem(function (playerId, itemKind) {
+  client.on(ClientEvents.EQUIP, function (playerId, itemKind) {
     var player = game.getEntityById(playerId);
     var itemName = Types.getKindAsString(itemKind);
 
@@ -355,7 +332,7 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.onPlayerTeleport(function (id, x, y) {
+  client.on(ClientEvents.TELEPORT, function (id, x, y) {
     if (id !== game.playerId) {
       var entity = game.getEntityById(id);
 
@@ -373,7 +350,7 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.onDropItem(function (item, mobId) {
+  client.on(ClientEvents.DROP, function (item, mobId) {
     var pos = game.getDeadMobPosition(mobId);
     if (pos) {
       game.addItem(item, pos.x, pos.y);
@@ -381,13 +358,13 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.onPopulationChange(function (worldPlayers, totalPlayers) {
+  client.on(ClientEvents.POPULATION, function (worldPlayers, totalPlayers) {
     if (game.nbplayers_callback) {
       game.nbplayers_callback(worldPlayers, totalPlayers);
     }
   });
 
-  client.onDisconnected(function (message) {
+  client.on(ClientEvents.DISCONNECTED, function (message) {
     if (game.player) {
       game.player.die();
     }
@@ -398,7 +375,7 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
 }
 
 function setupCombatHandlers(game: Game, client: GameClient): void {
-  client.onEntityAttack(function (attackerId, targetId) {
+  client.on(ClientEvents.ATTACK, function (attackerId, targetId) {
     var attacker = game.getEntityById(attackerId);
     var target = game.getEntityById(targetId);
 
@@ -415,14 +392,14 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.onPlayerDamageMob(function (mobId, points) {
+  client.on(ClientEvents.DAMAGE, function (mobId, points) {
     var mob = game.getEntityById(mobId);
     if (mob && points) {
       game.infoManager.addDamageInfo(points, mob.x, mob.y - 15, 'inflicted');
     }
   });
 
-  client.onPlayerKillMob(function (kind) {
+  client.on(ClientEvents.KILL, function (kind) {
     var mobName = Types.getKindAsString(kind);
 
     if (mobName === 'skeleton2') mobName = 'greater skeleton';
@@ -459,53 +436,51 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
 }
 
 function setupAIHandlers(game: Game, client: GameClient): void {
-  client.onNpcTalkResponse(function (npcKind, response) {
+  client.on(ClientEvents.NPC_TALK, function (npcKind, response) {
     if (game.currentNpcTalk) {
       var npc = game.currentNpcTalk;
       game.currentNpcTalk = null;
       if (response) {
-        game.createBubble(npc.id, response);
-        game.assignBubbleTo(npc);
+        game.showBubbleFor(npc, response);
         game.audioManager.playSound('npc');
       }
     }
   });
 
-  client.onCompanionHint(function (hint) {
+  client.on(ClientEvents.COMPANION_HINT, function (hint) {
     if (hint && game.player) {
-      game.createBubble(game.player.id, '\u2728 ' + hint);
-      game.assignBubbleTo(game.player);
+      game.showBubbleFor(game.player, '\u2728 ' + hint);
     }
   });
 
-  client.onQuestOffer(function (quest) {
+  client.on(ClientEvents.QUEST_OFFER, function (quest) {
     if (quest && game.notification_callback) {
       game.notification_callback('Quest: ' + quest.description);
       game.currentQuest = quest;
     }
   });
 
-  client.onQuestComplete(function (result) {
+  client.on(ClientEvents.QUEST_COMPLETE, function (result) {
     if (result && game.notification_callback) {
       game.notification_callback('Quest Complete! Reward: ' + result.reward);
       game.currentQuest = null;
     }
   });
 
-  client.onItemLore(function (itemKind, lore) {
+  client.on(ClientEvents.ITEM_LORE, function (itemKind, lore) {
     if (lore && game.notification_callback) {
       var itemName = Types.getKindAsString(itemKind);
       game.notification_callback(itemName + ': ' + lore);
     }
   });
 
-  client.onNarrator(function (text, style) {
+  client.on(ClientEvents.NARRATOR, function (text, style) {
     if (text) {
       game.showNarratorText(text, style);
     }
   });
 
-  client.onEntityThought(function (entityId, thought, state) {
+  client.on(ClientEvents.ENTITY_THOUGHT, function (entityId, thought, state) {
     console.log('[Thought] Received for entity', entityId, ':', thought);
     var entity = game.getEntityById(entityId);
     if (entity) {
@@ -518,21 +493,22 @@ function setupAIHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.onNewsResponse(function (headlines) {
+  client.on(ClientEvents.NEWS, function (headlines) {
     console.log('[TownCrier] Showing newspaper with', headlines.length, 'headlines');
     game.showNewspaper(headlines);
   });
 
-  client.onChatMessage(function (entityId, message) {
+  client.on(ClientEvents.CHAT, function (entityId, message) {
     var entity = game.getEntityById(entityId);
-    game.createBubble(entityId, message);
-    game.assignBubbleTo(entity);
+    if (entity) {
+      game.showBubbleFor(entity, message);
+    }
     game.audioManager.playSound('chat');
   });
 }
 
 function setupProgressionHandlers(game: Game, client: GameClient): void {
-  client.onXpGain(function (amount, currentXp, xpToNext) {
+  client.on(ClientEvents.XP_GAIN, function (amount, currentXp, xpToNext) {
     game.playerXp = currentXp;
     game.playerXpToNext = xpToNext;
 
@@ -547,7 +523,7 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.onLevelUp(function (newLevel, bonusHP, bonusDamage) {
+  client.on(ClientEvents.LEVEL_UP, function (newLevel, bonusHP, bonusDamage) {
     game.playerLevel = newLevel;
     game.playerXp = 0;
 
@@ -568,8 +544,7 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  // Economy system - gold gain
-  client.onGoldGain(function (amount, totalGold) {
+  client.on(ClientEvents.GOLD_GAIN, function (amount, totalGold) {
     game.playerGold = totalGold;
 
     game.storage.saveGold(totalGold);
@@ -583,81 +558,94 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  // Daily reward system
-  client.onDailyReward(function (gold, xp, streak, isNewDay) {
+  client.on(ClientEvents.DAILY_REWARD, function (gold, xp, streak, isNewDay) {
     if (!isNewDay) {
-      // Not a new day, reward already claimed
       console.log('[Daily] Already claimed today');
       return;
     }
 
-    // Save the new streak data
     const today = new Date().toISOString().split('T')[0];
     game.storage.saveDailyLogin(today, streak);
-
-    // Show the daily reward popup
     game.showDailyRewardPopup(gold, xp, streak);
   });
 }
 
 function setupMiscHandlers(game: Game, client: GameClient): void {
-  // Any additional handlers can be added here
+  // Additional handlers can be added here
 }
 
 function setupShopHandlers(game: Game, client: GameClient): void {
-  client.onShopOpen(function (npcKind, shopName, items) {
+  client.on(ClientEvents.SHOP_OPEN, function (npcKind, shopName, items) {
     game.showShop(npcKind, shopName, items);
   });
 
-  client.onShopBuyResult(function (success, itemKind, newGold, message) {
+  client.on(ClientEvents.SHOP_BUY_RESULT, function (success, itemKind, newGold, message) {
     game.handleShopBuyResult(success, itemKind, newGold, message);
   });
 }
 
 function setupAchievementHandlers(game: Game, client: GameClient): void {
-  client.onAchievementInit(function (unlocked, progress, selectedTitle) {
+  client.on(ClientEvents.ACHIEVEMENT_INIT, function (unlocked, progress, selectedTitle) {
     game.handleAchievementInit(unlocked, progress, selectedTitle);
   });
 
-  client.onAchievementUnlock(function (achievementId) {
+  client.on(ClientEvents.ACHIEVEMENT_UNLOCK, function (achievementId) {
     game.handleAchievementUnlock(achievementId);
   });
 
-  client.onAchievementProgress(function (achievementId, current, target) {
+  client.on(ClientEvents.ACHIEVEMENT_PROGRESS, function (achievementId, current, target) {
     game.handleAchievementProgress(achievementId, current, target);
   });
 
-  client.onPlayerTitleUpdate(function (playerId, title) {
+  client.on(ClientEvents.PLAYER_TITLE_UPDATE, function (playerId, title) {
     game.handlePlayerTitleUpdate(playerId, title);
   });
 }
 
 function setupPartyHandlers(game: Game, client: GameClient): void {
-  client.onPartyInviteReceived(function (inviterId, inviterName) {
+  client.on(ClientEvents.PARTY_INVITE_RECEIVED, function (inviterId, inviterName) {
     game.handlePartyInvite(inviterId, inviterName);
   });
 
-  client.onPartyJoin(function (partyId, members, leaderId) {
+  client.on(ClientEvents.PARTY_JOIN, function (partyId, members, leaderId) {
     game.handlePartyJoin(partyId, members, leaderId);
   });
 
-  client.onPartyLeave(function (playerId) {
+  client.on(ClientEvents.PARTY_LEAVE, function (playerId) {
     game.handlePartyLeave(playerId);
   });
 
-  client.onPartyDisband(function () {
+  client.on(ClientEvents.PARTY_DISBAND, function () {
     game.handlePartyDisband();
   });
 
-  client.onPartyUpdate(function (members) {
+  client.on(ClientEvents.PARTY_UPDATE, function (members) {
     game.handlePartyUpdate(members);
   });
 
-  client.onPartyChat(function (senderId, senderName, message) {
+  client.on(ClientEvents.PARTY_CHAT, function (senderId, senderName, message) {
     game.handlePartyChat(senderId, senderName, message);
   });
 
-  client.onPlayerInspectResult(function (playerId, name, title, level, weapon, armor) {
+  client.on(ClientEvents.PLAYER_INSPECT_RESULT, function (playerId, name, title, level, weapon, armor) {
     game.handlePlayerInspectResult(playerId, name, title, level, weapon, armor);
+  });
+}
+
+function setupInventoryHandlers(game: Game, client: GameClient): void {
+  client.on(ClientEvents.INVENTORY_INIT, function (slots) {
+    game.handleInventoryInit(slots);
+  });
+
+  client.on(ClientEvents.INVENTORY_ADD, function (slotIndex, kind, properties, count) {
+    game.handleInventoryAdd(slotIndex, kind, properties, count);
+  });
+
+  client.on(ClientEvents.INVENTORY_REMOVE, function (slotIndex) {
+    game.handleInventoryRemove(slotIndex);
+  });
+
+  client.on(ClientEvents.INVENTORY_UPDATE, function (slotIndex, count) {
+    game.handleInventoryUpdate(slotIndex, count);
   });
 }

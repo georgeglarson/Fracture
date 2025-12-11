@@ -48,6 +48,13 @@ export class FormatChecker {
 
     // Player inspect
     this.formats[Types.Messages.PLAYER_INSPECT] = ['n']; // targetId
+
+    // Inventory system
+    this.formats[Types.Messages.INVENTORY_USE] = ['n']; // slotIndex
+    this.formats[Types.Messages.INVENTORY_EQUIP] = ['n']; // slotIndex
+    this.formats[Types.Messages.INVENTORY_DROP] = ['n']; // slotIndex
+    this.formats[Types.Messages.INVENTORY_SWAP] = ['n', 'n']; // fromSlot, toSlot
+    this.formats[Types.Messages.INVENTORY_PICKUP] = ['n']; // itemEntityId
   }
 
   check(msg) {

@@ -11,6 +11,16 @@ export class Camera {
   gridW;
   gridH;
 
+  // Full viewport size (for outdoor areas)
+  fullGridW: number = 0;
+  fullGridH: number = 0;
+
+  // Indoor mode - use smaller fixed viewport
+  // Sized to fit single building rooms (most are ~9x7 tiles)
+  indoorMode: boolean = false;
+  static readonly INDOOR_GRID_W = 11;
+  static readonly INDOOR_GRID_H = 9;
+
   // Map bounds for clamping
   mapWidth: number = 0;
   mapHeight: number = 0;
@@ -74,18 +84,50 @@ export class Camera {
     var scale = this.renderer.scale || 2;
     var tilesize = this.renderer.tilesize || 16;
 
-    // How many tiles fit in the window?
-    this.gridW = Math.ceil(window.innerWidth / (tilesize * scale));
-    this.gridH = Math.ceil(window.innerHeight / (tilesize * scale));
+    // Status bar height (60px + 3px border)
+    var statusBarHeight = 63;
+
+    // How many tiles fit in the window? Subtract status bar from height
+    this.fullGridW = Math.ceil(window.innerWidth / (tilesize * scale));
+    this.fullGridH = Math.ceil((window.innerHeight - statusBarHeight) / (tilesize * scale));
 
     // Ensure minimum size
-    this.gridW = Math.max(this.gridW, 15);
-    this.gridH = Math.max(this.gridH, 7);
+    this.fullGridW = Math.max(this.fullGridW, 15);
+    this.fullGridH = Math.max(this.fullGridH, 7);
+
+    // Apply indoor mode limits if active
+    if (this.indoorMode) {
+      this.gridW = Math.min(this.fullGridW, Camera.INDOOR_GRID_W);
+      this.gridH = Math.min(this.fullGridH, Camera.INDOOR_GRID_H);
+    } else {
+      this.gridW = this.fullGridW;
+      this.gridH = this.fullGridH;
+    }
 
     console.debug('---------');
     console.debug('Scale:' + scale + ' Tilesize:' + tilesize);
     console.debug('Viewport:' + window.innerWidth + 'x' + window.innerHeight);
-    console.debug('Grid W:' + this.gridW + ' H:' + this.gridH);
+    console.debug('Grid W:' + this.gridW + ' H:' + this.gridH + (this.indoorMode ? ' (indoor)' : ''));
+  }
+
+  /**
+   * Enter indoor mode - use smaller viewport for building interiors
+   */
+  setIndoorMode(indoor: boolean) {
+    if (this.indoorMode === indoor) return;
+
+    this.indoorMode = indoor;
+
+    // Apply the new grid size
+    if (indoor) {
+      this.gridW = Math.min(this.fullGridW, Camera.INDOOR_GRID_W);
+      this.gridH = Math.min(this.fullGridH, Camera.INDOOR_GRID_H);
+    } else {
+      this.gridW = this.fullGridW;
+      this.gridH = this.fullGridH;
+    }
+
+    console.debug('Camera indoor mode:', indoor, 'Grid:', this.gridW, 'x', this.gridH);
   }
 
   setPosition(x, y) {

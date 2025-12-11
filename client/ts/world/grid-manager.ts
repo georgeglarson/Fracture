@@ -196,6 +196,7 @@ export class GridManager {
 
   /**
    * Returns the entity located at the given position on the world grid.
+   * Prioritizes items (which are always pickupable) over other entities.
    * @returns the entity located at (x, y) or null if there is none.
    */
   getEntityAt(x: number, y: number): Entity | null {
@@ -203,12 +204,18 @@ export class GridManager {
       return null;
     }
 
+    // Check itemGrid first - items are always pickupable and should take priority
+    // This fixes the bug where items dropped from chests couldn't be picked up
+    // because the dying chest was still in entityGrid
+    const item = this.getItemAt(x, y);
+    if (item) {
+      return item;
+    }
+
     const entities = this.entityGrid[y][x];
     let entity: Entity | null = null;
     if (_.size(entities) > 0) {
       entity = entities[_.keys(entities)[0]];
-    } else {
-      entity = this.getItemAt(x, y);
     }
     return entity;
   }

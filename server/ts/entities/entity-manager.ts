@@ -148,16 +148,20 @@ export class EntityManager {
 
   /**
    * Create an item with generated properties (rarity, stats, bonuses)
+   * @param kind - Item type
+   * @param x - X position
+   * @param y - Y position
+   * @param existingProperties - Optional pre-existing properties (for dropped items)
    */
-  createItemWithProperties(kind: number, x: number, y: number): Item | Chest {
+  createItemWithProperties(kind: number, x: number, y: number, existingProperties?: any): Item | Chest {
     const id = '9' + this.itemCount++;
 
     if (kind === Types.Entities.CHEST) {
       return new Chest(id, x, y);
     } else {
-      // Generate item with random properties
-      const generated = generateItem(kind);
-      return new Item(id, kind, x, y, generated);
+      // Use existing properties or generate new ones
+      const properties = existingProperties || generateItem(kind);
+      return new Item(id, kind, x, y, properties);
     }
   }
 

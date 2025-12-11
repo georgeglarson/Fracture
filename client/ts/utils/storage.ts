@@ -44,6 +44,9 @@ export class Storage {
         currentStreak: 0,
         longestStreak: 0,
         totalDailyLogins: 0
+      },
+      inventory: {
+        slots: []
       }
     };
   }
@@ -305,6 +308,28 @@ export class Storage {
     }
     this.data.achievements.selectedTitle = title;
     this.save();
+  }
+
+  // Inventory System
+
+  getInventory(): { slots: any[] } {
+    // Initialize inventory if it doesn't exist (for existing players)
+    if (!this.data.inventory) {
+      this.data.inventory = { slots: [] };
+    }
+    return this.data.inventory;
+  }
+
+  saveInventory(slots: any[]) {
+    if (!this.data.inventory) {
+      this.data.inventory = { slots: [] };
+    }
+    this.data.inventory.slots = slots;
+    this.save();
+  }
+
+  getInventorySlots(): any[] {
+    return this.getInventory().slots;
   }
 
 }

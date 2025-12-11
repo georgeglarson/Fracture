@@ -17,6 +17,9 @@ import {shopService, isMerchant, getShopInventory} from './shop/shop.service';
 import {getAchievementService} from './achievements/achievement.service';
 import {PlayerAchievements} from '../../shared/ts/achievements';
 import {PartyService} from './party';
+import {Inventory} from './inventory/inventory';
+import {serializeSlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
+import {serializeProperties} from '../../shared/ts/items/item-types';
 
 export class Player extends Character {
 
@@ -32,6 +35,9 @@ export class Player extends Character {
 
   // Equipment management (unified handling of all equipment slots)
   private equipment: EquipmentManager = new EquipmentManager();
+
+  // Inventory management
+  private inventory: Inventory = new Inventory();
 
   // Legacy accessors for backward compatibility
   get weapon(): number { return this.equipment.weapon; }
@@ -342,6 +348,32 @@ export class Player extends Character {
       else if (action === Types.Messages.PLAYER_INSPECT) {
         var targetId = message[1];
         self.handlePlayerInspect(targetId);
+      }
+      // Inventory system - use item
+      else if (action === Types.Messages.INVENTORY_USE) {
+        var slotIndex = message[1];
+        self.handleInventoryUse(slotIndex);
+      }
+      // Inventory system - equip item
+      else if (action === Types.Messages.INVENTORY_EQUIP) {
+        var slotIndex = message[1];
+        self.handleInventoryEquip(slotIndex);
+      }
+      // Inventory system - drop item
+      else if (action === Types.Messages.INVENTORY_DROP) {
+        var slotIndex = message[1];
+        self.handleInventoryDrop(slotIndex);
+      }
+      // Inventory system - swap slots
+      else if (action === Types.Messages.INVENTORY_SWAP) {
+        var fromSlot = message[1];
+        var toSlot = message[2];
+        self.handleInventorySwap(fromSlot, toSlot);
+      }
+      // Inventory system - pickup to inventory
+      else if (action === Types.Messages.INVENTORY_PICKUP) {
+        var itemId = message[1];
+        self.handleInventoryPickup(itemId);
       }
       else {
         if (self.message_callback) {
@@ -1399,5 +1431,232 @@ export class Player extends Character {
         }
       }
     }
+  }
+
+  // ============================================================================
+  // INVENTORY SYSTEM
+  // ============================================================================
+
+  /**
+   * Send inventory init to client
+   */
+  sendInventoryInit() {
+    const slots = this.inventory.getSerializedSlots();
+    this.send([Types.Messages.INVENTORY_INIT, slots]);
+  }
+
+  /**
+   * Handle pickup item to inventory
+   */
+  handleInventoryPickup(itemId: number) {
+    const item = this.world.getEntityById(itemId);
+
+    if (!item || !Types.isItem(item.kind)) {
+      console.log(`[Inventory] Invalid item ${itemId} for pickup`);
+      return;
+    }
+
+    // Check if inventory has room
+    if (!this.inventory.hasRoom(item.kind)) {
+      console.log(`[Inventory] ${this.name}'s inventory is full`);
+      // Could send notification to player here
+      return;
+    }
+
+    // Get item properties if it's equipment
+    const properties = item.properties || null;
+
+    // Add to inventory
+    const slotIndex = this.inventory.addItem(item.kind, properties, 1);
+    if (slotIndex === -1) {
+      console.log(`[Inventory] Failed to add item to inventory`);
+      return;
+    }
+
+    // Despawn item from world (false = also send to self)
+    this.broadcast(item.despawn(), false);
+    this.world.removeEntity(item);
+
+    // Send inventory add message
+    const slot = this.inventory.getSlot(slotIndex);
+    const serializedProps = slot?.properties ? serializeProperties(slot.properties) : null;
+    this.send([
+      Types.Messages.INVENTORY_ADD,
+      slotIndex,
+      item.kind,
+      serializedProps,
+      slot?.count || 1
+    ]);
+
+    console.log(`[Inventory] ${this.name} picked up ${Types.getKindAsString(item.kind)} to slot ${slotIndex}`);
+  }
+
+  /**
+   * Handle use consumable from inventory
+   */
+  handleInventoryUse(slotIndex: number) {
+    const slot = this.inventory.getSlot(slotIndex);
+
+    if (!slot) {
+      console.log(`[Inventory] Slot ${slotIndex} is empty`);
+      return;
+    }
+
+    if (!this.inventory.isSlotConsumable(slotIndex)) {
+      console.log(`[Inventory] Slot ${slotIndex} is not consumable`);
+      return;
+    }
+
+    const kind = slot.kind;
+
+    // Handle firepotion specially
+    if (this.inventory.isFirePotion(kind)) {
+      this.inventory.removeItem(slotIndex, 1);
+      this.updateHitPoints();
+      this.broadcast(this.equip(Types.Entities.FIREFOX));
+      this.firepotionTimeout = setTimeout(() => {
+        this.broadcast(this.equip(this.armor)); // return to normal after 15 sec
+        this.firepotionTimeout = null;
+      }, 15000);
+      this.send(new Messages.HitPoints(this.maxHitPoints).serialize());
+    } else {
+      // Healing item
+      const healAmount = this.inventory.getConsumableHealAmount(kind);
+      if (healAmount > 0 && !this.hasFullHealth()) {
+        this.regenHealthBy(healAmount);
+        this.world.pushToPlayer(this, this.health());
+      }
+      this.inventory.removeItem(slotIndex, 1);
+    }
+
+    // Send update or remove based on remaining count
+    const updatedSlot = this.inventory.getSlot(slotIndex);
+    if (updatedSlot) {
+      this.send([Types.Messages.INVENTORY_UPDATE, slotIndex, updatedSlot.count]);
+    } else {
+      this.send([Types.Messages.INVENTORY_REMOVE, slotIndex]);
+    }
+
+    console.log(`[Inventory] ${this.name} used ${Types.getKindAsString(kind)}`);
+  }
+
+  /**
+   * Handle equip from inventory
+   */
+  handleInventoryEquip(slotIndex: number) {
+    const slot = this.inventory.getSlot(slotIndex);
+
+    if (!slot) {
+      console.log(`[Inventory] Slot ${slotIndex} is empty`);
+      return;
+    }
+
+    if (!this.inventory.isSlotEquipment(slotIndex)) {
+      console.log(`[Inventory] Slot ${slotIndex} is not equipment`);
+      return;
+    }
+
+    const newItemKind = slot.kind;
+    const newItemProps = slot.properties;
+    const isWeapon = Types.isWeapon(newItemKind);
+    const isArmor = Types.isArmor(newItemKind);
+
+    // Get currently equipped item
+    const currentKind = isWeapon ? this.weapon : this.armor;
+    const isDefaultItem = (isWeapon && currentKind === Types.Entities.SWORD1) ||
+                          (isArmor && currentKind === Types.Entities.CLOTHARMOR);
+
+    // Remove new item from inventory
+    this.inventory.removeItem(slotIndex, 1);
+
+    // Put old equipped item in inventory (if not default)
+    if (!isDefaultItem) {
+      // Note: old item doesn't have stored properties in current system
+      // We'd need to track equipped item properties separately for full support
+      this.inventory.setSlot(slotIndex, {
+        kind: currentKind,
+        properties: null, // TODO: track equipped item properties
+        count: 1
+      });
+      const serializedOldSlot = serializeSlot(this.inventory.getSlot(slotIndex));
+      this.send([
+        Types.Messages.INVENTORY_ADD,
+        slotIndex,
+        currentKind,
+        serializedOldSlot?.p || null,
+        1
+      ]);
+    } else {
+      // Default item - just remove slot
+      this.send([Types.Messages.INVENTORY_REMOVE, slotIndex]);
+    }
+
+    // Equip new item
+    if (isWeapon) {
+      this.equipWeapon(newItemKind);
+    } else {
+      this.equipArmor(newItemKind);
+      this.updateHitPoints();
+      this.send(new Messages.HitPoints(this.maxHitPoints).serialize());
+    }
+
+    // Broadcast equipment change
+    this.broadcast(this.equip(newItemKind));
+
+    console.log(`[Inventory] ${this.name} equipped ${Types.getKindAsString(newItemKind)}`);
+  }
+
+  /**
+   * Handle drop from inventory
+   */
+  handleInventoryDrop(slotIndex: number) {
+    const slot = this.inventory.getSlot(slotIndex);
+
+    if (!slot) {
+      console.log(`[Inventory] Slot ${slotIndex} is empty`);
+      return;
+    }
+
+    const kind = slot.kind;
+    const properties = slot.properties;
+
+    // Remove from inventory
+    this.inventory.removeItem(slotIndex, 1);
+
+    // Create item at player's position
+    const item = this.world.createItemWithProperties(kind, this.x, this.y, properties);
+    if (item) {
+      this.world.addItem(item);
+      this.broadcast(new Messages.Spawn(item), false);
+      console.log(`[Inventory] ${this.name} dropped ${Types.getKindAsString(kind)} at (${this.x}, ${this.y})`);
+    }
+
+    // Send inventory remove
+    this.send([Types.Messages.INVENTORY_REMOVE, slotIndex]);
+  }
+
+  /**
+   * Handle swap slots
+   */
+  handleInventorySwap(fromSlot: number, toSlot: number) {
+    if (this.inventory.swapSlots(fromSlot, toSlot)) {
+      // Send full inventory update (could optimize to only send affected slots)
+      this.sendInventoryInit();
+      console.log(`[Inventory] ${this.name} swapped slots ${fromSlot} <-> ${toSlot}`);
+    }
+  }
+
+  /**
+   * Get serialized inventory for persistence
+   */
+  getInventoryState(): (SerializedInventorySlot | null)[] {
+    return this.inventory.getSerializedSlots();
+  }
+
+  /**
+   * Load inventory from saved data
+   */
+  loadInventory(data: (SerializedInventorySlot | null)[]) {
+    this.inventory.loadFromData(data);
   }
 }

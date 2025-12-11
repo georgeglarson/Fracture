@@ -15,7 +15,10 @@ module.exports = env => {
     },
 
     resolve: {
-      extensions: ['.ts', '.js']
+      extensions: ['.ts', '.js'],
+      extensionAlias: {
+        '.js': ['.ts', '.js']
+      }
     },
 
     // Source maps support

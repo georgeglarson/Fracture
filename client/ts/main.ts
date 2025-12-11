@@ -419,6 +419,12 @@ var initGame = function () {
         }
         return false;
       }
+      if (key === 73) { // I - Toggle inventory
+        if (game.ready && game.started) {
+          game.toggleInventory();
+        }
+        return false;
+      }
     } else {
       if (key === 13 && game.ready) {
         $chat.focus();
