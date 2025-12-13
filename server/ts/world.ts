@@ -15,6 +15,7 @@ import {EntityManager} from './entities/entity-manager';
 import {SpatialManager} from './world/spatial-manager';
 import {SpawnManager} from './world/spawn-manager';
 import {GameLoop} from './world/game-loop';
+import {getZoneManager, ZoneManager} from './zones';
 
 export class World {
 
@@ -38,6 +39,9 @@ export class World {
 
   attackers = {};
   equipping = {};
+
+  // Zone manager for zone-based loot and notifications
+  zoneManager: ZoneManager;
   hurt = {};
 
   // Spatial manager (initialized in run() after map is ready)
@@ -83,6 +87,7 @@ export class World {
     this.id = id;
     this.maxPlayers = maxPlayers;
     this.server = websocketServer;
+    this.zoneManager = getZoneManager();
 
 
     this.onPlayerConnect(function (player) {
@@ -575,10 +580,16 @@ export class World {
 
   getDroppedItem(mob) {
     var kind = Types.getKindAsString(mob.kind),
-      drops = Properties[kind].drops,
+      baseDrops = Properties[kind].drops,
       v = Utils.random(100),
       p = 0,
       item = null;
+
+    // Get zone at mob position for loot bonuses
+    const zone = this.zoneManager.getZoneAt(mob.x, mob.y);
+
+    // Apply zone modifiers to drop table (increased armor/weapon chances)
+    const drops = this.zoneManager.modifyDropTable(baseDrops, zone);
 
     for (var itemName in drops) {
       var percentage = drops[itemName];
@@ -586,7 +597,8 @@ export class World {
       p += percentage;
       if (v <= p) {
         // Use createItemWithProperties to generate items with random stats
-        item = this.addItem(this.createItemWithProperties(Types.getKindFromString(itemName), mob.x, mob.y));
+        // Pass zone for rarity bonus
+        item = this.addItem(this.createItemWithProperties(Types.getKindFromString(itemName), mob.x, mob.y, zone));
         break;
       }
     }

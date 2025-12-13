@@ -39,12 +39,29 @@ function randomFloat(min: number, max: number): number {
 
 /**
  * Roll a rarity tier based on weights
+ * @param rarityBonus - Optional bonus that increases chance of higher rarities (0-1, e.g., 0.3 = +30%)
  */
-export function rollRarity(): Rarity {
+export function rollRarity(rarityBonus: number = 0): Rarity {
   const roll = Math.random() * 100;
   let cumulative = 0;
 
-  for (const [rarity, weight] of Object.entries(RarityWeights)) {
+  // Apply rarity bonus by shifting weights toward rarer items
+  // A bonus of 0.3 means +30% chance at each tier upgrade
+  const adjustedWeights = { ...RarityWeights };
+
+  if (rarityBonus > 0) {
+    // Reduce COMMON weight, increase others proportionally
+    const commonReduction = adjustedWeights.common * rarityBonus;
+    adjustedWeights.common -= commonReduction;
+
+    // Distribute to higher rarities
+    adjustedWeights.uncommon += commonReduction * 0.5;
+    adjustedWeights.rare += commonReduction * 0.25;
+    adjustedWeights.epic += commonReduction * 0.15;
+    adjustedWeights.legendary += commonReduction * 0.1;
+  }
+
+  for (const [rarity, weight] of Object.entries(adjustedWeights)) {
     cumulative += weight;
     if (roll < cumulative) {
       return rarity as Rarity;
@@ -154,8 +171,10 @@ function generateConsumableProperties(kind: number): ItemProperties {
 
 /**
  * Main entry point: Generate an item with full properties
+ * @param kind - Item type
+ * @param rarityBonus - Optional bonus that increases chance of higher rarities (0-1)
  */
-export function generateItem(kind: number): GeneratedItem {
+export function generateItem(kind: number, rarityBonus: number = 0): GeneratedItem {
   const category = getItemCategory(kind);
   const kindName = Types.getKindAsString(kind);
 
@@ -168,12 +187,12 @@ export function generateItem(kind: number): GeneratedItem {
 
   switch (category) {
     case 'weapon':
-      rarity = rollRarity();
+      rarity = rollRarity(rarityBonus);
       properties = generateWeaponProperties(kind, rarity);
       break;
 
     case 'armor':
-      rarity = rollRarity();
+      rarity = rollRarity(rarityBonus);
       properties = generateArmorProperties(kind, rarity);
       break;
 

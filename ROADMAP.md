@@ -2,11 +2,11 @@
 
 > A living document tracking the path from foundation to addictive, successful game.
 
-## Current State: Phase 2 In Progress! 🎉
+## Current State: Phase 3 Starting! 🎉
 
-We have a fully playable core game loop with items, progression, economy, shops, and social features.
+We have a fully playable core game loop with items, inventory, progression, economy, shops, and social features.
 
-**Tag:** `v1.4.0-party-system`
+**Tag:** `v1.5.0-inventory-system`
 
 **What exists:**
 - Real-time multiplayer browser game
@@ -22,12 +22,13 @@ We have a fully playable core game loop with items, progression, economy, shops,
 - **Daily login rewards with streak bonuses** (004 ✅)
 - **Achievements & titles** with progress tracking (005 ✅)
 - **Party system + player inspect** (006 ✅)
+- **Inventory system** - 20-slot grid, equip/use/drop (007 ✅)
 - **Combat polish** - screen shake, particles, death effects (010 ✅)
 - **Fullscreen responsive UI** with status bar (011 ✅)
 
 **What's missing for a "real game":**
-- Inventory system (carry multiple items)
 - More content (areas, mobs, bosses)
+- Audio (ambient music, combat sounds)
 - Persistent accounts (for friends/guilds)
 
 ---
@@ -44,7 +45,7 @@ We have a fully playable core game loop with items, progression, economy, shops,
 - [x] Rarity tiers (Common/Uncommon/Rare/Epic/Legendary)
 - [x] Item comparison tooltips
 - [x] Drop key (D) to drop equipped weapon
-- [ ] Inventory system (future)
+- [x] Inventory system (007 ✅)
 - [ ] Drop tables per mob/area (future)
 
 ### 002: Progression System ✅
@@ -69,6 +70,20 @@ We have a fully playable core game loop with items, progression, economy, shops,
 - [x] Gold sync on player connect
 - [ ] Item selling to shops (future)
 - [ ] Player-to-player trading (future)
+
+### 007: Inventory System ✅
+**Impact:** High - Enables carrying multiple items, strategic choices
+**Status:** Complete (MVP)
+
+- [x] 20-slot grid inventory (4x5)
+- [x] 'I' key toggle panel
+- [x] Click to equip/use items
+- [x] Right-click context menu (Use/Equip/Drop)
+- [x] Server-side validation
+- [x] LocalStorage persistence
+- [x] Consumable stacking (max 10)
+- [ ] Drag-and-drop rearranging (future)
+- [ ] Item sorting/filtering (future)
 
 ---
 
@@ -158,10 +173,15 @@ We have a fully playable core game loop with items, progression, economy, shops,
 - [ ] Mobile-friendly controls (future)
 - [ ] Accessibility options (future)
 
-### 012: Audio
-- Ambient music per zone
-- Combat music triggers
-- SFX for all actions
+### 012: Audio ✅
+**Status:** Complete (MVP)
+
+- [x] Ambient music per zone (village, beach, forest, cave, desert, lavaland)
+- [x] Combat music triggers (boss music during combat, 5s fade back)
+- [x] Volume controls UI (Master/Music/SFX sliders)
+- [x] Settings persistence in localStorage
+- [x] SFX for level up, gold pickup, equip, achievements
+- [ ] More unique SFX per action (future)
 
 ---
 
@@ -207,4 +227,4 @@ We have a fully playable core game loop with items, progression, economy, shops,
 ---
 
 *This roadmap is not a timeline. It's a direction.*
-*Last updated: 2025-12-10*
+*Last updated: 2025-12-11*

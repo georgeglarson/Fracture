@@ -271,6 +271,7 @@ export class AudioManager {
    * Called when player enters combat (attacks or is attacked)
    */
   enterCombat() {
+    console.log('[Audio] enterCombat called - enabled:', this.enabled, 'inCombat:', this.inCombat);
     if (!this.enabled) return;
 
     // Clear any pending combat exit
@@ -299,7 +300,9 @@ export class AudioManager {
         });
       }
       this.playMusic(combatMusic);
-      console.debug('[Audio] Combat music started');
+      console.log('[Audio] Combat music STARTED - boss track playing');
+    } else {
+      console.warn('[Audio] Combat music failed - boss sound not found!');
     }
   }
 
@@ -307,6 +310,7 @@ export class AudioManager {
    * Called when combat ends (5s after last combat action)
    */
   exitCombat() {
+    console.log('[Audio] exitCombat called - enabled:', this.enabled, 'inCombat:', this.inCombat);
     if (!this.enabled || !this.inCombat) return;
 
     // Clear any pending timeout

@@ -151,16 +151,26 @@ export class EntityManager {
    * @param kind - Item type
    * @param x - X position
    * @param y - Y position
-   * @param existingProperties - Optional pre-existing properties (for dropped items)
+   * @param existingPropertiesOrZone - Optional pre-existing properties (for dropped items) or zone for rarity bonus
    */
-  createItemWithProperties(kind: number, x: number, y: number, existingProperties?: any): Item | Chest {
+  createItemWithProperties(kind: number, x: number, y: number, existingPropertiesOrZone?: any): Item | Chest {
     const id = '9' + this.itemCount++;
 
     if (kind === Types.Entities.CHEST) {
       return new Chest(id, x, y);
     } else {
-      // Use existing properties or generate new ones
-      const properties = existingProperties || generateItem(kind);
+      // Check if we got a zone (has rarityBonus) or existing properties
+      let properties;
+      if (existingPropertiesOrZone && typeof existingPropertiesOrZone.rarityBonus === 'number') {
+        // It's a zone object - generate with rarity bonus
+        properties = generateItem(kind, existingPropertiesOrZone.rarityBonus);
+      } else if (existingPropertiesOrZone) {
+        // It's existing properties - use directly
+        properties = existingPropertiesOrZone;
+      } else {
+        // No properties or zone - generate default
+        properties = generateItem(kind);
+      }
       return new Item(id, kind, x, y, properties);
     }
   }

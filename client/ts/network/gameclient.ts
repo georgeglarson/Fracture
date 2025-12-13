@@ -93,6 +93,10 @@ export class GameClient extends EventEmitter {
     this.handlers[Types.Messages.INVENTORY_REMOVE] = this.receiveInventoryRemove;
     this.handlers[Types.Messages.INVENTORY_UPDATE] = this.receiveInventoryUpdate;
 
+    // Zone system handlers
+    this.handlers[Types.Messages.ZONE_ENTER] = this.receiveZoneEnter;
+    this.handlers[Types.Messages.ZONE_INFO] = this.receiveZoneInfo;
+
     this.enable();
   }
 
@@ -518,6 +522,19 @@ export class GameClient extends EventEmitter {
     var slotIndex = data[1], count = data[2];
     console.log('[Inventory] Update slot', slotIndex, 'count:', count);
     this.emit(ClientEvents.INVENTORY_UPDATE, slotIndex, count);
+  }
+
+  // Zone system receive methods
+  receiveZoneEnter(data) {
+    var zoneId = data[1], zoneName = data[2], minLevel = data[3], maxLevel = data[4], warning = data[5] || null;
+    console.log('[Zone] Entered:', zoneName, '(Level', minLevel + '-' + maxLevel + ')', warning ? 'WARNING: ' + warning : '');
+    this.emit(ClientEvents.ZONE_ENTER, zoneId, zoneName, minLevel, maxLevel, warning);
+  }
+
+  receiveZoneInfo(data) {
+    var zoneId = data[1], rarityBonus = data[2], goldBonus = data[3], xpBonus = data[4];
+    console.log('[Zone] Bonuses - Rarity: +' + rarityBonus + '%, Gold: +' + goldBonus + '%, XP: +' + xpBonus + '%');
+    this.emit(ClientEvents.ZONE_INFO, zoneId, rarityBonus, goldBonus, xpBonus);
   }
 
   // ========== Send Methods ==========

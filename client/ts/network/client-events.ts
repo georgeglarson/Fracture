@@ -81,6 +81,10 @@ export const ClientEvents = {
   INVENTORY_ADD: 'inventoryAdd',
   INVENTORY_REMOVE: 'inventoryRemove',
   INVENTORY_UPDATE: 'inventoryUpdate',
+
+  // Zone system
+  ZONE_ENTER: 'zoneEnter',
+  ZONE_INFO: 'zoneInfo',
 } as const;
 
 // Type for event names
@@ -160,6 +164,10 @@ export interface ClientEventPayloads {
   [ClientEvents.INVENTORY_ADD]: [slotIndex: number, kind: number, properties: any, count: number];
   [ClientEvents.INVENTORY_REMOVE]: [slotIndex: number];
   [ClientEvents.INVENTORY_UPDATE]: [slotIndex: number, count: number];
+
+  // Zone system
+  [ClientEvents.ZONE_ENTER]: [zoneId: string, zoneName: string, minLevel: number, maxLevel: number, warning: string | null];
+  [ClientEvents.ZONE_INFO]: [zoneId: string, rarityBonus: number, goldBonus: number, xpBonus: number];
 }
 
 // Typed EventEmitter interface

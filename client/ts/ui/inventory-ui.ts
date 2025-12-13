@@ -46,6 +46,7 @@ export class InventoryUI {
    * Toggle visibility
    */
   toggle(): void {
+    console.log('[InventoryUI] Toggle called, current visible state:', this.visible);
     if (this.visible) {
       this.hide();
     } else {

@@ -88,7 +88,11 @@ export const Types: any = {
     INVENTORY_EQUIP: 71,          // Client: [71, slotIndex]
     INVENTORY_DROP: 72,           // Client: [72, slotIndex]
     INVENTORY_SWAP: 73,           // Client: [73, fromSlot, toSlot]
-    INVENTORY_PICKUP: 74          // Client: [74, itemEntityId]
+    INVENTORY_PICKUP: 74,         // Client: [74, itemEntityId]
+
+    // Zone system
+    ZONE_ENTER: 75,               // Server: [75, zoneId, zoneName, minLevel, maxLevel, warning?]
+    ZONE_INFO: 76                 // Server: [76, zoneId, rarityBonus, goldBonus, xpBonus]
   },
 
   Entities: {

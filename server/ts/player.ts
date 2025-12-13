@@ -154,6 +154,9 @@ export class Player extends Character {
 
             self.broadcast(new Messages.Move(self));
             self.move_callback(self.x, self.y);
+
+            // Check for zone change and send notification
+            self.checkZoneChange(x, y);
           }
         }
       }
@@ -520,6 +523,24 @@ export class Player extends Character {
     if (this.requestpos_callback) {
       var pos = this.requestpos_callback();
       this.setPosition(pos.x, pos.y);
+    }
+  }
+
+  // ============================================================================
+  // ZONE SYSTEM
+  // ============================================================================
+
+  /**
+   * Check if player entered a new zone and send notification
+   */
+  checkZoneChange(x: number, y: number) {
+    const result = this.world.zoneManager.updatePlayerZone(this.id, x, y, this.level);
+    if (result.changed && result.zone) {
+      // Send zone enter notification
+      this.send(this.world.zoneManager.createZoneEnterMessage(result.zone, result.warning));
+      // Send zone info (bonus percentages)
+      this.send(this.world.zoneManager.createZoneInfoMessage(result.zone));
+      console.log(`[Zone] ${this.name} entered ${result.zone.name} (Level ${result.zone.minLevel}-${result.zone.maxLevel})`);
     }
   }
 

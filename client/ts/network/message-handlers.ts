@@ -33,6 +33,7 @@ export function setupNetworkHandlers(game: Game, client: GameClient): void {
   setupAchievementHandlers(game, client);
   setupPartyHandlers(game, client);
   setupInventoryHandlers(game, client);
+  setupZoneHandlers(game, client);
 }
 
 function setupSpawnHandlers(game: Game, client: GameClient): void {
@@ -329,6 +330,11 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
       } else if (Types.isWeapon(itemKind)) {
         player.setWeaponName(itemName);
       }
+
+      // Play equip sound for local player
+      if (playerId === game.playerId) {
+        game.audioManager.playSound('equip');
+      }
     }
   });
 
@@ -379,6 +385,11 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
     var attacker = game.getEntityById(attackerId);
     var target = game.getEntityById(targetId);
 
+    // Trigger combat music if player is involved
+    if (attackerId === game.playerId || targetId === game.playerId) {
+      game.audioManager.enterCombat();
+    }
+
     if (attacker && target && attacker.id !== game.playerId) {
       console.debug(attacker.id + ' attacks ' + target.id);
 
@@ -396,6 +407,8 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
     var mob = game.getEntityById(mobId);
     if (mob && points) {
       game.infoManager.addDamageInfo(points, mob.x, mob.y - 15, 'inflicted');
+      // Refresh combat timer when dealing damage
+      game.audioManager.refreshCombat();
     }
   });
 
@@ -415,6 +428,9 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
         game.showNotification('You killed a ' + mobName);
       }
     }
+
+    // Start fading out combat music after kill
+    game.audioManager.exitCombat();
 
     game.storage.incrementTotalKills();
     game.tryUnlockingAchievement('HUNTER');
@@ -533,7 +549,7 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
       game.notification_callback('Level Up! You are now level ' + newLevel + ' (+' + bonusHP + ' HP, +' + bonusDamage + ' damage)');
     }
 
-    game.audioManager.playSound('achievement');
+    game.audioManager.playSound('levelup');
 
     if (game.playerxp_callback) {
       game.playerxp_callback(game.playerXp, game.playerXpToNext, newLevel);
@@ -552,6 +568,8 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
     if (game.player) {
       game.infoManager.addDamageInfo('+' + amount + 'g', game.player.x, game.player.y - 25, 'gold');
     }
+
+    game.audioManager.playSound('gold');
 
     if (game.playergold_callback) {
       game.playergold_callback(totalGold);
@@ -591,6 +609,7 @@ function setupAchievementHandlers(game: Game, client: GameClient): void {
 
   client.on(ClientEvents.ACHIEVEMENT_UNLOCK, function (achievementId) {
     game.handleAchievementUnlock(achievementId);
+    game.audioManager.playSound('quest');
   });
 
   client.on(ClientEvents.ACHIEVEMENT_PROGRESS, function (achievementId, current, target) {
@@ -647,5 +666,17 @@ function setupInventoryHandlers(game: Game, client: GameClient): void {
 
   client.on(ClientEvents.INVENTORY_UPDATE, function (slotIndex, count) {
     game.handleInventoryUpdate(slotIndex, count);
+  });
+}
+
+function setupZoneHandlers(game: Game, client: GameClient): void {
+  // Zone enter notification - show zone name and level range
+  client.on(ClientEvents.ZONE_ENTER, function (zoneId, zoneName, minLevel, maxLevel, warning) {
+    game.handleZoneEnter(zoneId, zoneName, minLevel, maxLevel, warning);
+  });
+
+  // Zone info - update UI with bonus percentages
+  client.on(ClientEvents.ZONE_INFO, function (zoneId, rarityBonus, goldBonus, xpBonus) {
+    game.handleZoneInfo(zoneId, rarityBonus, goldBonus, xpBonus);
   });
 }
