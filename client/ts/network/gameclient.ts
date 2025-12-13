@@ -117,8 +117,16 @@ export class GameClient extends EventEmitter {
 
     console.info('Trying to connect to server : ' + url);
 
-    this.connection = io(url);
-    this.connection.on('connection', function (socket) {
+    // Socket.IO client with reconnection settings
+    this.connection = io(url, {
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
+    });
+
+    this.connection.on('connect', function () {
       console.info('Connected to server ' + url);
     });
 
@@ -135,13 +143,31 @@ export class GameClient extends EventEmitter {
       self.receiveMessage(data);
     });
 
-    this.connection.on('disconnect', function () {
-      console.debug('Connection closed');
+    // Reconnection events for UI feedback
+    this.connection.on('reconnect_attempt', function (attemptNumber) {
+      console.info('Reconnection attempt ' + attemptNumber);
+      self.emit(ClientEvents.RECONNECTING, attemptNumber);
+    });
+
+    this.connection.on('reconnect', function (attemptNumber) {
+      console.info('Reconnected after ' + attemptNumber + ' attempts');
+      self.emit(ClientEvents.RECONNECTED);
+    });
+
+    this.connection.on('reconnect_failed', function () {
+      console.error('Failed to reconnect after all attempts');
+      self.emit(ClientEvents.DISCONNECTED, 'Unable to reconnect to PixelQuest. Please refresh the page.');
+    });
+
+    this.connection.on('disconnect', function (reason) {
+      console.debug('Connection closed: ' + reason);
       if (self.isTimeout) {
         self.emit(ClientEvents.DISCONNECTED, 'You have been disconnected for being inactive for too long');
-      } else {
-        self.emit(ClientEvents.DISCONNECTED, 'The connection to PixelQuest has been lost');
+      } else if (reason === 'io server disconnect') {
+        // Server disconnected us, won't auto-reconnect
+        self.emit(ClientEvents.DISCONNECTED, 'You were disconnected by the server');
       }
+      // Other disconnections will trigger reconnect attempts
     });
   }
 

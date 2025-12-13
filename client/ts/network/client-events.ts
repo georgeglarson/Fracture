@@ -12,6 +12,8 @@ export const ClientEvents = {
   // Connection
   CONNECTED: 'connected',
   DISCONNECTED: 'disconnected',
+  RECONNECTING: 'reconnecting',
+  RECONNECTED: 'reconnected',
 
   // Core gameplay
   WELCOME: 'welcome',
@@ -96,6 +98,8 @@ export interface ClientEventPayloads {
   // Connection
   [ClientEvents.CONNECTED]: [];
   [ClientEvents.DISCONNECTED]: [message: string];
+  [ClientEvents.RECONNECTING]: [attemptNumber: number];
+  [ClientEvents.RECONNECTED]: [];
 
   // Core gameplay
   [ClientEvents.WELCOME]: [id: number, name: string, x: number, y: number, hp: number];
