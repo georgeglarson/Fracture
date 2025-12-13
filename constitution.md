@@ -1,4 +1,4 @@
-# BrowserQuest-Ultra Constitution
+# PixelQuest Constitution
 
 > Project governing principles and development guidelines. All implementations must adhere to these standards.
 

@@ -1,7 +1,7 @@
-BrowserQuest client documentation
-=================================
+PixelQuest client documentation
+===============================
 
-The client side for BrowserQuest has been converted to a more modern development toolset.
+The client side for PixelQuest has been converted to a modern development toolset.
 
 Current technologies used are:
 

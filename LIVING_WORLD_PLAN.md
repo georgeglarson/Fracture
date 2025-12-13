@@ -1,4 +1,4 @@
-# BrowserQuest: The Living World
+# PixelQuest: The Living World
 ## AI Showcase Plan - "Make Venice Moon"
 
 ### The Viral Vision
@@ -106,7 +106,7 @@ When Director makes a decision, ALL players see:
 
 Every 24 hours, summarize server events into a "newspaper" overlay:
 
-**The BrowserQuest Chronicle - Day 47**
+**The PixelQuest Chronicle - Day 47**
 ```
 HEADLINES:
 • "Massacre in the East Forest" - Player 'NoobMaster' dies to rats 23 times
@@ -192,7 +192,7 @@ Player sees blacksmith walking toward the forest. Follows him. Blacksmith gets a
 2. Kill a rat, watch nearby rats' thoughts change to fear
 3. Show Director announcement: "The Horde Retaliates"
 4. Open Chronicle showing AI-generated headlines
-5. End card: "BrowserQuest: The Living World - Powered by Venice AI"
+5. End card: "PixelQuest: The Living World - Powered by Venice AI"
 
 ---
 

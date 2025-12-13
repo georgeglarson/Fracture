@@ -1,7 +1,7 @@
 {
-  "name": "browserquest-ultra",
-  "version": "1.0.0",
-  "description": "BrowserQuest Ultra - HTML5 multiplayer RPG with Venice AI integration",
+  "name": "pixelquest",
+  "version": "2.0.0",
+  "description": "PixelQuest - A modern HTML5 multiplayer RPG with AI-powered NPCs",
   "private": false,
   "scripts": {
     "watch:client": "webpack serve --env NODE_ENV=dev --config ./webpack.config.js --mode development",

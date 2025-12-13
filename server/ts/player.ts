@@ -1,4 +1,4 @@
-// BrowserQuest Ultra Player - with AI Narrator integration
+// PixelQuest Player - with AI Narrator integration
 import * as _ from 'lodash';
 import {FormatChecker} from './format';
 import {Character} from './character';

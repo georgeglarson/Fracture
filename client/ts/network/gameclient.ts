@@ -140,7 +140,7 @@ export class GameClient extends EventEmitter {
       if (self.isTimeout) {
         self.emit(ClientEvents.DISCONNECTED, 'You have been disconnected for being inactive for too long');
       } else {
-        self.emit(ClientEvents.DISCONNECTED, 'The connection to BrowserQuest has been lost');
+        self.emit(ClientEvents.DISCONNECTED, 'The connection to PixelQuest has been lost');
       }
     });
   }

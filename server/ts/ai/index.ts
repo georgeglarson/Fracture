@@ -1,5 +1,5 @@
 /**
- * Venice AI Module for BrowserQuest
+ * Venice AI Module for PixelQuest
  *
  * This module provides AI-powered features:
  * - NPC Dialogue (DialogueService)

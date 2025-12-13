@@ -1,5 +1,5 @@
 /**
- * Venice AI Types for BrowserQuest
+ * Venice AI Types for PixelQuest
  */
 
 export interface NpcPersonality {

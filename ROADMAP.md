@@ -1,4 +1,4 @@
-# BrowserQuest-Ultra Roadmap
+# PixelQuest Roadmap
 
 > A living document tracking the path from foundation to addictive, successful game.
 

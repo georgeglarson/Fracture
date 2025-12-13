@@ -691,9 +691,9 @@ export class Game {
         self.storage.savePlayer(self.renderer.getPlayerImage(),
           self.player.getSpriteName(),
           self.player.getWeaponName());
-        self.showNotification('Welcome to BrowserQuest!');
+        self.showNotification('Welcome to PixelQuest!');
       } else {
-        self.showNotification('Welcome back to BrowserQuest!');
+        self.showNotification('Welcome back to PixelQuest!');
         self.storage.setPlayerName(name);
 
         // Load saved progression from localStorage

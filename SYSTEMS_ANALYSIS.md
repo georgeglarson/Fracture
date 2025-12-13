@@ -1,4 +1,4 @@
-# BrowserQuest Ultra - Systems Analysis
+# PixelQuest - Systems Analysis
 
 ## Deep Dive: Entity, Item, Drop, and Spawn Systems
 

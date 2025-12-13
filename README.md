@@ -1,7 +1,9 @@
-BrowserQuest
-============
+PixelQuest
+==========
 
-BrowserQuest is a HTML5/JavaScript multiplayer game experiment.
+PixelQuest is a modern HTML5/TypeScript multiplayer RPG with AI-powered NPCs.
+
+Originally based on Mozilla's BrowserQuest, this project has been extensively modernized with:
 
 Changes from the original
 -------------------------

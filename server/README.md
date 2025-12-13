@@ -1,5 +1,5 @@
-BrowserQuest server documentation
-=================================
+PixelQuest server documentation
+===============================
 
 The game server requires nodejs 6.x or greater.
 

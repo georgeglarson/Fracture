@@ -101,7 +101,7 @@ export const NpcTalk = {
       'The tougher the enemy, the higher the potential rewards.',
       'You can also unlock achievements by exploring and hunting.',
       'Click on the small cup icon to see a list of all the achievements.',
-      'Please stay a while and enjoy the many surprises of BrowserQuest',
+      'Please stay a while and enjoy the many surprises of PixelQuest',
       'Farewell, young friend.'
     ],
 
@@ -120,13 +120,13 @@ export const NpcTalk = {
     ],
 
     'octocat': [
-      'Welcome to BrowserQuest!',
+      'Welcome to PixelQuest!',
       'Want to see the source code?',
-      'Check out <a target="_blank" href="http://github.com/mozilla/BrowserQuest">the repository on GitHub</a>'
+      'Check out the repository on GitHub!'
     ],
 
     'coder': [
-      'Hi! Do you know that you can also play BrowserQuest on your tablet or mobile?',
+      'Hi! Did you know you can also play PixelQuest on your tablet or mobile?',
       'That\'s the beauty of HTML5!',
       'Give it a try...'
     ],

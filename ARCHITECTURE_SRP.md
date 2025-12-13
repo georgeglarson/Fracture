@@ -1,4 +1,4 @@
-# BrowserQuest Ultra - Architecture & SRP Analysis
+# PixelQuest - Architecture & SRP Analysis
 
 **Purpose:** Identify and isolate all systems, pipelines, and responsibilities for Single Responsibility Principle refactoring.
 
