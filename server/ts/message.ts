@@ -441,6 +441,24 @@ export const Messages = {
     }
   },
 
+  // Shop System - result of sell attempt
+  ShopSellResult: class {
+    constructor(
+      private success: boolean,
+      private goldGained: number,
+      private newGold: number,
+      private message: string
+    ) {}
+
+    serialize() {
+      return [Types.Messages.SHOP_SELL_RESULT,
+        this.success ? 1 : 0,
+        this.goldGained,
+        this.newGold,
+        this.message];
+    }
+  },
+
   // Achievement System - broadcast title change to all players
   PlayerTitleUpdate: class {
     constructor(

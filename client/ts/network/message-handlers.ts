@@ -600,6 +600,10 @@ function setupShopHandlers(game: Game, client: GameClient): void {
   client.on(ClientEvents.SHOP_BUY_RESULT, function (success, itemKind, newGold, message) {
     game.handleShopBuyResult(success, itemKind, newGold, message);
   });
+
+  client.on(ClientEvents.SHOP_SELL_RESULT, function (success, goldGained, newGold, message) {
+    game.handleShopSellResult(success, goldGained, newGold, message);
+  });
 }
 
 function setupAchievementHandlers(game: Game, client: GameClient): void {

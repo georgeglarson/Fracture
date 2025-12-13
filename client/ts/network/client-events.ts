@@ -58,6 +58,7 @@ export const ClientEvents = {
   // Shop
   SHOP_OPEN: 'shopOpen',
   SHOP_BUY_RESULT: 'shopBuyResult',
+  SHOP_SELL_RESULT: 'shopSellResult',
 
   // Achievements
   ACHIEVEMENT_INIT: 'achievementInit',
@@ -141,6 +142,7 @@ export interface ClientEventPayloads {
   // Shop
   [ClientEvents.SHOP_OPEN]: [npcKind: number, shopName: string, items: Array<{itemKind: number, price: number, stock: number}>];
   [ClientEvents.SHOP_BUY_RESULT]: [success: boolean, itemKind: number, newGold: number, message: string];
+  [ClientEvents.SHOP_SELL_RESULT]: [success: boolean, goldGained: number, newGold: number, message: string];
 
   // Achievements
   [ClientEvents.ACHIEVEMENT_INIT]: [unlocked: string[], progress: Record<string, number>, selectedTitle: string | null];

@@ -437,6 +437,10 @@ var initGame = function () {
         game.toggleInventory();
         return false;
       }
+      if (key === 74) { // J - Toggle achievements
+        game.toggleAchievements();
+        return false;
+      }
       if (key === 77) { // M - Toggle minimap
         if (game.ready && game.started) {
           game.toggleMinimap();

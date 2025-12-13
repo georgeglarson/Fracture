@@ -69,6 +69,7 @@ export class GameClient extends EventEmitter {
     // Shop system handlers
     this.handlers[Types.Messages.SHOP_OPEN] = this.receiveShopOpen;
     this.handlers[Types.Messages.SHOP_BUY_RESULT] = this.receiveShopBuyResult;
+    this.handlers[Types.Messages.SHOP_SELL_RESULT] = this.receiveShopSellResult;
 
     // Achievement system handlers
     this.handlers[Types.Messages.ACHIEVEMENT_INIT] = this.receiveAchievementInit;
@@ -431,6 +432,12 @@ export class GameClient extends EventEmitter {
     this.emit(ClientEvents.SHOP_BUY_RESULT, success, itemKind, newGold, message);
   }
 
+  receiveShopSellResult(data) {
+    var success = data[1] === 1, goldGained = data[2], newGold = data[3], message = data[4];
+    console.log('[Shop] Sell result:', success ? 'SUCCESS' : 'FAILED', message);
+    this.emit(ClientEvents.SHOP_SELL_RESULT, success, goldGained, newGold, message);
+  }
+
   // Achievement system receive methods
   receiveAchievementInit(data) {
     var unlockedIds = data[1] || [], progressMap = data[2] || {}, selectedTitle = data[3] || null;
@@ -623,6 +630,10 @@ export class GameClient extends EventEmitter {
 
   sendShopBuy(npcKind: number, itemKind: number) {
     this.sendMessage([Types.Messages.SHOP_BUY, npcKind, itemKind]);
+  }
+
+  sendShopSell(slotIndex: number) {
+    this.sendMessage([Types.Messages.SHOP_SELL, slotIndex]);
   }
 
   sendSelectTitle(achievementId: string) {

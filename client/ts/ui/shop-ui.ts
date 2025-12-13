@@ -13,6 +13,7 @@ export interface ShopItem {
 
 export interface ShopCallbacks {
   onBuy: (npcKind: number, itemKind: number) => void;
+  onSell: (slotIndex: number) => void;
   getPlayerGold: () => number;
   onGoldChange: (newGold: number) => void;
   saveGold: (gold: number) => void;
@@ -220,6 +221,37 @@ export class ShopUI {
     // Convert camelCase/lowercase to Title Case
     const words = kindString.replace(/([A-Z])/g, ' $1').toLowerCase().split(/[\s_-]+/);
     return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+
+  /**
+   * Handle sell result from server
+   */
+  handleSellResult(success: boolean, goldGained: number, newGold: number, message: string): void {
+    try {
+      // Show notification (works even if shop is closed)
+      if (success && this.callbacks) {
+        // Update gold
+        this.callbacks.onGoldChange(newGold);
+        this.callbacks.saveGold(newGold);
+
+        // Update gold display if shop is open
+        this.updateGoldDisplay();
+
+        // Play sound
+        this.callbacks.playSound('loot');
+
+        console.info('[Shop] Sold item for', goldGained, 'gold. New total:', newGold);
+      }
+
+      // Show message if shop popup is visible
+      const msgEl = document.getElementById('shop-message');
+      if (msgEl && this.isOpen()) {
+        msgEl.textContent = message;
+        msgEl.className = success ? '' : 'error';
+      }
+    } catch (e) {
+      console.error('[Shop] Error handling sell result:', e);
+    }
   }
 
   /**

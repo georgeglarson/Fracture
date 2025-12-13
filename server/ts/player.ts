@@ -13,7 +13,7 @@ import {Chest} from './chest';
 import {getVeniceService} from './ai';
 import {EquipmentManager} from './equipment/equipment-manager';
 import {EquipmentSlot, getSlotForKind} from '../../shared/ts/equipment/equipment-types';
-import {shopService, isMerchant, getShopInventory} from './shop/shop.service';
+import {shopService, isMerchant, getShopInventory, getSellPrice} from './shop/shop.service';
 import {getAchievementService} from './achievements/achievement.service';
 import {PlayerAchievements} from '../../shared/ts/achievements';
 import {PartyService} from './party';
@@ -309,6 +309,11 @@ export class Player extends Character {
         var npcKind = message[1];
         var itemKind = message[2];
         self.handleShopBuy(npcKind, itemKind);
+      }
+      // Shop system - sell item from inventory
+      else if (action === Types.Messages.SHOP_SELL) {
+        var slotIndex = message[1];
+        self.handleShopSell(slotIndex);
       }
       // Achievement system - select title
       else if (action === Types.Messages.ACHIEVEMENT_SELECT_TITLE) {
@@ -939,6 +944,51 @@ export class Player extends Character {
       console.log(`[Shop] ${this.name} failed to buy: ${result.message}`);
       this.send(new Messages.ShopBuyResult(false, itemKind, this.gold, result.message).serialize());
     }
+  }
+
+  /**
+   * Handle selling an item from inventory
+   */
+  handleShopSell(slotIndex: number) {
+    const slot = this.inventory.getSlot(slotIndex);
+
+    if (!slot) {
+      console.log(`[Shop] ${this.name} tried to sell empty slot ${slotIndex}`);
+      this.send(new Messages.ShopSellResult(false, 0, this.gold, 'Nothing to sell').serialize());
+      return;
+    }
+
+    const itemKind = slot.kind;
+    const sellPrice = getSellPrice(itemKind);
+
+    if (sellPrice <= 0) {
+      console.log(`[Shop] ${this.name} tried to sell unsellable item ${itemKind}`);
+      this.send(new Messages.ShopSellResult(false, 0, this.gold, 'This item cannot be sold').serialize());
+      return;
+    }
+
+    // Remove one item from the slot (for stackables) or the whole slot
+    this.inventory.removeItem(slotIndex, 1);
+
+    // Grant gold
+    this.gold += sellPrice;
+    console.log(`[Shop] ${this.name} sold item ${itemKind} for ${sellPrice}g (new balance: ${this.gold}g)`);
+
+    // Send updated inventory
+    const updatedSlot = this.inventory.getSlot(slotIndex);
+    if (updatedSlot) {
+      // Still has items (was stackable)
+      this.send([Types.Messages.INVENTORY_UPDATE, slotIndex, updatedSlot.count]);
+    } else {
+      // Slot is now empty
+      this.send([Types.Messages.INVENTORY_REMOVE, slotIndex]);
+    }
+
+    // Send sell result
+    this.send(new Messages.ShopSellResult(true, sellPrice, this.gold, `Sold for ${sellPrice} gold`).serialize());
+
+    // Also send gold update
+    this.send(new Messages.GoldGain(sellPrice, this.gold).serialize());
   }
 
   /**

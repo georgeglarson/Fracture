@@ -92,7 +92,11 @@ export const Types: any = {
 
     // Zone system
     ZONE_ENTER: 75,               // Server: [75, zoneId, zoneName, minLevel, maxLevel, warning?]
-    ZONE_INFO: 76                 // Server: [76, zoneId, rarityBonus, goldBonus, xpBonus]
+    ZONE_INFO: 76,                // Server: [76, zoneId, rarityBonus, goldBonus, xpBonus]
+
+    // Shop sell system
+    SHOP_SELL: 77,                // Client: [77, inventorySlot]
+    SHOP_SELL_RESULT: 78          // Server: [78, success, goldGained, newGold, message]
   },
 
   Entities: {

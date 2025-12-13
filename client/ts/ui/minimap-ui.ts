@@ -8,6 +8,7 @@ export interface MinimapCallbacks {
   getPlayer: () => any;
   getCamera: () => any;
   forEachEntity: (callback: (entity: any) => void) => void;
+  onClickPosition?: (gridX: number, gridY: number) => void;
 }
 
 export class MinimapUI {
@@ -32,6 +33,10 @@ export class MinimapUI {
   private displayWidth = 180;
   private displayHeight = 180;
   private scale = 1; // Pixels per tile
+
+  // Offset for centering terrain (needed for click calculations)
+  private offsetX = 0;
+  private offsetY = 0;
 
   constructor() {
     this.createContainer();
@@ -94,6 +99,10 @@ export class MinimapUI {
     `;
     this.container.appendChild(this.canvas);
     this.ctx = this.canvas.getContext('2d');
+
+    // Add click handler for click-to-walk
+    this.canvas.style.cursor = 'pointer';
+    this.canvas.addEventListener('click', (e) => this.handleClick(e));
 
     // Create terrain cache canvas
     this.terrainCanvas = document.createElement('canvas');
@@ -219,11 +228,13 @@ export class MinimapUI {
     ctx.fillStyle = '#c9b896';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Calculate centering offset
+    // Calculate centering offset (store for click calculations)
     const terrainW = this.terrainCanvas!.width;
     const terrainH = this.terrainCanvas!.height;
-    const offsetX = Math.floor((this.displayWidth - terrainW) / 2);
-    const offsetY = Math.floor((this.displayHeight - terrainH) / 2);
+    this.offsetX = Math.floor((this.displayWidth - terrainW) / 2);
+    this.offsetY = Math.floor((this.displayHeight - terrainH) / 2);
+    const offsetX = this.offsetX;
+    const offsetY = this.offsetY;
 
     // Draw cached terrain
     if (this.terrainCanvas) {
@@ -332,5 +343,38 @@ export class MinimapUI {
    */
   invalidateTerrain(): void {
     this.terrainRendered = false;
+  }
+
+  /**
+   * Handle click on minimap to walk to that position
+   */
+  private handleClick(e: MouseEvent): void {
+    if (!this.callbacks?.onClickPosition || !this.canvas) return;
+
+    // Get click position relative to canvas
+    const rect = this.canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    // Convert to grid coordinates
+    const mapX = (clickX - this.offsetX) / this.scale;
+    const mapY = (clickY - this.offsetY) / this.scale;
+
+    // Check bounds
+    if (mapX < 0 || mapY < 0 || mapX >= this.mapWidth || mapY >= this.mapHeight) {
+      return;
+    }
+
+    // Round to grid position
+    const gridX = Math.floor(mapX);
+    const gridY = Math.floor(mapY);
+
+    // Check if walkable
+    const map = this.callbacks.getMap();
+    if (map && map.isColliding(gridX, gridY)) {
+      return; // Can't walk to walls
+    }
+
+    this.callbacks.onClickPosition(gridX, gridY);
   }
 }

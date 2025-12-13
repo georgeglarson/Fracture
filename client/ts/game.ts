@@ -35,6 +35,7 @@ import {ContextMenu} from './ui/context-menu';
 import {InventoryUI} from './ui/inventory-ui';
 import {ShopUI} from './ui/shop-ui';
 import {MinimapUI} from './ui/minimap-ui';
+import {AchievementUI} from './ui/achievement-ui';
 import {InventoryManager} from './inventory/inventory-manager';
 import {deserializeInventory, InventorySlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
 import {setupNetworkHandlers} from './network/message-handlers';
@@ -72,6 +73,7 @@ export class Game {
   inventoryUI: InventoryUI | null = null;
   shopUI: ShopUI | null = null;
   minimapUI: MinimapUI | null = null;
+  achievementUI: AchievementUI | null = null;
   zoningManager: ZoningManager | null = null;
   spriteLoader: SpriteLoader | null = null;
 
@@ -547,6 +549,9 @@ export class Game {
 
         // Initialize minimap
         self.initMinimap();
+
+        // Initialize achievements panel UI
+        self.initAchievementsUI();
 
         // Initialize zoning manager
         self.zoningManager = new ZoningManager();
@@ -1713,6 +1718,16 @@ export class Game {
     // Save to storage
     this.storage.saveAchievements(unlockedIds, selectedTitle);
 
+    // Update achievement panel UI
+    if (this.achievementUI) {
+      // Convert progressMap to simple current values for UI
+      const progressCurrent: Record<string, number> = {};
+      for (const [id, data] of Object.entries(progressMap)) {
+        progressCurrent[id] = data.current;
+      }
+      this.achievementUI.updateData(unlockedIds, progressCurrent, selectedTitle);
+    }
+
     console.info('[Achievements] Initialized:', unlockedIds.length, 'unlocked, title:', selectedTitle);
   }
 
@@ -1738,6 +1753,11 @@ export class Game {
       this.achievementunlock_callback(achievementId);
     }
 
+    // Update achievement panel UI
+    if (this.achievementUI) {
+      this.achievementUI.unlockAchievement(achievementId);
+    }
+
     // Play achievement sound
     if (this.audioManager) {
       this.audioManager.playSound('achievement');
@@ -1751,6 +1771,11 @@ export class Game {
 
     if (this.achievementprogress_callback) {
       this.achievementprogress_callback(achievementId, current, target);
+    }
+
+    // Update achievement panel UI
+    if (this.achievementUI) {
+      this.achievementUI.updateProgress(achievementId, current);
     }
 
     console.debug('[Achievements] Progress:', achievementId, current + '/' + target);
@@ -2000,6 +2025,10 @@ export class Game {
         if (this.audioManager) {
           this.audioManager.playSound(sound);
         }
+      },
+      onSell: (slotIndex: number) => {
+        // Selling is handled through inventory context menu, not shop UI directly
+        this.client.sendShopSell(slotIndex);
       }
     });
   }
@@ -2014,6 +2043,10 @@ export class Game {
 
   handleShopBuyResult(success: boolean, itemKind: number, newGold: number, message: string) {
     this.shopUI?.handleBuyResult(success, itemKind, newGold, message);
+  }
+
+  handleShopSellResult(success: boolean, goldGained: number, newGold: number, message: string) {
+    this.shopUI?.handleSellResult(success, goldGained, newGold, message);
   }
 
   // Party System
@@ -2164,6 +2197,13 @@ export class Game {
       onDrop: (slotIndex: number) => {
         console.log('[Inventory] Drop slot', slotIndex);
         this.client.sendInventoryDrop(slotIndex);
+      },
+      onSell: (slotIndex: number) => {
+        console.log('[Inventory] Sell slot', slotIndex);
+        this.client.sendShopSell(slotIndex);
+      },
+      isShopOpen: () => {
+        return this.shopUI?.isOpen() ?? false;
       }
     });
 
@@ -2201,10 +2241,15 @@ export class Game {
       getMap: () => this.map,
       getPlayer: () => this.player,
       getCamera: () => this.camera,
-      forEachEntity: (callback) => this.forEachEntity(callback)
+      forEachEntity: (callback) => this.forEachEntity(callback),
+      onClickPosition: (gridX, gridY) => {
+        if (this.player && this.started) {
+          this.makePlayerGoTo(gridX, gridY);
+        }
+      }
     });
 
-    console.info('[Minimap] Initialized');
+    console.info('[Minimap] Initialized with click-to-walk');
   }
 
   toggleMinimap() {
@@ -2281,5 +2326,27 @@ export class Game {
     if (this.currentZone && this.currentZone.id === zoneId) {
       console.info(`[Zone] Bonuses - Rarity: +${rarityBonus}%, Gold: +${goldBonus}%, XP: +${xpBonus}%`);
     }
+  }
+
+  // Achievement Panel UI
+  initAchievementsUI() {
+    if (this.achievementUI) return;
+
+    this.achievementUI = new AchievementUI();
+    this.achievementUI.setOnSelectTitle((achievementId: string | null) => {
+      // Send title selection to server
+      if (this.client) {
+        this.client.sendSelectTitle(achievementId);
+      }
+    });
+
+    console.info('[Achievements] Panel UI initialized');
+  }
+
+  toggleAchievements() {
+    if (!this.achievementUI) {
+      this.initAchievementsUI();
+    }
+    this.achievementUI?.toggle();
   }
 }

@@ -11,6 +11,8 @@ export interface InventoryCallbacks {
   onUse: (slotIndex: number) => void;
   onEquip: (slotIndex: number) => void;
   onDrop: (slotIndex: number) => void;
+  onSell: (slotIndex: number) => void;
+  isShopOpen: () => boolean;
 }
 
 export class InventoryUI {
@@ -325,6 +327,17 @@ export class InventoryUI {
       `;
     }
 
+    // Show Sell option when shop is open
+    if (this.callbacks?.isShopOpen()) {
+      html += `
+        <div class="ctx-option" data-action="sell" style="
+          padding: 8px 12px;
+          color: #ffd700;
+          cursor: pointer;
+        ">Sell</div>
+      `;
+    }
+
     html += `
       <div class="ctx-option" data-action="drop" style="
         padding: 8px 12px;
@@ -368,6 +381,9 @@ export class InventoryUI {
               break;
             case 'equip':
               this.callbacks.onEquip(slotIndex);
+              break;
+            case 'sell':
+              this.callbacks.onSell(slotIndex);
               break;
             case 'drop':
               this.callbacks.onDrop(slotIndex);
