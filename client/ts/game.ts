@@ -1047,6 +1047,34 @@ export class Game {
   }
 
   /**
+   * Move player one tile in a direction (for WASD/Arrow key controls)
+   * @param dx Direction on X axis (-1 = left, 1 = right, 0 = none)
+   * @param dy Direction on Y axis (-1 = up, 1 = down, 0 = none)
+   */
+  movePlayerInDirection(dx: number, dy: number) {
+    if (!this.player || this.player.isDead) return;
+
+    const targetX = this.player.gridX + dx;
+    const targetY = this.player.gridY + dy;
+
+    // Check if target is walkable
+    if (this.map && this.map.isColliding(targetX, targetY)) {
+      return; // Can't walk into walls
+    }
+
+    // Check plateau restrictions
+    if (this.map) {
+      const playerOnPlateau = this.player.isOnPlateau;
+      const targetOnPlateau = this.map.isPlateau(targetX, targetY);
+      if (playerOnPlateau !== targetOnPlateau) {
+        return; // Can't cross plateau boundary directly
+      }
+    }
+
+    this.makePlayerGoTo(targetX, targetY);
+  }
+
+  /**
    * Moves the current player towards a specific item.
    * @see makeCharacterGoTo
    */

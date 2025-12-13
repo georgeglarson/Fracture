@@ -5,7 +5,6 @@ import * as _ from 'lodash';
 export class App {
 
   config = Config;
-  currentPage;
   blinkInterval;
   previousState;
   isParchmentReady;
@@ -22,7 +21,6 @@ export class App {
   messageTimer;
 
   constructor() {
-    this.currentPage = 1;
     this.blinkInterval = null;
     this.previousState = null;
     this.isParchmentReady = true;
@@ -108,7 +106,12 @@ export class App {
     if (username && !this.game.started) {
       var config = this.config;
 
-      this.game.setServerOptions(config.host, config.port, username);
+      // Use current hostname for production (HTTPS) to support multiple domains
+      var host = window.location.protocol === 'https:'
+        ? window.location.hostname
+        : config.host;
+
+      this.game.setServerOptions(host, config.port, username);
 
       this.center();
       this.game.run(function () {
@@ -247,33 +250,12 @@ export class App {
   }
 
   toggleInstructions() {
-    if ($('#achievements').hasClass('active')) {
-      this.toggleAchievements();
+    // Close new achievements panel if open
+    if (this.game?.achievementUI?.isVisible()) {
+      this.game.achievementUI.hide();
       $('#achievementsbutton').removeClass('active');
     }
     $('#instructions').toggleClass('active');
-  }
-
-  toggleAchievements() {
-    if ($('#instructions').hasClass('active')) {
-      this.toggleInstructions();
-      $('#helpbutton').removeClass('active');
-    }
-    this.resetPage();
-    $('#achievements').toggleClass('active');
-  }
-
-  resetPage() {
-    var self = this,
-      $achievements = $('#achievements');
-
-    if ($achievements.hasClass('active')) {
-      $achievements.bind('transitioned', function () {
-        $achievements.removeClass('page' + self.currentPage).addClass('page1');
-        self.currentPage = 1;
-        $achievements.unbind('transitioned');
-      });
-    }
   }
 
   initEquipmentIcons() {
@@ -293,8 +275,9 @@ export class App {
   }
 
   hideWindows() {
-    if ($('#achievements').hasClass('active')) {
-      this.toggleAchievements();
+    // Close new achievements panel if open
+    if (this.game?.achievementUI?.isVisible()) {
+      this.game.achievementUI.hide();
       $('#achievementsbutton').removeClass('active');
     }
     if ($('#instructions').hasClass('active')) {

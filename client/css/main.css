@@ -278,7 +278,10 @@ footer, header, hgroup, menu, nav, section {
     #statusbar #chatbutton,
     #statusbar #achievementsbutton,
     #statusbar #helpbutton,
-    #statusbar #mutebutton {
+    #statusbar #mutebutton,
+    #statusbar #inventorybutton,
+    #statusbar #minimapbutton,
+    #statusbar #newspaperbutton {
         position: relative !important;
         top: auto !important;
         left: auto !important;
@@ -292,6 +295,15 @@ footer, header, hgroup, menu, nav, section {
         height: 36px !important;
     }
     /* Button icons using Unicode symbols */
+    #statusbar #inventorybutton::after {
+        content: '🎒' !important;
+    }
+    #statusbar #minimapbutton::after {
+        content: '🗺️' !important;
+    }
+    #statusbar #newspaperbutton::after {
+        content: '📜' !important;
+    }
     #statusbar #chatbutton::after {
         content: '💬' !important;
     }
@@ -1770,13 +1782,14 @@ footer, header, hgroup, menu, nav, section {
     position: fixed;
     right: 150px;
     bottom: 60px;
-    width: 200px;
+    width: 240px;
     background: linear-gradient(180deg, rgba(40, 40, 40, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%);
     border: 2px solid #555;
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     z-index: 5001;
     font-family: 'GraphicPixel', sans-serif;
+    padding: 5px;
 }
 
 .volume-panel.active {
@@ -1858,4 +1871,95 @@ footer, header, hgroup, menu, nav, section {
     width: 14px;
     height: 14px;
     cursor: pointer;
+}
+
+/* Instructions Panel Override - Modern dark panel design */
+#instructions {
+    background: linear-gradient(180deg, rgba(40, 40, 40, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%) !important;
+    background-position: unset !important;
+    border: 2px solid #555;
+    border-radius: 12px;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.6);
+    padding: 20px 30px;
+    width: auto !important;
+    height: auto !important;
+    max-height: 80vh;
+    overflow-y: auto;
+    transform: translate(-50%, -50%);
+    margin: 0 !important;
+    color: #EEE !important;
+}
+
+#instructions h1 {
+    font-size: 24px !important;
+    text-align: center;
+    margin: 0 0 15px 0 !important;
+    color: #FFD700;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    border-bottom: 1px solid #555;
+    padding-bottom: 10px;
+}
+
+#instructions h1 .left-ornament,
+#instructions h1 .right-ornament {
+    display: none;
+}
+
+#instructions ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 !important;
+    font-size: 14px !important;
+}
+
+#instructions ul li {
+    margin: 8px 0 !important;
+    padding: 8px 15px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    clear: none !important;
+}
+
+#instructions ul li:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+#instructions ul li .icon {
+    display: none !important;
+}
+
+#instructions p {
+    text-align: center;
+    font-size: 12px !important;
+    color: #888;
+    margin: 15px 0 0 0 !important;
+    clear: both;
+}
+
+#instructions .close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 24px !important;
+    height: 24px !important;
+    background: #555 !important;
+    background-position: unset !important;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#instructions .close::before {
+    content: '\00D7';
+    color: #FFF;
+    font-size: 18px;
+    line-height: 1;
+}
+
+#instructions .close:hover {
+    background: #777 !important;
 }

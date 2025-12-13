@@ -13,8 +13,16 @@ function getCorsOrigins(): string[] {
   if (envOrigins) {
     return envOrigins.split(',').map(o => o.trim());
   }
-  // Default origins for development
-  return ['http://localhost:8008', 'http://45.77.216.118:8008'];
+  // Default origins for development and production
+  return [
+    'http://localhost:8008',
+    'http://45.77.216.118:8008',
+    'https://bq.venice.guru',
+    'https://pq.venice.guru',
+    'https://pixelquest.venice.guru',
+    'https://pq.georgelarson.me',
+    'https://pixelquest.georgelarson.me'
+  ];
 }
 
 export class Server {

@@ -96,15 +96,25 @@ export class VolumeUI {
       });
     }
 
-    // Close panel when clicking outside
+    // Stop clicks inside panel from reaching the game
+    if (this.panel) {
+      this.panel.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    }
+
+    // Close panel when clicking outside (use capture phase)
     document.addEventListener('click', (e) => {
-      if (this.isOpen && this.panel && !this.panel.contains(e.target as Node)) {
+      if (this.isOpen && this.panel) {
         const muteBtn = document.getElementById('mutebutton');
-        if (muteBtn && !muteBtn.contains(e.target as Node)) {
+        const clickedInPanel = this.panel.contains(e.target as Node);
+        const clickedMuteBtn = muteBtn && muteBtn.contains(e.target as Node);
+
+        if (!clickedInPanel && !clickedMuteBtn) {
           this.hide();
         }
       }
-    });
+    }, true); // Use capture phase to run before other handlers
   }
 
   private updateMasterVolume(value: number): void {
@@ -234,6 +244,58 @@ export class VolumeUI {
     } else {
       this.show();
     }
+  }
+
+  /**
+   * Toggle mute state (called when mute button is clicked)
+   */
+  toggleMuteState(): void {
+    if (!this.callbacks) return;
+
+    const audio = this.callbacks.getAudioManager();
+    if (!audio) return;
+
+    // Toggle the actual audio state
+    if (audio.enabled) {
+      audio.enabled = false;
+      audio.fadeOutCurrentMusic();
+    } else {
+      audio.enabled = true;
+      audio.updateMusic();
+    }
+
+    // Update button visual to match new state
+    this.updateMuteButton();
+
+    // Save settings
+    this.saveSettings();
+  }
+
+  /**
+   * Update mute button visual to match audio state
+   */
+  updateMuteButton(): void {
+    if (!this.callbacks) return;
+
+    const audio = this.callbacks.getAudioManager();
+    const muteBtn = document.getElementById('mutebutton');
+
+    if (muteBtn && audio) {
+      // active = sound on (🔊), no active = muted (🔇)
+      if (audio.enabled) {
+        muteBtn.classList.add('active');
+      } else {
+        muteBtn.classList.remove('active');
+      }
+    }
+  }
+
+  /**
+   * Initialize mute button state on game load
+   * Call this after audio manager is ready
+   */
+  initMuteButtonState(): void {
+    this.updateMuteButton();
   }
 
   show(): void {

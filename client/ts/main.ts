@@ -33,7 +33,7 @@ var initApp = function () {
       }
     });
 
-    $('.barbutton').click(function () {
+    $('.barbutton').not('#mutebutton').click(function () {
       $(this).toggleClass('active');
     });
 
@@ -46,11 +46,32 @@ var initApp = function () {
     });
 
     $('#helpbutton').click(function () {
-      app.toggleAbout();
+      app.toggleInstructions();
+    });
+
+    $('#inventorybutton').click(function () {
+      if (game && game.ready && game.started) {
+        game.toggleInventory();
+      }
+    });
+
+    $('#minimapbutton').click(function () {
+      if (game && game.ready && game.started) {
+        game.toggleMinimap();
+      }
+    });
+
+    $('#newspaperbutton').click(function () {
+      if (game && game.ready && game.started) {
+        game.toggleNewspaper();
+      }
     });
 
     $('#achievementsbutton').click(function () {
-      app.toggleAchievements();
+      // Use game's achievements menu (same as J key)
+      if (game && game.ready && game.started) {
+        game.toggleAchievements();
+      }
       if (app.blinkInterval) {
         clearInterval(app.blinkInterval);
       }
@@ -96,30 +117,6 @@ var initApp = function () {
 
     $('#nameinput').bind('keyup', function () {
       app.toggleButton();
-    });
-
-    $('#previous').click(function () {
-      var $achievements = $('#achievements');
-
-      if (app.currentPage === 1) {
-        return false;
-      } else {
-        app.currentPage -= 1;
-        $achievements.removeClass().addClass('active page' + app.currentPage);
-      }
-    });
-
-    $('#next').click(function () {
-      var $achievements = $('#achievements'),
-        $lists = $('#lists'),
-        nbPages = $lists.children('ul').length;
-
-      if (app.currentPage === nbPages) {
-        return false;
-      } else {
-        app.currentPage += 1;
-        $achievements.removeClass().addClass('active page' + app.currentPage);
-      }
     });
 
     $('#notifications div').bind('transitioned', app.resetMessagesPosition.bind(app));
@@ -189,6 +186,10 @@ var initGame = function () {
 
   game.onGameStart(function () {
     app.initEquipmentIcons();
+    // Initialize mute button state once audio manager is ready
+    if (volumeUI) {
+      volumeUI.initMuteButtonState();
+    }
   });
 
   game.onDisconnect(function (message) {
@@ -383,6 +384,7 @@ var initGame = function () {
 
   $('#mutebutton').click(function (e) {
     e.stopPropagation();
+    // Just toggle the panel - mute control is inside the panel
     volumeUI.toggle();
   });
 
@@ -414,20 +416,41 @@ var initGame = function () {
         });
         return false;
       }
-      if (key === 65) { // a
-        // game.player.hit();
-        return false;
-      }
       if (key === 78) { // N - Toggle Town Crier newspaper
         if (game.ready && game.started) {
           game.toggleNewspaper();
         }
         return false;
       }
-      if (key === 68) { // D - Drop current weapon
-        console.log('[KeyPress] D key pressed, game.ready:', game.ready, 'game.started:', game.started);
+      if (key === 88) { // X - Drop current weapon (changed from D for WASD)
+        console.log('[KeyPress] X key pressed, game.ready:', game.ready, 'game.started:', game.started);
         if (game.ready && game.started) {
           game.dropCurrentWeapon();
+        }
+        return false;
+      }
+      // WASD and Arrow keys for movement
+      if (key === 87 || key === 38) { // W or Up Arrow
+        if (game.ready && game.started && game.player) {
+          game.movePlayerInDirection(0, -1);
+        }
+        return false;
+      }
+      if (key === 65 || key === 37) { // A or Left Arrow
+        if (game.ready && game.started && game.player) {
+          game.movePlayerInDirection(-1, 0);
+        }
+        return false;
+      }
+      if (key === 83 || key === 40) { // S or Down Arrow
+        if (game.ready && game.started && game.player) {
+          game.movePlayerInDirection(0, 1);
+        }
+        return false;
+      }
+      if (key === 68 || key === 39) { // D or Right Arrow
+        if (game.ready && game.started && game.player) {
+          game.movePlayerInDirection(1, 0);
         }
         return false;
       }
@@ -445,6 +468,10 @@ var initGame = function () {
         if (game.ready && game.started) {
           game.toggleMinimap();
         }
+        return false;
+      }
+      if (key === 191 || key === 112) { // ? (forward slash with shift) or F1 - Help
+        app.toggleInstructions();
         return false;
       }
     } else {
