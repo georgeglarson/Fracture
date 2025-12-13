@@ -15,7 +15,7 @@ export class MobArea extends Area {
     this.kind = kind;
     this.setNumberOfEntities(this.nb);
 
-    //this.initRoaming();
+    this.initRoaming();
   }
 
   spawnMobs() {
@@ -57,7 +57,7 @@ export class MobArea extends Area {
     }
   }
 
-  initRoaming(mob) {
+  initRoaming() {
     var self = this;
 
     setInterval(function () {
