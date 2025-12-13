@@ -1054,6 +1054,9 @@ export class Game {
   movePlayerInDirection(dx: number, dy: number) {
     if (!this.player || this.player.isDead) return;
 
+    // Block movement during zone transition to prevent camera desync
+    if (this.zoningManager?.isZoning()) return;
+
     const targetX = this.player.gridX + dx;
     const targetY = this.player.gridY + dy;
 
@@ -1608,6 +1611,10 @@ export class Game {
 
   endZoning() {
     this.zoningManager?.endZoning();
+    // Re-center camera on player after zone transition completes
+    if (this.player && this.camera) {
+      this.camera.lookAt(this.player);
+    }
   }
 
   isZoning() {
