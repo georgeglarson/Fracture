@@ -13,7 +13,7 @@ import {Chest} from './chest';
 import {getVeniceService} from './ai';
 import {EquipmentManager} from './equipment/equipment-manager';
 import {EquipmentSlot, getSlotForKind} from '../../shared/ts/equipment/equipment-types';
-import {shopService, isMerchant, getShopInventory, getSellPrice} from './shop/shop.service';
+import {shopService, isMerchant, getShopInventory} from './shop/shop.service';
 import {getAchievementService} from './achievements/achievement.service';
 import {PlayerAchievements} from '../../shared/ts/achievements';
 import {PartyService} from './party';
@@ -22,6 +22,7 @@ import {serializeSlot, SerializedInventorySlot} from '../../shared/ts/inventory/
 import {serializeProperties} from '../../shared/ts/items/item-types';
 import {MessageRouter} from './player/message-router';
 import {getDailyRewardService} from './player/daily-reward.service';
+import {getEconomyService} from './player/economy.service';
 
 export class Player extends Character {
   // Shared message router instance (singleton pattern)
@@ -858,26 +859,25 @@ export class Player extends Character {
   handleShopBuy(npcKind: number, itemKind: number) {
     console.log(`[Shop] ${this.name} attempting to buy item ${itemKind} from NPC ${npcKind}`);
 
-    const result = shopService.processPurchase(npcKind, itemKind, this.gold);
+    const economyService = getEconomyService();
+    const result = economyService.processPurchase(npcKind, itemKind, this.gold);
 
     if (result.success) {
       // Deduct gold
-      this.gold -= result.cost;
+      this.gold = result.newGold;
       console.log(`[Shop] ${this.name} purchased item ${itemKind} for ${result.cost}g (new balance: ${this.gold}g)`);
 
       // Give item to player (equip it)
-      if (Types.isWeapon(itemKind)) {
+      if (result.isWeapon) {
         this.equipWeapon(itemKind);
         this.broadcast(new Messages.EquipItem(this, itemKind).serialize());
-      } else if (Types.isArmor(itemKind)) {
+      } else if (result.isArmor) {
         this.equipArmor(itemKind);
         this.broadcast(new Messages.EquipItem(this, itemKind).serialize());
-      } else if (Types.isHealingItem(itemKind)) {
+      } else if (result.isConsumable && result.healAmount > 0) {
         // Consumables heal immediately
-        // Use ConsumableStats from item-tables
-        const healAmount = this.getConsumableHealAmount(itemKind);
-        if (healAmount > 0 && this.hitPoints < this.maxHitPoints) {
-          this.regenHealthBy(healAmount);
+        if (this.hitPoints < this.maxHitPoints) {
+          this.regenHealthBy(result.healAmount);
           this.broadcast(new Messages.Health(this.hitPoints).serialize(), false);
         }
       }
@@ -910,11 +910,12 @@ export class Player extends Character {
     }
 
     const itemKind = slot.kind;
-    const sellPrice = getSellPrice(itemKind);
+    const economyService = getEconomyService();
+    const result = economyService.processSell(itemKind, this.gold);
 
-    if (sellPrice <= 0) {
+    if (!result.success) {
       console.log(`[Shop] ${this.name} tried to sell unsellable item ${itemKind}`);
-      this.send(new Messages.ShopSellResult(false, 0, this.gold, 'This item cannot be sold').serialize());
+      this.send(new Messages.ShopSellResult(false, 0, this.gold, result.message).serialize());
       return;
     }
 
@@ -922,8 +923,8 @@ export class Player extends Character {
     this.inventory.removeItem(slotIndex, 1);
 
     // Grant gold
-    this.gold += sellPrice;
-    console.log(`[Shop] ${this.name} sold item ${itemKind} for ${sellPrice}g (new balance: ${this.gold}g)`);
+    this.gold = result.newGold;
+    console.log(`[Shop] ${this.name} sold item ${itemKind} for ${result.sellPrice}g (new balance: ${this.gold}g)`);
 
     // Send updated inventory
     const updatedSlot = this.inventory.getSlot(slotIndex);
@@ -936,24 +937,10 @@ export class Player extends Character {
     }
 
     // Send sell result
-    this.send(new Messages.ShopSellResult(true, sellPrice, this.gold, `Sold for ${sellPrice} gold`).serialize());
+    this.send(new Messages.ShopSellResult(true, result.sellPrice, this.gold, result.message).serialize());
 
     // Also send gold update
-    this.send(new Messages.GoldGain(sellPrice, this.gold).serialize());
-  }
-
-  /**
-   * Get heal amount for consumable items
-   */
-  private getConsumableHealAmount(itemKind: number): number {
-    // Based on ConsumableStats in item-tables.ts
-    const healAmounts: Record<number, number> = {
-      [Types.Entities.FLASK]: 40,
-      [Types.Entities.BURGER]: 100,
-      [Types.Entities.CAKE]: 60,
-      [Types.Entities.FIREPOTION]: 0 // Fire potion is special effect, not heal
-    };
-    return healAmounts[itemKind] || 0;
+    this.send(new Messages.GoldGain(result.sellPrice, this.gold).serialize());
   }
 
   // Town Crier: Handle newspaper request
