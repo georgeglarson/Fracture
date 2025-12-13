@@ -119,7 +119,7 @@ PLAYER_TITLE_UPDATE = 53       // [PLAYER_TITLE_UPDATE, playerId, title]
 | `shared/ts/achievements/achievement-data.ts` | Achievement definitions |
 | `shared/ts/achievements/index.ts` | Re-exports |
 | `server/ts/achievements/achievement.service.ts` | Server-side tracking |
-| `client/ts/ui/achievement-panel.ts` | UI component |
+| `client/ts/ui/achievement-ui.ts` | UI component (category tabs, progress bars, title selection) |
 
 ## Files to Modify
 
@@ -140,7 +140,7 @@ PLAYER_TITLE_UPDATE = 53       // [PLAYER_TITLE_UPDATE, playerId, title]
 - [x] Kill mob -> progress updates
 - [x] Meet requirement -> achievement unlocks
 - [x] Unlock -> notification appears
-- [ ] Open panel -> see all achievements (UI deferred)
+- [x] Open panel ('J' key) -> see all achievements with category tabs
 - [x] Select title -> title appears above name
 - [x] Other players see your title
 - [x] Refresh -> achievements persist

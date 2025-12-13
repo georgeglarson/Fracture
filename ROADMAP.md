@@ -46,7 +46,7 @@ We have a fully playable core game loop with items, inventory, progression, econ
 - [x] Item comparison tooltips
 - [x] Drop key (D) to drop equipped weapon
 - [x] Inventory system (007 ✅)
-- [ ] Drop tables per mob/area (future)
+- [x] Drop tables per mob tier + zone bonuses (properties.ts, zone-manager.ts)
 
 ### 002: Progression System ✅
 **Impact:** High - Levels = goals = retention
@@ -68,7 +68,7 @@ We have a fully playable core game loop with items, inventory, progression, econ
 - [x] NPC merchant shops
 - [x] Item buying from shops
 - [x] Gold sync on player connect
-- [ ] Item selling to shops (future)
+- [x] Item selling to shops (context menu in inventory when shop open)
 - [ ] Player-to-player trading (future)
 
 ### 007: Inventory System ✅
@@ -109,7 +109,7 @@ We have a fully playable core game loop with items, inventory, progression, econ
 - [x] Title selection and broadcasting to other players
 - [x] Achievement unlock notifications
 - [x] LocalStorage persistence
-- [ ] Achievement panel UI (future)
+- [x] Achievement panel UI ('J' key toggle, category tabs, progress bars)
 
 ### 006: Social Features ✅
 **Status:** Partial (Party + Inspect complete)
@@ -227,4 +227,4 @@ We have a fully playable core game loop with items, inventory, progression, econ
 ---
 
 *This roadmap is not a timeline. It's a direction.*
-*Last updated: 2025-12-11*
+*Last updated: 2025-12-13*
