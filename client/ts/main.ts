@@ -437,6 +437,12 @@ var initGame = function () {
         game.toggleInventory();
         return false;
       }
+      if (key === 77) { // M - Toggle minimap
+        if (game.ready && game.started) {
+          game.toggleMinimap();
+        }
+        return false;
+      }
     } else {
       if (key === 13 && game.ready) {
         $chat.focus();

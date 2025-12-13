@@ -34,6 +34,7 @@ import {PlayerInspect} from './ui/player-inspect';
 import {ContextMenu} from './ui/context-menu';
 import {InventoryUI} from './ui/inventory-ui';
 import {ShopUI} from './ui/shop-ui';
+import {MinimapUI} from './ui/minimap-ui';
 import {InventoryManager} from './inventory/inventory-manager';
 import {deserializeInventory, InventorySlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
 import {setupNetworkHandlers} from './network/message-handlers';
@@ -70,6 +71,7 @@ export class Game {
   inventoryManager: InventoryManager | null = null;
   inventoryUI: InventoryUI | null = null;
   shopUI: ShopUI | null = null;
+  minimapUI: MinimapUI | null = null;
   zoningManager: ZoningManager | null = null;
   spriteLoader: SpriteLoader | null = null;
 
@@ -543,6 +545,9 @@ export class Game {
         // Initialize shop UI
         self.initShop();
 
+        // Initialize minimap
+        self.initMinimap();
+
         // Initialize zoning manager
         self.zoningManager = new ZoningManager();
         self.zoningManager.setContext({
@@ -577,6 +582,9 @@ export class Game {
       this.updateCursorLogic();
       this.updater.update();
       this.renderer.renderFrame();
+
+      // Update minimap
+      this.minimapUI?.update();
     }
 
     if (!this.isStopped) {
@@ -2183,6 +2191,27 @@ export class Game {
     } else {
       console.error('[Inventory] inventoryUI is null - initialization failed');
     }
+  }
+
+  initMinimap() {
+    if (this.minimapUI) return;
+
+    this.minimapUI = new MinimapUI();
+    this.minimapUI.setCallbacks({
+      getMap: () => this.map,
+      getPlayer: () => this.player,
+      getCamera: () => this.camera,
+      forEachEntity: (callback) => this.forEachEntity(callback)
+    });
+
+    console.info('[Minimap] Initialized');
+  }
+
+  toggleMinimap() {
+    if (!this.minimapUI) {
+      this.initMinimap();
+    }
+    this.minimapUI?.toggle();
   }
 
   handleInventoryInit(serializedSlots: (SerializedInventorySlot | null)[]) {
