@@ -1611,10 +1611,6 @@ export class Game {
 
   endZoning() {
     this.zoningManager?.endZoning();
-    // Re-center camera on player after zone transition completes
-    if (this.player && this.camera) {
-      this.camera.lookAt(this.player);
-    }
   }
 
   isZoning() {
