@@ -22,6 +22,7 @@ export class PlayerInspect {
   private currentData: InspectData | null = null;
   private callbacks: InspectCallbacks | null = null;
   private isInParty: () => boolean = () => false;
+  private escHandler: ((e: KeyboardEvent) => void) | null = null;
 
   constructor() {}
 
@@ -52,6 +53,11 @@ export class PlayerInspect {
    */
   hide(): void {
     this.currentData = null;
+    // Remove keyboard listener
+    if (this.escHandler) {
+      document.removeEventListener('keydown', this.escHandler);
+      this.escHandler = null;
+    }
     const popup = document.getElementById('player-inspect-popup');
     if (popup) {
       popup.remove();
@@ -165,14 +171,16 @@ export class PlayerInspect {
       }
     });
 
-    // Close on Escape key
-    const escHandler = (e: KeyboardEvent) => {
+    // Close on Escape key - store handler for cleanup
+    if (this.escHandler) {
+      document.removeEventListener('keydown', this.escHandler);
+    }
+    this.escHandler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         this.hide();
-        document.removeEventListener('keydown', escHandler);
       }
     };
-    document.addEventListener('keydown', escHandler);
+    document.addEventListener('keydown', this.escHandler);
   }
 
   /**
