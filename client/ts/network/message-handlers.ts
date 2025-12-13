@@ -558,6 +558,13 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
     if (game.levelup_callback) {
       game.levelup_callback(newLevel, bonusHP, bonusDamage);
     }
+
+    // Show "Hire Me" banner for 5 seconds on level up
+    const hireMe = document.getElementById('hire-me');
+    if (hireMe) {
+      hireMe.classList.add('visible');
+      setTimeout(() => hireMe.classList.remove('visible'), 5000);
+    }
   });
 
   client.on(ClientEvents.GOLD_GAIN, function (amount, totalGold) {

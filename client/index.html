@@ -29,9 +29,7 @@
   </div>
 </noscript>
 <div id="intro">
-  <h1 id="logo">
-    <span id="logosparks"></span>
-  </h1>
+  <h1 id="logo">PixelQuest</h1>
   <article id="portrait">
     <p>
       Please rotate your device to landscape mode
@@ -103,21 +101,19 @@
         <h1>
           <span class="left-ornament"></span>
           <span class="title">
-         	                   Made for Mozilla by <a target="_blank" class="stroke clickable"
-                                                    href="http://www.littleworkshop.fr/">Little Workshop</a>
-         	               </span>
+            Original game by <a target="_blank" class="stroke clickable"
+                               href="http://www.littleworkshop.fr/">Little Workshop</a>
+          </span>
           <span class="right-ornament"></span>
         </h1>
         <div id="authors">
           <div id="guillaume">
             <div class="avatar"></div>
-            Pixels by
-            <a class="stroke clickable" target="_blank" href="http://twitter.com/glecollinet">Guillaume Lecollinet</a>
+            Pixels by Guillaume Lecollinet
           </div>
           <div id="franck">
             <div class="avatar"></div>
-            Code by
-            <a class="stroke clickable" target="_blank" href="http://twitter.com/whatthefranck">Franck Lecollinet</a>
+            Code by Franck Lecollinet
           </div>
         </div>
         <div id="seb">
@@ -150,13 +146,8 @@
         <div class="left">
           <div class="img"></div>
           <p>
-            This demo is powered by HTML5 and WebSockets, which allow for real-time gaming and apps on the Web.
+            Built with HTML5, WebSockets, and AI-powered NPCs for real-time multiplayer gaming on the Web.
           </p>
-          <span class="link">
-                                <span class="ext-link"></span>
-                                <a target="_blank" class="clickable"
-                                   href="http://hacks.mozilla.org/2012/03/browserquest/">Learn more</a> about the technology
-                            </span>
         </div>
         <div class="right">
           <div class="img"></div>
@@ -313,14 +304,8 @@
   </div>
 </div>
 <footer>
-  <div id="sharing" class="clickable">
-    Share this on
-    <a href="http://twitter.com/share?text=PixelQuest%3A%20HTML5%20multiplayer%20RPG%20with%20AI%20NPCs%20%23PixelQuest%20%23HTML5"
-       class="twitter"></a>
-    <a href="#" class="facebook"></a>
-  </div>
   <div id="credits-link" class="clickable">
-    – <span id="toggle-credits">Credits</span>
+    <span id="toggle-credits">Credits</span>
   </div>
 </footer>
 
@@ -331,9 +316,6 @@
     <div class="coin"></div>
     <span class="achievement-name">???</span>
     <span class="achievement-description">???</span>
-    <div class="achievement-sharing">
-      <a href="" class="twitter"></a>
-    </div>
   </li>
 </ul>
 
@@ -341,6 +323,11 @@
 
 <div id="resize-check"></div>
 <div id="low-health-vignette"></div>
+
+<!-- Hire Me banner - appears on level up -->
+<a id="hire-me" href="https://georgelarson.me" target="_blank">
+  <span>Hire Me</span>
+</a>
 
 <script type="text/javascript">
   var ctx = document.querySelector('canvas').getContext('2d'),
