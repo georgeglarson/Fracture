@@ -20,9 +20,18 @@ import {PartyService} from './party';
 import {Inventory} from './inventory/inventory';
 import {serializeSlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
 import {serializeProperties} from '../../shared/ts/items/item-types';
+import {MessageRouter} from './player/message-router';
 
 export class Player extends Character {
+  // Shared message router instance (singleton pattern)
+  private static messageRouter: MessageRouter | null = null;
 
+  private static getMessageRouter(): MessageRouter {
+    if (!Player.messageRouter) {
+      Player.messageRouter = new MessageRouter(Messages, Formulas, Utils, Chest);
+    }
+    return Player.messageRouter;
+  }
 
   hasEnteredGame = false;
   isDead = false;
