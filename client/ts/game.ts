@@ -1057,6 +1057,36 @@ export class Game {
     const targetX = this.player.gridX + dx;
     const targetY = this.player.gridY + dy;
 
+    // Check for entity at target position and interact if present
+    const entity = this.getEntityAt(targetX, targetY);
+    if (entity) {
+      // Interact with entity instead of moving
+      if (entity instanceof Mob) {
+        this.makePlayerAttack(entity);
+        return;
+      }
+      else if (entity instanceof Chest) {
+        this.client.sendOpen(entity);
+        this.audioManager.playSound('chest');
+        return;
+      }
+      else if (entity instanceof Item) {
+        this.makePlayerGoToItem(entity);
+        return;
+      }
+      else if (entity instanceof Npc) {
+        this.makeNpcTalk(entity);
+        return;
+      }
+      else if (entity instanceof Player && entity.id !== this.playerId) {
+        // Another player - request inspect data from server
+        this.client.sendPlayerInspect(entity.id);
+        return;
+      }
+      // Other entities block movement
+      return;
+    }
+
     // Check if target is walkable
     if (this.map && this.map.isColliding(targetX, targetY)) {
       return; // Can't walk into walls
@@ -1640,7 +1670,7 @@ export class Game {
         }
       }
 
-      y = ((character.y - this.camera.y) * s) - (t * 2) - offsetY;
+      y = ((character.y - this.camera.y) * s) - (t * 1.25) - offsetY;
 
       bubble.element.css('left', x - offset + 'px');
       bubble.element.css('top', y + 'px');

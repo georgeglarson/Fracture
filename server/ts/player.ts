@@ -416,10 +416,19 @@ export class Player extends Character {
       }
     }
 
-    if (!venice || !npcType) {
-      // Fallback: send empty response
-      console.log('[Venice] Sending fallback response (no venice or npcType)');
+    if (!npcType) {
+      console.log('[Venice] Unknown NPC type, sending fallback');
       this.send(new Messages.NpcTalkResponse(npcKind, '...').serialize());
+      return;
+    }
+
+    // If Venice isn't available, use static NPC personality greetings
+    if (!venice) {
+      const { NPC_PERSONALITIES } = await import('./ai/npc-personalities.js');
+      const personality = NPC_PERSONALITIES[npcType.toLowerCase()];
+      const fallback = personality ? personality.greeting : '...';
+      console.log(`[Venice] No AI service, using static greeting: ${fallback}`);
+      this.send(new Messages.NpcTalkResponse(npcKind, fallback).serialize());
       return;
     }
 
