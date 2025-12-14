@@ -2,7 +2,7 @@
 
 > Goal: Replace client-side localStorage with server-side persistence for cross-device play and proper user accounts.
 
-## Status: Design Phase
+## Status: Phase 1 Complete (SQLite MVP)
 
 ## Problem Statement
 
@@ -206,14 +206,18 @@ class PostgresStorageService implements IStorageService { ... }  // Future
 
 ## Success Criteria
 
-- [ ] User can register and login
-- [ ] Progress persists across devices
-- [ ] Data survives browser clear
-- [ ] JWT authentication works
-- [ ] Inventory syncs to server
-- [ ] Achievements sync to server
-- [ ] Guest mode allows playing without account
-- [ ] Existing localStorage data can be migrated
+- [x] SQLite database created on server start
+- [x] New characters created in database with password hashing
+- [x] Character data loads from database on connect
+- [x] Character data saves to database on disconnect
+- [x] Inventory syncs to server (20-slot grid)
+- [x] Achievements sync to server (progress + unlocks)
+- [x] Daily login streak persists
+- [x] Abstract IStorageService interface for future DB swapping
+- [ ] User can register and login (Phase 2 - UI integration)
+- [ ] Progress persists across devices (Phase 2 - client migration)
+- [ ] JWT authentication (Phase 2)
+- [ ] Guest mode allows playing without account (Phase 2)
 
 ## Non-Goals (Future)
 
@@ -225,4 +229,22 @@ class PostgresStorageService implements IStorageService { ... }  // Future
 
 ---
 
-*Last updated: 2024-12-14*
+*Last updated: 2025-12-14*
+
+---
+
+## Implementation Notes (Phase 1 Complete)
+
+### Files Created
+- `server/ts/storage/storage.interface.ts` - Abstract IStorageService interface
+- `server/ts/storage/sqlite.service.ts` - SQLite implementation using better-sqlite3
+
+### Features Implemented
+- WAL mode for better concurrency
+- SHA-256 password hashing with salt
+- Automatic table creation and migrations
+- Full player state save/load convenience methods
+- Indexes for fast lookups
+
+### Database Location
+`server/data/pixelquest.db` (gitignored)

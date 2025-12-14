@@ -17,7 +17,8 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - Quest system with AI generation
 - Narrator system for event storytelling
 - Town Crier newspaper aggregating world events
-- Entity thought bubbles
+- Entity thought bubbles with AI thought pool (25% AI-generated, 75% templates)
+- **SQLite storage layer** - Character/inventory/achievement persistence (016 ✅)
 - Typed EventBus for decoupled systems
 - **Item System** with rarity, properties, tooltips (001 ✅)
 - **XP/Level progression system** (002 ✅)
@@ -30,7 +31,7 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - **Fullscreen responsive UI** with status bar (011 ✅)
 
 **What's missing for a "real game":**
-- Persistent accounts/storage (unlocks friends/guilds)
+- Client-side storage integration (server-side done, client still uses localStorage)
 - Voice-acted NPCs (Fish Audio TTS integration)
 - More content (areas, mobs, bosses)
 
@@ -53,13 +54,18 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - [x] Config-driven boss stats (HP, damage, armor, aggro range, respawn time)
 - [x] Dynamic difficulty scaling (+20% HP / +10% damage per player)
 
-### P2: Storage/Persistence 🟡
-**Status:** Design phase
+### P2: Storage/Persistence ✅ (Phase 1)
+**Status:** SQLite MVP Complete
 **Goal:** Replace localStorage with server-side persistence
-- [ ] Design storage architecture (see spec 016)
-- [ ] Implement user accounts
-- [ ] Migrate existing localStorage data
-- [ ] Enable cross-device play
+- [x] Design storage architecture (see spec 016)
+- [x] Implement SQLite storage layer (better-sqlite3)
+- [x] Character persistence (level, XP, gold, equipment)
+- [x] Inventory persistence (20-slot grid)
+- [x] Achievement persistence (progress + unlocks)
+- [x] Daily login streak persistence
+- [x] Password hashing (SHA-256 + salt)
+- [ ] Client-side integration (Phase 2)
+- [ ] Enable cross-device play (Phase 2)
 
 ### P3: Voice Acting (Fish Audio) 🔵
 **Status:** Planning
@@ -304,4 +310,4 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 ---
 
 *This roadmap is not a timeline. It's a direction.*
-*Last updated: 2024-12-14*
+*Last updated: 2025-12-14*
