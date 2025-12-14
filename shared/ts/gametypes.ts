@@ -101,7 +101,11 @@ export const Types: any = {
     // Boss leaderboard system
     LEADERBOARD_REQUEST: 79,      // Client: [79]
     LEADERBOARD_RESPONSE: 80,     // Server: [80, entries[{rank, name, kills}]]
-    BOSS_KILL: 81                 // Server: [81, bossName, killerName] - broadcast
+    BOSS_KILL: 81,                // Server: [81, bossName, killerName] - broadcast
+
+    // Kill streak system
+    KILL_STREAK: 82,              // Server: [82, playerId, playerName, streakCount, tierTitle, announcement]
+    KILL_STREAK_ENDED: 83         // Server: [83, playerId, playerName, streakCount, endedByName]
   },
 
   Entities: {

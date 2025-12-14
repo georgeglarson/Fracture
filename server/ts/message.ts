@@ -593,6 +593,44 @@ export const Messages = {
     serialize() {
       return [Types.Messages.BOSS_KILL, this.bossName, this.killerName];
     }
+  },
+
+  // Kill Streak - broadcast when player reaches a streak tier
+  KillStreak: class {
+    constructor(
+      private playerId: number,
+      private playerName: string,
+      private streakCount: number,
+      private tierTitle: string,
+      private announcement: string
+    ) {}
+
+    serialize() {
+      return [Types.Messages.KILL_STREAK,
+        this.playerId,
+        this.playerName,
+        this.streakCount,
+        this.tierTitle,
+        this.announcement];
+    }
+  },
+
+  // Kill Streak Ended - broadcast when a player's streak ends
+  KillStreakEnded: class {
+    constructor(
+      private playerId: number,
+      private playerName: string,
+      private streakCount: number,
+      private endedByName: string | null
+    ) {}
+
+    serialize() {
+      return [Types.Messages.KILL_STREAK_ENDED,
+        this.playerId,
+        this.playerName,
+        this.streakCount,
+        this.endedByName || ''];
+    }
   }
 };
 

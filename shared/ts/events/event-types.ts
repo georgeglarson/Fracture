@@ -105,6 +105,20 @@ export interface PlayerZoneChangeEvent {
   toZone: string;
 }
 
+export interface PlayerStreakEvent {
+  playerId: number;
+  playerName: string;
+  streak: number;
+  tier: string;
+  announcement?: string;
+}
+
+export interface PlayerStreakEndedEvent {
+  playerId: number;
+  streak: number;
+  endedById?: number;
+}
+
 // ============ Item Events ============
 
 export interface ItemLootedEvent {
@@ -231,6 +245,8 @@ export interface GameEventMap {
   'player:levelup': PlayerLevelUpEvent;
   'player:equip': PlayerEquipEvent;
   'player:zonechange': PlayerZoneChangeEvent;
+  'player:streak': PlayerStreakEvent;
+  'player:streakEnded': PlayerStreakEndedEvent;
 
   // Items
   'item:looted': ItemLootedEvent;

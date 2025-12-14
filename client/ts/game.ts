@@ -2409,6 +2409,23 @@ export class Game {
     console.info(`[Boss] ${killerName} has slain ${bossName}!`);
   }
 
+  handleKillStreak(playerId: number, playerName: string, streakCount: number, tierTitle: string, announcement: string) {
+    // Show a dramatic announcement for kill streaks
+    this.showNotification(announcement);
+    console.info(`[KillStreak] ${playerName} - ${tierTitle} (${streakCount} kills)`);
+  }
+
+  handleKillStreakEnded(playerId: number, playerName: string, streakCount: number, endedByName: string) {
+    // Show notification when a streak ends
+    if (streakCount >= 5) {
+      const message = endedByName
+        ? `${playerName}'s ${streakCount}-kill streak was ended by ${endedByName}!`
+        : `${playerName}'s ${streakCount}-kill streak has ended!`;
+      this.showNotification(message);
+      console.info(`[KillStreak] ${message}`);
+    }
+  }
+
   // Achievement Panel UI
   initAchievementsUI() {
     if (this.achievementUI) return;

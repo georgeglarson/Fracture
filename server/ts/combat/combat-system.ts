@@ -10,6 +10,7 @@ import { Formulas } from '../formulas.js';
 import { getVeniceService } from '../ai/venice.service.js';
 import { getServerEventBus } from '../../../shared/ts/events/index.js';
 import { PartyService } from '../party/index.js';
+import { getKillStreakService } from './kill-streak.service.js';
 
 export interface Entity {
   id: string | number;
@@ -52,6 +53,7 @@ export interface WorldContext {
   getEntityById(id: string | number): Entity | undefined;
   pushToPlayer(player: Entity | undefined, message: Message): void;
   pushToAdjacentGroups(groupId: string, message: Message, ignoredPlayer?: string | number): void;
+  pushBroadcast(message: Message): void;  // Broadcast to all players
   getDroppedItem(mob: Entity): Entity | null;
   handleItemDespawn(item: Entity): void;
   removeEntity(entity: Entity): void;
@@ -195,9 +197,27 @@ export class CombatSystem {
     if (attacker) {
       this.world.pushToPlayer(attacker, new Messages.Kill(mob));
 
-      // Grant XP and gold with party sharing
+      // Record kill streak and get multipliers
+      const streakService = getKillStreakService();
+      const streakResult = streakService.recordKill(
+        attacker.id as number,
+        attacker.name || 'Unknown'
+      );
+
+      // Broadcast streak announcements when reaching new tier
+      if (streakResult.isNewTier && streakResult.tier) {
+        this.world.pushBroadcast(new Messages.KillStreak(
+          attacker.id as number,
+          attacker.name || 'Unknown',
+          streakResult.streak,
+          streakResult.tier.title,
+          `${attacker.name} ${streakResult.tier.announcement}`
+        ));
+      }
+
+      // Grant XP and gold with party sharing and streak bonuses
       if (mob.armorLevel) {
-        this.distributePartyRewards(attacker, mob);
+        this.distributePartyRewards(attacker, mob, streakResult.xpMultiplier, streakResult.goldMultiplier);
       }
 
       // AI: Trigger kill handling for narrator and quest tracking
@@ -304,8 +324,10 @@ export class CombatSystem {
   /**
    * Distribute XP and gold rewards, with party sharing if applicable
    * Party members within 15 tiles get a share of XP with a bonus per member
+   * @param xpMultiplier - Streak bonus multiplier for XP (default 1.0)
+   * @param goldMultiplier - Streak bonus multiplier for gold (default 1.0)
    */
-  private distributePartyRewards(attacker: Entity, mob: Entity): void {
+  private distributePartyRewards(attacker: Entity, mob: Entity, xpMultiplier: number = 1.0, goldMultiplier: number = 1.0): void {
     const partyService = PartyService.getInstance();
     const attackerId = attacker.id as number;
     const attackerX = attacker.x ?? 0;
@@ -313,8 +335,9 @@ export class CombatSystem {
     const attackerGridX = Math.floor(attackerX / 16);
     const attackerGridY = Math.floor(attackerY / 16);
 
-    const baseXp = Formulas.xpFromMob(mob.armorLevel!);
-    const baseGold = Formulas.goldFromMob(mob.armorLevel!);
+    // Apply streak multipliers to base rewards
+    const baseXp = Math.floor(Formulas.xpFromMob(mob.armorLevel!) * xpMultiplier);
+    const baseGold = Math.floor(Formulas.goldFromMob(mob.armorLevel!) * goldMultiplier);
 
     // Check if attacker is in a party
     if (partyService.isInParty(attackerId)) {

@@ -703,4 +703,14 @@ function setupBossHandlers(game: Game, client: GameClient): void {
   client.on(ClientEvents.BOSS_KILL, function (bossName, killerName) {
     game.handleBossKill(bossName, killerName);
   });
+
+  // Kill streak announcement - show when player reaches a new tier
+  client.on(ClientEvents.KILL_STREAK, function (playerId, playerName, streakCount, tierTitle, announcement) {
+    game.handleKillStreak(playerId, playerName, streakCount, tierTitle, announcement);
+  });
+
+  // Kill streak ended - show when a player's streak is broken
+  client.on(ClientEvents.KILL_STREAK_ENDED, function (playerId, playerName, streakCount, endedByName) {
+    game.handleKillStreakEnded(playerId, playerName, streakCount, endedByName);
+  });
 }

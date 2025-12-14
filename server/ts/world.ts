@@ -332,6 +332,7 @@ export class World {
         getEntityById: (id) => self.getEntityById(id),
         pushToPlayer: (player, message) => self.pushToPlayer(player, message),
         pushToAdjacentGroups: (groupId, message, ignoredPlayer) => self.pushToAdjacentGroups(groupId, message, ignoredPlayer),
+        pushBroadcast: (message) => self.pushBroadcast(message),
         getDroppedItem: (mob) => self.getDroppedItem(mob),
         handleItemDespawn: (item) => self.handleItemDespawn(item),
         removeEntity: (entity) => self.removeEntity(entity),

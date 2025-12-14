@@ -102,6 +102,10 @@ export class GameClient extends EventEmitter {
     this.handlers[Types.Messages.LEADERBOARD_RESPONSE] = this.receiveLeaderboardResponse;
     this.handlers[Types.Messages.BOSS_KILL] = this.receiveBossKill;
 
+    // Kill streak handlers
+    this.handlers[Types.Messages.KILL_STREAK] = this.receiveKillStreak;
+    this.handlers[Types.Messages.KILL_STREAK_ENDED] = this.receiveKillStreakEnded;
+
     this.enable();
   }
 
@@ -585,6 +589,19 @@ export class GameClient extends EventEmitter {
     var bossName = data[1], killerName = data[2];
     console.log('[Boss] ' + killerName + ' has slain ' + bossName + '!');
     this.emit(ClientEvents.BOSS_KILL, bossName, killerName);
+  }
+
+  // Kill streak receive methods
+  receiveKillStreak(data) {
+    var playerId = data[1], playerName = data[2], streakCount = data[3], tierTitle = data[4], announcement = data[5];
+    console.log('[KillStreak] ' + announcement);
+    this.emit(ClientEvents.KILL_STREAK, playerId, playerName, streakCount, tierTitle, announcement);
+  }
+
+  receiveKillStreakEnded(data) {
+    var playerId = data[1], playerName = data[2], streakCount = data[3], endedByName = data[4];
+    console.log('[KillStreak] ' + playerName + '\'s ' + streakCount + ' kill streak ended!');
+    this.emit(ClientEvents.KILL_STREAK_ENDED, playerId, playerName, streakCount, endedByName);
   }
 
   // ========== Send Methods ==========

@@ -92,6 +92,10 @@ export const ClientEvents = {
   // Boss Leaderboard
   LEADERBOARD_RESPONSE: 'leaderboardResponse',
   BOSS_KILL: 'bossKill',
+
+  // Kill Streak
+  KILL_STREAK: 'killStreak',
+  KILL_STREAK_ENDED: 'killStreakEnded',
 } as const;
 
 // Type for event names
@@ -182,6 +186,10 @@ export interface ClientEventPayloads {
   // Boss Leaderboard
   [ClientEvents.LEADERBOARD_RESPONSE]: [entries: Array<{ rank: number; name: string; kills: number }>];
   [ClientEvents.BOSS_KILL]: [bossName: string, killerName: string];
+
+  // Kill Streak
+  [ClientEvents.KILL_STREAK]: [playerId: number, playerName: string, streakCount: number, tierTitle: string, announcement: string];
+  [ClientEvents.KILL_STREAK_ENDED]: [playerId: number, playerName: string, streakCount: number, endedByName: string];
 }
 
 // Typed EventEmitter interface
