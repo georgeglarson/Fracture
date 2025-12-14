@@ -105,7 +105,11 @@ export const Types: any = {
 
     // Kill streak system
     KILL_STREAK: 82,              // Server: [82, playerId, playerName, streakCount, tierTitle, announcement]
-    KILL_STREAK_ENDED: 83         // Server: [83, playerId, playerName, streakCount, endedByName]
+    KILL_STREAK_ENDED: 83,        // Server: [83, playerId, playerName, streakCount, endedByName]
+
+    // Nemesis system
+    NEMESIS_POWER_UP: 84,         // Server: [84, mobId, originalName, nemesisName, title, powerLevel, kills, victimName]
+    NEMESIS_KILLED: 85            // Server: [85, mobId, nemesisName, title, kills, killerName, isRevenge]
   },
 
   Entities: {

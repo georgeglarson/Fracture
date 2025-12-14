@@ -96,6 +96,13 @@ export const ClientEvents = {
   // Kill Streak
   KILL_STREAK: 'killStreak',
   KILL_STREAK_ENDED: 'killStreakEnded',
+
+  // Nemesis System
+  NEMESIS_POWER_UP: 'nemesisPowerUp',
+  NEMESIS_KILLED: 'nemesisKilled',
+
+  // PvP
+  PVP_DEATH: 'pvpDeath',
 } as const;
 
 // Type for event names
@@ -190,6 +197,13 @@ export interface ClientEventPayloads {
   // Kill Streak
   [ClientEvents.KILL_STREAK]: [playerId: number, playerName: string, streakCount: number, tierTitle: string, announcement: string];
   [ClientEvents.KILL_STREAK_ENDED]: [playerId: number, playerName: string, streakCount: number, endedByName: string];
+
+  // Nemesis System
+  [ClientEvents.NEMESIS_POWER_UP]: [mobId: number, originalName: string, nemesisName: string, title: string, powerLevel: number, kills: number, victimName: string];
+  [ClientEvents.NEMESIS_KILLED]: [mobId: number, nemesisName: string, title: string, kills: number, killerName: string, isRevenge: boolean];
+
+  // PvP
+  [ClientEvents.PVP_DEATH]: [killerId: number, killerName: string];
 }
 
 // Typed EventEmitter interface

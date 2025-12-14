@@ -106,6 +106,10 @@ export class GameClient extends EventEmitter {
     this.handlers[Types.Messages.KILL_STREAK] = this.receiveKillStreak;
     this.handlers[Types.Messages.KILL_STREAK_ENDED] = this.receiveKillStreakEnded;
 
+    // Nemesis system handlers
+    this.handlers[Types.Messages.NEMESIS_POWER_UP] = this.receiveNemesisPowerUp;
+    this.handlers[Types.Messages.NEMESIS_KILLED] = this.receiveNemesisKilled;
+
     this.enable();
   }
 
@@ -602,6 +606,22 @@ export class GameClient extends EventEmitter {
     var playerId = data[1], playerName = data[2], streakCount = data[3], endedByName = data[4];
     console.log('[KillStreak] ' + playerName + '\'s ' + streakCount + ' kill streak ended!');
     this.emit(ClientEvents.KILL_STREAK_ENDED, playerId, playerName, streakCount, endedByName);
+  }
+
+  // Nemesis system receive methods
+  receiveNemesisPowerUp(data) {
+    var mobId = data[1], originalName = data[2], nemesisName = data[3], title = data[4],
+        powerLevel = data[5], kills = data[6], victimName = data[7];
+    console.log('[Nemesis] ' + nemesisName + ' ' + title + ' has grown stronger! (Power: ' + powerLevel + '%)');
+    this.emit(ClientEvents.NEMESIS_POWER_UP, mobId, originalName, nemesisName, title, powerLevel, kills, victimName);
+  }
+
+  receiveNemesisKilled(data) {
+    var mobId = data[1], nemesisName = data[2], title = data[3], kills = data[4],
+        killerName = data[5], isRevenge = data[6] === 1;
+    var revengeText = isRevenge ? ' REVENGE!' : '';
+    console.log('[Nemesis] ' + killerName + ' has slain ' + nemesisName + ' ' + title + '!' + revengeText);
+    this.emit(ClientEvents.NEMESIS_KILLED, mobId, nemesisName, title, kills, killerName, isRevenge);
   }
 
   // ========== Send Methods ==========

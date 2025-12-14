@@ -631,6 +631,51 @@ export const Messages = {
         this.streakCount,
         this.endedByName || ''];
     }
+  },
+
+  // Nemesis system messages
+  NemesisPowerUp: class {
+    constructor(
+      private mobId: number,
+      private originalName: string,
+      private nemesisName: string,
+      private title: string,
+      private powerLevel: number,
+      private kills: number,
+      private victimName: string
+    ) {}
+
+    serialize() {
+      return [Types.Messages.NEMESIS_POWER_UP,
+        this.mobId,
+        this.originalName,
+        this.nemesisName,
+        this.title,
+        this.powerLevel,
+        this.kills,
+        this.victimName];
+    }
+  },
+
+  NemesisKilled: class {
+    constructor(
+      private mobId: number,
+      private nemesisName: string,
+      private title: string,
+      private kills: number,
+      private killerName: string,
+      private isRevenge: boolean
+    ) {}
+
+    serialize() {
+      return [Types.Messages.NEMESIS_KILLED,
+        this.mobId,
+        this.nemesisName,
+        this.title,
+        this.kills,
+        this.killerName,
+        this.isRevenge ? 1 : 0];
+    }
   }
 };
 

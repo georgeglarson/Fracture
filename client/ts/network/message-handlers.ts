@@ -713,4 +713,14 @@ function setupBossHandlers(game: Game, client: GameClient): void {
   client.on(ClientEvents.KILL_STREAK_ENDED, function (playerId, playerName, streakCount, endedByName) {
     game.handleKillStreakEnded(playerId, playerName, streakCount, endedByName);
   });
+
+  // Nemesis power up - show when a mob becomes more powerful after killing players
+  client.on(ClientEvents.NEMESIS_POWER_UP, function (mobId, originalName, nemesisName, title, powerLevel, kills, victimName) {
+    game.handleNemesisPowerUp(mobId, originalName, nemesisName, title, powerLevel, kills, victimName);
+  });
+
+  // Nemesis killed - show when a nemesis is slain (possibly revenge)
+  client.on(ClientEvents.NEMESIS_KILLED, function (mobId, nemesisName, title, kills, killerName, isRevenge) {
+    game.handleNemesisKilled(mobId, nemesisName, title, kills, killerName, isRevenge);
+  });
 }

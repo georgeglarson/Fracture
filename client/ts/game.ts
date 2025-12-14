@@ -2426,6 +2426,23 @@ export class Game {
     }
   }
 
+  handleNemesisPowerUp(mobId: number, originalName: string, nemesisName: string, title: string, powerLevel: number, kills: number, victimName: string) {
+    // Show ominous notification when a nemesis grows stronger
+    const message = kills === 2
+      ? `A ${originalName} has become ${nemesisName} ${title} after killing ${victimName}!`
+      : `${nemesisName} ${title} grows stronger! (${powerLevel}% power)`;
+    this.showNotification(message);
+    console.info(`[Nemesis] ${message}`);
+  }
+
+  handleNemesisKilled(mobId: number, nemesisName: string, title: string, kills: number, killerName: string, isRevenge: boolean) {
+    // Show triumphant notification when a nemesis is slain
+    const revengeText = isRevenge ? ' REVENGE!' : '';
+    const message = `${killerName} has slain ${nemesisName} ${title}!${revengeText}`;
+    this.showNotification(message);
+    console.info(`[Nemesis] ${message}`);
+  }
+
   // Achievement Panel UI
   initAchievementsUI() {
     if (this.achievementUI) return;

@@ -11,6 +11,7 @@ import {getVeniceService} from './ai/venice.service';
 import {AIPlayerManager} from './ai/aiplayer';
 import {MessageBroadcaster} from './messaging/message-broadcaster';
 import {CombatSystem} from './combat/combat-system';
+import {nemesisService} from './combat/nemesis.service';
 import {EntityManager} from './entities/entity-manager';
 import {SpatialManager} from './world/spatial-manager';
 import {SpawnManager} from './world/spawn-manager';
@@ -342,6 +343,14 @@ export class World {
       // Wire entity manager dependencies
       self.entityManager!.setBroadcaster(self.broadcaster!);
       self.entityManager!.setCombatSystem(self.combatSystem!);
+
+      // Initialize nemesis service context
+      nemesisService.setContext({
+        pushBroadcast: (message) => self.pushBroadcast(message),
+        getMobName: (kind) => Types.getKindAsString(kind),
+        getMob: (mobId) => self.entityManager?.mobs[mobId],
+        getPlayer: (playerId) => self.entityManager?.players[playerId],
+      });
 
       self.map.generateCollisionGrid();
 
