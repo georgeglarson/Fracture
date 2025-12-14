@@ -88,6 +88,10 @@ export const ClientEvents = {
   // Zone system
   ZONE_ENTER: 'zoneEnter',
   ZONE_INFO: 'zoneInfo',
+
+  // Boss Leaderboard
+  LEADERBOARD_RESPONSE: 'leaderboardResponse',
+  BOSS_KILL: 'bossKill',
 } as const;
 
 // Type for event names
@@ -174,6 +178,10 @@ export interface ClientEventPayloads {
   // Zone system
   [ClientEvents.ZONE_ENTER]: [zoneId: string, zoneName: string, minLevel: number, maxLevel: number, warning: string | null];
   [ClientEvents.ZONE_INFO]: [zoneId: string, rarityBonus: number, goldBonus: number, xpBonus: number];
+
+  // Boss Leaderboard
+  [ClientEvents.LEADERBOARD_RESPONSE]: [entries: Array<{ rank: number; name: string; kills: number }>];
+  [ClientEvents.BOSS_KILL]: [bossName: string, killerName: string];
 }
 
 // Typed EventEmitter interface

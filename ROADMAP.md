@@ -2,11 +2,14 @@
 
 > A living document tracking the path from foundation to addictive, successful game.
 
-## Current State: Phase 3 Starting! 🎉
+## Current State: Phase 3 Active - Content & Features
 
-We have a fully playable core game loop with items, inventory, progression, economy, shops, and social features.
+We have a fully playable core game with SRP architecture, roaming bosses, and AI-powered NPCs.
 
-**Tag:** `v1.5.0-inventory-system`
+**Recent Milestones:**
+- `v2.0.0-pixelquest` - Full rebrand from BrowserQuest-Ultra
+- `v1.1.0-spec-kit` - Spec-driven development setup
+- `v1.0.0-engine-foundation` - Complete SRP refactor
 
 **What exists:**
 - Real-time multiplayer browser game
@@ -27,9 +30,73 @@ We have a fully playable core game loop with items, inventory, progression, econ
 - **Fullscreen responsive UI** with status bar (011 ✅)
 
 **What's missing for a "real game":**
+- Persistent accounts/storage (unlocks friends/guilds)
+- Voice-acted NPCs (Fish Audio TTS integration)
 - More content (areas, mobs, bosses)
-- Audio (ambient music, combat sounds)
-- Persistent accounts (for friends/guilds)
+
+---
+
+## ACTIVE PRIORITIES (December 2024)
+
+### P0: Venice AI Fix 🔴
+**Status:** API key expired - need new key from https://venice.ai
+**Impact:** All AI features (NPC dialogue, quests, narrator, news) falling back to static content
+
+### P1: Mob Proximity Aggro 🟡
+**Status:** In Progress
+- [x] Skeleton King roaming boss with 8-tile aggro range
+- [x] Boss kill leaderboard
+- [ ] Extend aggro to regular mobs (configurable per mob type)
+- [ ] Visual indicator when mob targets you
+
+### P2: Storage/Persistence 🟡
+**Status:** Design phase
+**Goal:** Replace localStorage with server-side persistence
+- [ ] Design storage architecture (see spec 016)
+- [ ] Implement user accounts
+- [ ] Migrate existing localStorage data
+- [ ] Enable cross-device play
+
+### P3: Voice Acting (Fish Audio) 🔵
+**Status:** Planning
+**Goal:** AI-generated voices for all NPCs
+- [ ] Fish Audio API integration
+- [ ] Voice personality per NPC type
+- [ ] Caching strategy for generated audio
+- [ ] Audio playback in client
+
+### P4: Weekly/Monthly Challenges 🔵
+**Status:** Not started
+- [ ] Challenge definition system
+- [ ] Leaderboard per challenge period
+- [ ] Reward tiers
+- [ ] Challenge reset scheduler
+
+---
+
+## GAME DESIGN IDEAS (Backlog)
+
+### Kill Streak System
+- Player kill streaks with escalating rewards
+- Streak interruption announcements ("X ended Y's rampage!")
+- Streak-based achievements/titles
+
+### Nemesis System (Shadow of Mordor style)
+- Mobs that kill players gain power/levels
+- Named enemies that "remember" players
+- Revenge mechanic - bonus XP for killing your nemesis
+- Creates emergent stories: "The Skeleton that killed me 3x is now level 15!"
+
+### Level Cap Increase
+- Current cap: 20 (too low?)
+- Consider: 50 or 100 for longer progression
+- Prestige system? Reset for cosmetic rewards
+- Scaling curve adjustment needed
+
+### Dynamic Difficulty
+- Skeleton King adapts to server population
+- More players = stronger boss
+- Solo players get scaled-down encounters
 
 ---
 
@@ -227,4 +294,4 @@ We have a fully playable core game loop with items, inventory, progression, econ
 ---
 
 *This roadmap is not a timeline. It's a direction.*
-*Last updated: 2025-12-13*
+*Last updated: 2024-12-14*

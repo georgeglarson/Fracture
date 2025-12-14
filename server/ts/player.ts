@@ -1111,6 +1111,20 @@ export class Player extends Character {
   }
 
   /**
+   * Handle leaderboard request - send boss kill leaderboard
+   */
+  handleLeaderboardRequest() {
+    if (!this.world.roamingBossManager) {
+      // Send empty leaderboard if boss system not initialized
+      this.send(new Messages.LeaderboardResponse([]).serialize());
+      return;
+    }
+
+    const leaderboard = this.world.roamingBossManager.getLeaderboard();
+    this.send(new Messages.LeaderboardResponse(leaderboard).serialize());
+  }
+
+  /**
    * Cleanup party data on disconnect
    */
   cleanupParty() {

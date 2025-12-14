@@ -105,6 +105,9 @@ export interface MessageHandlerContext {
   handleInventorySwap(fromSlot: number, toSlot: number): void;
   handleInventoryPickup(itemId: number): void;
 
+  // Boss leaderboard
+  handleLeaderboardRequest(): void;
+
   // Timeouts
   firepotionTimeout: NodeJS.Timeout | null;
 }
@@ -490,6 +493,13 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.INVENTORY_PICKUP, {
     handler: (ctx, msg) => {
       ctx.handleInventoryPickup(msg[1]);
+    }
+  });
+
+  // Boss Leaderboard
+  handlers.set(Types.Messages.LEADERBOARD_REQUEST, {
+    handler: (ctx, msg) => {
+      ctx.handleLeaderboardRequest();
     }
   });
 

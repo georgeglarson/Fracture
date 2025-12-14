@@ -98,6 +98,10 @@ export class GameClient extends EventEmitter {
     this.handlers[Types.Messages.ZONE_ENTER] = this.receiveZoneEnter;
     this.handlers[Types.Messages.ZONE_INFO] = this.receiveZoneInfo;
 
+    // Boss leaderboard handlers
+    this.handlers[Types.Messages.LEADERBOARD_RESPONSE] = this.receiveLeaderboardResponse;
+    this.handlers[Types.Messages.BOSS_KILL] = this.receiveBossKill;
+
     this.enable();
   }
 
@@ -568,6 +572,19 @@ export class GameClient extends EventEmitter {
     var zoneId = data[1], rarityBonus = data[2], goldBonus = data[3], xpBonus = data[4];
     console.log('[Zone] Bonuses - Rarity: +' + rarityBonus + '%, Gold: +' + goldBonus + '%, XP: +' + xpBonus + '%');
     this.emit(ClientEvents.ZONE_INFO, zoneId, rarityBonus, goldBonus, xpBonus);
+  }
+
+  // Boss leaderboard receive methods
+  receiveLeaderboardResponse(data) {
+    var entries = data[1];
+    console.log('[Leaderboard] Received', entries ? entries.length : 0, 'entries');
+    this.emit(ClientEvents.LEADERBOARD_RESPONSE, entries);
+  }
+
+  receiveBossKill(data) {
+    var bossName = data[1], killerName = data[2];
+    console.log('[Boss] ' + killerName + ' has slain ' + bossName + '!');
+    this.emit(ClientEvents.BOSS_KILL, bossName, killerName);
   }
 
   // ========== Send Methods ==========

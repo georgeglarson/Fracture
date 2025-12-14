@@ -1,3 +1,6 @@
+// Load environment variables from .env file
+import 'dotenv/config';
+
 import * as fs from 'fs';
 import * as path from 'path';
 import {World} from './world';

@@ -96,7 +96,12 @@ export const Types: any = {
 
     // Shop sell system
     SHOP_SELL: 77,                // Client: [77, inventorySlot]
-    SHOP_SELL_RESULT: 78          // Server: [78, success, goldGained, newGold, message]
+    SHOP_SELL_RESULT: 78,         // Server: [78, success, goldGained, newGold, message]
+
+    // Boss leaderboard system
+    LEADERBOARD_REQUEST: 79,      // Client: [79]
+    LEADERBOARD_RESPONSE: 80,     // Server: [80, entries[{rank, name, kills}]]
+    BOSS_KILL: 81                 // Server: [81, bossName, killerName] - broadcast
   },
 
   Entities: {

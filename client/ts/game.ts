@@ -2389,6 +2389,26 @@ export class Game {
     }
   }
 
+  // Boss Leaderboard handlers
+  handleLeaderboardResponse(entries: Array<{ rank: number; name: string; kills: number }>) {
+    console.info('[Leaderboard] Received entries:', entries);
+    // For now, just show in notifications. A full UI can be built later.
+    if (entries && entries.length > 0) {
+      this.showNotification('Boss Kill Leaderboard');
+      entries.slice(0, 5).forEach((entry) => {
+        this.showNotification(`#${entry.rank} ${entry.name}: ${entry.kills} kills`);
+      });
+    } else {
+      this.showNotification('No boss kills recorded yet!');
+    }
+  }
+
+  handleBossKill(bossName: string, killerName: string) {
+    // Show a dramatic notification for boss kills
+    this.showNotification(`${killerName} has slain ${bossName}!`);
+    console.info(`[Boss] ${killerName} has slain ${bossName}!`);
+  }
+
   // Achievement Panel UI
   initAchievementsUI() {
     if (this.achievementUI) return;

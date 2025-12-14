@@ -16,6 +16,7 @@ import {SpatialManager} from './world/spatial-manager';
 import {SpawnManager} from './world/spawn-manager';
 import {GameLoop} from './world/game-loop';
 import {getZoneManager, ZoneManager} from './zones';
+import {RoamingBossManager} from './roaming-boss';
 
 export class World {
 
@@ -80,6 +81,9 @@ export class World {
 
   // AI Players (Westworld feature)
   aiPlayerManager: AIPlayerManager | null = null;
+
+  // Roaming Boss Manager (Thunderdome feature)
+  roamingBossManager: RoamingBossManager | null = null;
 
   constructor(id, maxPlayers, websocketServer) {
     var self = this;
@@ -351,6 +355,12 @@ export class World {
       this.aiPlayerManager = new AIPlayerManager(this, 5); // 5 AI players
       this.aiPlayerManager.start();
     }, 3000);
+
+    // Start Roaming Bosses (Thunderdome feature) - after world is settled
+    setTimeout(() => {
+      this.roamingBossManager = new RoamingBossManager(this);
+      this.roamingBossManager.init();
+    }, 5000);
   }
 
   setUpdatesPerSecond(ups) {

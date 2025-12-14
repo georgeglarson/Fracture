@@ -570,6 +570,29 @@ export const Messages = {
         this.weapon,
         this.armor];
     }
+  },
+
+  // Boss Leaderboard - send leaderboard to player
+  LeaderboardResponse: class {
+    constructor(
+      private entries: Array<{ rank: number; name: string; kills: number }>
+    ) {}
+
+    serialize() {
+      return [Types.Messages.LEADERBOARD_RESPONSE, this.entries];
+    }
+  },
+
+  // Boss Kill - broadcast when a boss is killed
+  BossKill: class {
+    constructor(
+      private bossName: string,
+      private killerName: string
+    ) {}
+
+    serialize() {
+      return [Types.Messages.BOSS_KILL, this.bossName, this.killerName];
+    }
   }
 };
 

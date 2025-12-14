@@ -34,6 +34,7 @@ export function setupNetworkHandlers(game: Game, client: GameClient): void {
   setupPartyHandlers(game, client);
   setupInventoryHandlers(game, client);
   setupZoneHandlers(game, client);
+  setupBossHandlers(game, client);
 }
 
 function setupSpawnHandlers(game: Game, client: GameClient): void {
@@ -689,5 +690,17 @@ function setupZoneHandlers(game: Game, client: GameClient): void {
   // Zone info - update UI with bonus percentages
   client.on(ClientEvents.ZONE_INFO, function (zoneId, rarityBonus, goldBonus, xpBonus) {
     game.handleZoneInfo(zoneId, rarityBonus, goldBonus, xpBonus);
+  });
+}
+
+function setupBossHandlers(game: Game, client: GameClient): void {
+  // Leaderboard response - show boss kill rankings
+  client.on(ClientEvents.LEADERBOARD_RESPONSE, function (entries) {
+    game.handleLeaderboardResponse(entries);
+  });
+
+  // Boss kill announcement - show notification when boss is killed
+  client.on(ClientEvents.BOSS_KILL, function (bossName, killerName) {
+    game.handleBossKill(bossName, killerName);
   });
 }
