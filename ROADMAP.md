@@ -42,12 +42,16 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 **Status:** Complete - API key updated
 **Impact:** All AI features working (NPC dialogue, quests, narrator, news)
 
-### P1: Mob Proximity Aggro ✅
+### P1: Zone Bosses ✅
 **Status:** Complete
 - [x] Skeleton King roaming boss with 8-tile aggro range
 - [x] Boss kill leaderboard
 - [x] Extend aggro to regular mobs (configurable per mob type - range 3-8 by tier)
 - [x] Visual indicator when mob targets you (pulsing red "!" above mob)
+- [x] 6 zone-specific bosses (Giant Crab, Goblin Warlord, Bone Dragon, Sand Wurm, Demon Lord, Skeleton King)
+- [x] Zone-bound spawning (bosses patrol within their zones)
+- [x] Config-driven boss stats (HP, damage, armor, aggro range, respawn time)
+- [x] Dynamic difficulty scaling (+20% HP / +10% damage per player)
 
 ### P2: Storage/Persistence 🟡
 **Status:** Design phase
