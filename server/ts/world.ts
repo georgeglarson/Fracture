@@ -74,6 +74,7 @@ export class World {
   added_callback;
   regen_callback;
   thought_callback;
+  aggro_callback;
   init_callback;
   connect_callback;
   enter_callback;
@@ -256,6 +257,43 @@ export class World {
 
       console.log('[Thoughts] Processed', groupsWithPlayers, 'groups,', totalEntities, 'entities');
     });
+
+    // Mob Proximity Aggro - Check for players within aggro range
+    this.onAggroTick(function() {
+      // Iterate all mobs
+      self.forEachMob(function(mob: Mob) {
+        // Skip if mob is dead, already has a target, or has no aggro range
+        if (mob.isDead || mob.hasTarget() || !mob.aggroRange || mob.aggroRange <= 0) {
+          return;
+        }
+
+        let closestPlayer: any = null;
+        let closestDistance = mob.aggroRange;
+
+        // Check all players
+        self.forEachPlayer(function(player: any) {
+          if (!player || player.isDead) return;
+
+          const distance = Utils.distanceTo(mob.x, mob.y, player.x, player.y);
+
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestPlayer = player;
+          }
+        });
+
+        // Aggro closest player if found
+        if (closestPlayer) {
+          // Add initial hate points based on distance (closer = more hate)
+          const hatePoints = Math.max(1, Math.floor((mob.aggroRange - closestDistance) * 10));
+          mob.increaseHateFor(closestPlayer.id, hatePoints);
+          self.handleMobHate(mob.id, closestPlayer.id, hatePoints);
+
+          const mobName = Types.getKindAsString(mob.kind);
+          console.debug(`[Aggro] ${mobName} (range ${mob.aggroRange}) targeting ${closestPlayer.name} at distance ${closestDistance.toFixed(1)}`);
+        }
+      });
+    });
   }
 
   run(mapFilePath) {
@@ -345,6 +383,11 @@ export class World {
           self.thought_callback();
         }
       });
+      self.gameLoop.onAggro(() => {
+        if (self.aggro_callback) {
+          self.aggro_callback();
+        }
+      });
       self.gameLoop.start();
     });
 
@@ -393,6 +436,10 @@ export class World {
 
   onThoughtTick(callback) {
     this.thought_callback = callback;
+  }
+
+  onAggroTick(callback) {
+    this.aggro_callback = callback;
   }
 
   pushRelevantEntityListTo(player) {

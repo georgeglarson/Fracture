@@ -12,6 +12,7 @@ export class Mob extends Character {
   spawningY;
   armorLevel;
   weaponLevel;
+  aggroRange;
   hatelist = [];
   respawnTimeout = null;
   returnTimeout = null;
@@ -27,6 +28,7 @@ export class Mob extends Character {
     this.spawningY = y;
     this.armorLevel = Properties.getArmorLevel(this.kind);
     this.weaponLevel = Properties.getWeaponLevel(this.kind);
+    this.aggroRange = Properties.getAggroRange(this.kind);
 
   }
 

@@ -23,8 +23,10 @@ export class GameLoop {
   // Counter state
   private regenCount = 0;
   private thoughtCount = 0;
+  private aggroCount = 0;
   private updateCount = 0;
   private thoughtUpdateCount = 0;
+  private aggroUpdateCount = 0;
 
   // Dependencies
   private spatialContext: SpatialContext | null = null;
@@ -33,11 +35,13 @@ export class GameLoop {
   // Callbacks
   private regenCallback: TickCallback | null = null;
   private thoughtCallback: TickCallback | null = null;
+  private aggroCallback: TickCallback | null = null;
 
   constructor(ups: number = 50) {
     this.ups = ups;
     this.regenCount = this.ups * 2;      // Regen every 2 seconds
     this.thoughtCount = this.ups * 15;   // Thoughts every 15 seconds
+    this.aggroCount = Math.floor(this.ups / 2);  // Aggro check every 0.5 seconds
   }
 
   /**
@@ -47,6 +51,7 @@ export class GameLoop {
     this.ups = ups;
     this.regenCount = this.ups * 2;
     this.thoughtCount = this.ups * 15;
+    this.aggroCount = Math.floor(this.ups / 2);
   }
 
   /**
@@ -75,6 +80,13 @@ export class GameLoop {
    */
   onThought(callback: TickCallback): void {
     this.thoughtCallback = callback;
+  }
+
+  /**
+   * Set aggro check callback (called every 0.5 seconds)
+   */
+  onAggro(callback: TickCallback): void {
+    this.aggroCallback = callback;
   }
 
   /**
@@ -130,6 +142,14 @@ export class GameLoop {
     } else {
       this.thoughtCallback?.();
       this.thoughtUpdateCount = 0;
+    }
+
+    // Aggro check timer
+    if (this.aggroUpdateCount < this.aggroCount) {
+      this.aggroUpdateCount += 1;
+    } else {
+      this.aggroCallback?.();
+      this.aggroUpdateCount = 0;
     }
   }
 

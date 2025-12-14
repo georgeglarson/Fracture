@@ -423,6 +423,7 @@ export class Renderer {
       if (!this.mobile && !this.tablet) {
         this.drawEntityName(entity);
         this.drawEntityThought(entity);  // AI thought bubbles
+        this.drawAggroIndicator(entity);  // Aggro warning for mobs targeting player
       }
 
       this.context.save();
@@ -691,6 +692,46 @@ export class Renderer {
         true,
         color);
     }
+    this.context.restore();
+  }
+
+  // Aggro Indicator - Show when a mob is targeting the player
+  drawAggroIndicator(entity) {
+    // Only show for mobs that are targeting the current player
+    if (!this.game.player || !Types.isMob(entity.kind)) return;
+
+    // Check if this mob is in the player's attackers list
+    if (!this.game.player.isAttackedBy(entity)) return;
+
+    this.context.save();
+
+    // Pulsing effect using time
+    const time = Date.now() / 200;
+    const pulse = 0.7 + Math.sin(time) * 0.3;
+
+    // Position above the entity
+    const x = (entity.x + 8) * this.scale;
+    const y = (entity.y - 16) * this.scale;
+
+    // Draw a red exclamation mark (!)
+    this.context.font = 'bold ' + (12 * this.scale) + 'px GraphicPixel';
+    this.context.textAlign = 'center';
+    this.context.textBaseline = 'middle';
+
+    // Red glow effect
+    this.context.shadowColor = '#ff0000';
+    this.context.shadowBlur = 8 * this.scale;
+    this.context.globalAlpha = pulse;
+
+    // White text with red shadow
+    this.context.fillStyle = '#ff4444';
+    this.context.fillText('!', x, y);
+
+    // Second pass for intensity
+    this.context.fillStyle = '#ffffff';
+    this.context.globalAlpha = pulse * 0.8;
+    this.context.fillText('!', x, y);
+
     this.context.restore();
   }
 

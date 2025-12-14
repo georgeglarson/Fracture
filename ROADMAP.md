@@ -38,16 +38,16 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 
 ## ACTIVE PRIORITIES (December 2024)
 
-### P0: Venice AI Fix 🔴
-**Status:** API key expired - need new key from https://venice.ai
-**Impact:** All AI features (NPC dialogue, quests, narrator, news) falling back to static content
+### P0: Venice AI Fix ✅
+**Status:** Complete - API key updated
+**Impact:** All AI features working (NPC dialogue, quests, narrator, news)
 
-### P1: Mob Proximity Aggro 🟡
-**Status:** In Progress
+### P1: Mob Proximity Aggro ✅
+**Status:** Complete
 - [x] Skeleton King roaming boss with 8-tile aggro range
 - [x] Boss kill leaderboard
-- [ ] Extend aggro to regular mobs (configurable per mob type)
-- [ ] Visual indicator when mob targets you
+- [x] Extend aggro to regular mobs (configurable per mob type - range 3-8 by tier)
+- [x] Visual indicator when mob targets you (pulsing red "!" above mob)
 
 ### P2: Storage/Persistence 🟡
 **Status:** Design phase
