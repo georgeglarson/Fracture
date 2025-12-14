@@ -108,6 +108,11 @@ export interface MessageHandlerContext {
   // Boss leaderboard
   handleLeaderboardRequest(): void;
 
+  // Storage persistence
+  characterId: string | null;
+  loadFromStorage(storage: any): boolean;
+  saveToStorage(storage: any): void;
+
   // Timeouts
   firepotionTimeout: NodeJS.Timeout | null;
 }
@@ -142,11 +147,45 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.HELLO, {
     handler: (ctx, msg) => {
       const name = Utils.sanitize(msg[1]);
+      const password = msg[5] || ''; // Password is now at index 5
       (ctx as any).name = (name === '') ? 'lorem ipsum' : name.substr(0, 15);
       (ctx as any).kind = Types.Entities.WARRIOR;
-      ctx.equipArmor(msg[2]);
-      ctx.equipWeapon(msg[3]);
-      ctx.setGold(msg[4] || 0);
+
+      const storage = ctx.world.getStorageService();
+      const characterExists = storage.characterExists((ctx as any).name);
+
+      if (characterExists) {
+        // Existing character - verify password
+        if (!storage.verifyPassword((ctx as any).name, password)) {
+          console.log(`[Auth] Wrong password for: ${(ctx as any).name}`);
+          ctx.send([Types.Messages.AUTH_FAIL, 'wrong_password']);
+          return; // Don't proceed - client should disconnect
+        }
+
+        // Password correct - load character
+        const loaded = ctx.loadFromStorage(storage);
+        if (loaded) {
+          console.log(`[Storage] Loaded returning player: ${(ctx as any).name}`);
+        }
+      } else {
+        // New character - password is required
+        if (!password || password.length < 3) {
+          console.log(`[Auth] Password too short for new character: ${(ctx as any).name}`);
+          ctx.send([Types.Messages.AUTH_FAIL, 'password_required']);
+          return;
+        }
+
+        // Create new character with password
+        const newChar = storage.createCharacter((ctx as any).name, password);
+        ctx.characterId = newChar.id;
+
+        // Apply client-provided starting equipment
+        ctx.equipArmor(msg[2]);
+        ctx.equipWeapon(msg[3]);
+        ctx.setGold(msg[4] || 0);
+        console.log(`[Storage] Created new character: ${(ctx as any).name} (${ctx.characterId})`);
+      }
+
       (ctx as any).orientation = Utils.randomOrientation();
       ctx.updateHitPoints();
       (ctx as any).updatePosition();

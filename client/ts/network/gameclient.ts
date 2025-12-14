@@ -110,6 +110,9 @@ export class GameClient extends EventEmitter {
     this.handlers[Types.Messages.NEMESIS_POWER_UP] = this.receiveNemesisPowerUp;
     this.handlers[Types.Messages.NEMESIS_KILLED] = this.receiveNemesisKilled;
 
+    // Authentication handlers
+    this.handlers[Types.Messages.AUTH_FAIL] = this.receiveAuthFail;
+
     this.enable();
   }
 
@@ -624,18 +627,26 @@ export class GameClient extends EventEmitter {
     this.emit(ClientEvents.NEMESIS_KILLED, mobId, nemesisName, title, kills, killerName, isRevenge);
   }
 
+  // Authentication receive methods
+  receiveAuthFail(data) {
+    var reason = data[1];
+    console.log('[Auth] Authentication failed:', reason);
+    this.emit(ClientEvents.AUTH_FAIL, reason);
+  }
+
   // ========== Send Methods ==========
 
   sendNewsRequest() {
     this.sendMessage([Types.Messages.NEWS_REQUEST]);
   }
 
-  sendHello(player, gold: number = 0) {
+  sendHello(player, gold: number = 0, password: string = '') {
     this.sendMessage([Types.Messages.HELLO,
       player.name,
       Types.getKindFromString(player.getSpriteName()),
       Types.getKindFromString(player.getWeaponName()),
-      gold]);
+      gold,
+      password]);
   }
 
   sendMove(x, y) {

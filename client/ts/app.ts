@@ -52,7 +52,7 @@ export class App {
     }
   }
 
-  tryStartingGame(username, starting_callback) {
+  tryStartingGame(username, password, starting_callback) {
     console.log('Trying to start game with username', username);
     var self = this,
       $play = this.$playButton;
@@ -73,17 +73,17 @@ export class App {
               }
             }, 1500);
             clearInterval(watchCanStart);
-            self.startGame(username, starting_callback);
+            self.startGame(username, password, starting_callback);
           }
         }, 100);
       } else {
         this.$playDiv.unbind('click');
-        this.startGame(username, starting_callback);
+        this.startGame(username, password, starting_callback);
       }
     }
   }
 
-  startGame(username, starting_callback) {
+  startGame(username, password, starting_callback) {
     var self = this;
 
     if (starting_callback) {
@@ -95,11 +95,11 @@ export class App {
         // on the PLAY button instead of loading it in a web worker.
         self.game.loadMap();
       }
-      self.start(username);
+      self.start(username, password);
     });
   }
 
-  start(username) {
+  start(username, password = '') {
     var self = this,
       firstTimePlaying = !self.storage.hasAlreadyPlayed();
 
@@ -111,7 +111,7 @@ export class App {
         ? window.location.hostname
         : config.host;
 
-      this.game.setServerOptions(host, config.port, username);
+      this.game.setServerOptions(host, config.port, username, password);
 
       this.center();
       this.game.run(function () {

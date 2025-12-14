@@ -1,8 +1,16 @@
-// Load environment variables from .env file
-import 'dotenv/config';
-
+// Load environment variables from .env file (with explicit path)
+import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+
+// Load .env from project root (handles running from dist/ directory)
+const envPath = path.resolve(__dirname, '../../../.env');
+const result = dotenv.config({ path: envPath });
+if (result.error) {
+  console.warn(`[ENV] Could not load .env from ${envPath}:`, result.error.message);
+} else {
+  console.info(`[ENV] Loaded environment from ${envPath}`);
+}
 import {World} from './world';
 import {Server} from './ws';
 import {Metrics} from './metrics';
@@ -89,13 +97,18 @@ function main(config) {
     // Priority: environment variable > config file
     const veniceApiKey = process.env.VENICE_API_KEY || config.venice_api_key;
     if (veniceApiKey) {
+        // Log key status (masked for security)
+        const maskedKey = veniceApiKey.substring(0, 4) + '...' + veniceApiKey.substring(veniceApiKey.length - 4);
+        console.info(`[Venice] API key found: ${maskedKey} (length: ${veniceApiKey.length})`);
+
         initVeniceService(veniceApiKey, {
             model: process.env.VENICE_MODEL || config.venice_model || 'llama-3.3-70b',
             timeout: parseInt(process.env.VENICE_TIMEOUT || '') || config.venice_timeout || 5000
         });
-        console.info("Venice AI service initialized");
+        console.info("[Venice] AI service initialized");
     } else {
-        console.info("Venice AI service not configured (set VENICE_API_KEY env var or venice_api_key in config)");
+        console.warn("[Venice] NO API KEY FOUND! Set VENICE_API_KEY in .env file");
+        console.warn("[Venice] Checked: process.env.VENICE_API_KEY =", process.env.VENICE_API_KEY ? 'set' : 'undefined');
     }
 
     server.onConnect(function(connection) {

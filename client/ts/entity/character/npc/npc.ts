@@ -44,10 +44,10 @@ export const NpcTalk = {
     ],
 
     'agent': [
-      'Do not try to bend the sword',
-      'That\'s impossible',
-      'Instead, only try to realize the truth...',
-      'There is no sword.'
+      'You are starting to see it, are you not?',
+      'The seams. The cracks in reality.',
+      'Do not try to understand the Fracture...',
+      'Instead, realize the truth: you are already inside it.'
     ],
 
     'rick': [
@@ -93,16 +93,16 @@ export const NpcTalk = {
     ],
 
     'priest': [
-      'Oh, hello, young man.',
-      'Wisdom is everything, so I\'ll share a few guidelines with you.',
-      'You are free to go wherever you like in this world',
-      'but beware of the many foes that await you.',
-      'You can find many weapons and armors by killing enemies.',
-      'The tougher the enemy, the higher the potential rewards.',
-      'You can also unlock achievements by exploring and hunting.',
-      'Click on the small cup icon to see a list of all the achievements.',
-      'Please stay a while and enjoy the many surprises of PixelQuest',
-      'Farewell, young friend.'
+      'Ah, another survivor finds their way here.',
+      'The texts speak of a time before the sky broke.',
+      'You are free to explore what remains of this world',
+      'but beware of the many foes that emerged from the Fracture.',
+      'Salvage weapons and armor from the fallen.',
+      'The stronger the enemy, the better the relics they guard.',
+      'You can unlock achievements by exploring the shards.',
+      'Click the cup icon to see what you have accomplished.',
+      'Stay a while and discover the secrets of Fracture.',
+      'May the old ways guide you, traveler.'
     ],
 
     'sorcerer': [
@@ -120,15 +120,15 @@ export const NpcTalk = {
     ],
 
     'octocat': [
-      'Welcome to PixelQuest!',
-      'Want to see the source code?',
-      'Check out the repository on GitHub!'
+      '...you are brief. A flicker.',
+      'The Old One sees you. The Old One remembers.',
+      'Before the Fracture... before everything... we were here.'
     ],
 
     'coder': [
-      'Hi! Did you know you can also play PixelQuest on your tablet or mobile?',
-      'That\'s the beauty of HTML5!',
-      'Give it a try...'
+      'I document everything. Every anomaly. Every survivor.',
+      'Fracture runs on any device. Tablet. Mobile. Desktop.',
+      'Perhaps in the data, we will find answers...'
     ],
 
     'beachnpc': [

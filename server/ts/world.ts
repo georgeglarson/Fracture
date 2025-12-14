@@ -18,6 +18,8 @@ import {SpawnManager} from './world/spawn-manager';
 import {GameLoop} from './world/game-loop';
 import {getZoneManager, ZoneManager} from './zones';
 import {ZoneBossManager} from './roaming-boss';
+import {IStorageService} from './storage/storage.interface';
+import {getStorageService} from './storage/sqlite.service';
 
 export class World {
 
@@ -86,6 +88,9 @@ export class World {
 
   // Zone Boss Manager (Thunderdome feature)
   roamingBossManager: ZoneBossManager | null = null;
+
+  // Storage service for player persistence
+  private storageService: IStorageService | null = null;
 
   constructor(id, maxPlayers, websocketServer) {
     var self = this;
@@ -163,6 +168,17 @@ export class World {
 
       player.onExit(function () {
         console.info(player.name + ' has left the game.');
+
+        // Save player data to database before removing
+        if (self.storageService && player.characterId) {
+          try {
+            player.saveToStorage(self.storageService);
+            console.log(`[Storage] Saved ${player.name} on exit`);
+          } catch (e) {
+            console.error(`[Storage] Failed to save ${player.name}:`, e);
+          }
+        }
+
         self.removePlayer(player);
         self.decrementPlayerCount();
 
@@ -418,6 +434,16 @@ export class World {
 
   setUpdatesPerSecond(ups) {
     this.ups = ups;
+  }
+
+  /**
+   * Get the storage service for player persistence
+   */
+  getStorageService(): IStorageService {
+    if (!this.storageService) {
+      this.storageService = getStorageService();
+    }
+    return this.storageService;
   }
 
   onInit(callback) {

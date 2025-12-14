@@ -246,8 +246,27 @@ export class Updater {
 
   updateChatBubbles() {
     var t = this.game.currentTime;
+    var self = this;
 
     this.game.bubbleManager.update(t);
+
+    // Reposition all active bubbles to follow their entities
+    // Also collect orphaned bubbles (entity no longer exists)
+    var orphanedBubbles: number[] = [];
+    this.game.bubbleManager.forEachBubble(function (bubble) {
+      var entity = self.game.getEntityById(bubble.id);
+      if (entity) {
+        self.game.assignBubbleTo(entity);
+      } else {
+        // Entity no longer exists - mark bubble for removal
+        orphanedBubbles.push(bubble.id);
+      }
+    });
+
+    // Clean up orphaned bubbles
+    for (var i = 0; i < orphanedBubbles.length; i++) {
+      self.game.bubbleManager.destroyBubble(orphanedBubbles[i]);
+    }
   }
 
   updateInfos() {

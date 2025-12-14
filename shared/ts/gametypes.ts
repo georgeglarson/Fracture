@@ -109,7 +109,10 @@ export const Types: any = {
 
     // Nemesis system
     NEMESIS_POWER_UP: 84,         // Server: [84, mobId, originalName, nemesisName, title, powerLevel, kills, victimName]
-    NEMESIS_KILLED: 85            // Server: [85, mobId, nemesisName, title, kills, killerName, isRevenge]
+    NEMESIS_KILLED: 85,           // Server: [85, mobId, nemesisName, title, kills, killerName, isRevenge]
+
+    // Authentication
+    AUTH_FAIL: 86                 // Server: [86, reason] - "wrong_password" | "name_taken"
   },
 
   Entities: {

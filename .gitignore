@@ -8,3 +8,11 @@ client/audio/music
 # Config with secrets - use config.example.json as template
 server/config.json
 .env
+
+# SQLite database
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+
+# pnpm build approvals
+.pnpm-build-approvals.json

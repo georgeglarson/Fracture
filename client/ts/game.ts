@@ -137,6 +137,7 @@ export class Game {
   host;
   port;
   username;
+  password;
   isStopped;
   drawTarget;
   client;
@@ -437,10 +438,11 @@ export class Game {
     this.gridManager?.registerEntityPosition(entity);
   }
 
-  setServerOptions(host, port, username) {
+  setServerOptions(host, port, username, password = '') {
     this.host = host;
     this.port = port;
     this.username = username;
+    this.password = password;
   }
 
   loadAudio() {
@@ -644,6 +646,23 @@ export class Game {
       self.started = true;
 
       self.sendHello(self.player);
+    });
+
+    // Handle authentication failure
+    this.client.on(ClientEvents.AUTH_FAIL, function (reason: string) {
+      console.error('[Auth] Authentication failed:', reason);
+      self.started = false;
+
+      let message = 'Authentication failed.';
+      if (reason === 'wrong_password') {
+        message = 'Wrong password. Please try again.';
+      } else if (reason === 'password_required') {
+        message = 'Password required (3+ characters). This name is already registered.';
+      }
+
+      // Show error and return to login screen
+      alert(message);
+      window.location.reload();
     });
 
     this.client.on(ClientEvents.LIST, function (list: number[]) {
@@ -999,7 +1018,7 @@ export class Game {
    */
   sendHello(player?) {
     const gold = this.storage.getGold();
-    this.client.sendHello(player || this.player, gold);
+    this.client.sendHello(player || this.player, gold, this.password || '');
   }
 
   /**

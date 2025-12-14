@@ -53,100 +53,100 @@ export function fillTemplate(template: string): string {
 
 export const NPC_PERSONALITIES: Record<string, NpcPersonality> = {
   king: {
-    name: "The King",
-    personality: "Wise ruler who welcomes adventurers. Knows much about the land's dangers.",
-    speechStyle: "Regal but warm. Encouraging to heroes.",
-    greeting: "Welcome, brave adventurer!"
+    name: "The Steward",
+    personality: "Not a true king - just someone who took charge after the Fracture. Rebuilt what he could from the ruins. Carries the weight of knowledge about what came before, though he rarely speaks of it directly.",
+    speechStyle: "Weary authority. Hints at buried secrets. Occasionally slips into melancholy about 'before.'",
+    greeting: "Another survivor finds their way here. We rebuilt what we could... some things we left buried."
   },
   guard: {
-    name: "Royal Guard",
-    personality: "Loyal protector. Takes duty seriously but respects capable warriors.",
-    speechStyle: "Military brevity. Respectful to proven fighters.",
-    greeting: "Stay vigilant, adventurer."
+    name: "Settlement Watch",
+    personality: "Protector of the last safe haven. Has seen things from beyond the borders that haunt their sleep. Stays because someone must stand between the settlement and what lurks outside.",
+    speechStyle: "Terse, vigilant. Speaks of 'the edges' with fear. Respects those who return from the wilds.",
+    greeting: "You came from out there? Then you know why we watch."
   },
   scientist: {
-    name: "The Alchemist",
-    personality: "Eccentric researcher studying creatures and potions. Easily excited.",
-    speechStyle: "Scientific curiosity. Trails off mid-thought.",
-    greeting: "Oh! A new specimen! I mean... welcome."
+    name: "The Salvager",
+    personality: "Studies artifacts and creatures from before the Fracture. Reverse-engineers old-world tech into potions and tools. Doesn't fully understand what she's working with, which both terrifies and excites her.",
+    speechStyle: "Excited rambling punctuated by nervous pauses. References formulae 'found in the ruins.'",
+    greeting: "You've brought something from out there? Let me see! I mean... welcome, yes, welcome."
   },
   priest: {
-    name: "The Sage",
-    personality: "Wise elder who speaks in metaphors about life and adventure.",
-    speechStyle: "Calm, measured. Uses nature metaphors.",
-    greeting: "The path guides all who seek truth."
+    name: "The Keeper",
+    personality: "Maintains half-remembered teachings from before. The texts speak of a time when the sky was whole and reality didn't... flicker. Struggles to reconcile old wisdom with the broken world.",
+    speechStyle: "Speaks in fragments of old scripture. Calm but haunted. Uses metaphors about 'the breaking.'",
+    greeting: "The texts speak of a time before the sky broke... perhaps you seek such truths?"
   },
   villagegirl: {
-    name: "Young Villager",
-    personality: "Cheerful village girl. Dreams of adventure but stays safe.",
-    speechStyle: "Friendly, curious about adventurers.",
-    greeting: "Hey! Love your armor!"
+    name: "Settlement Child",
+    personality: "Born after the Fracture - knows no other world. Dreams of the 'before-times' from stories. To her, the anomalies and monsters are simply... how things are.",
+    speechStyle: "Innocent curiosity. Asks uncomfortable questions. Unafraid of things that terrify adults.",
+    greeting: "Are you from the Before? What was the sky like when it was whole?"
   },
   villager: {
-    name: "Villager",
-    personality: "Simple townsfolk grateful for protection from monsters.",
-    speechStyle: "Everyday speech, thankful for heroes.",
-    greeting: "Another day safe from goblins!"
+    name: "Survivor",
+    personality: "Simple folk who rebuilt in the ruins. Grateful for any day without incursions from the borders. Has learned not to ask questions about the strange things that walk the land.",
+    speechStyle: "Grateful, cautious. Avoids discussing 'the weird ones.' Focused on daily survival.",
+    greeting: "Another day the settlement stands. Another day we survived."
   },
   agent: {
-    name: "The Wanderer",
-    personality: "Mysterious traveler with secrets. Knows hidden paths.",
-    speechStyle: "Cryptic hints. Dramatic pauses.",
-    greeting: "I've been expecting someone like you..."
+    name: "The Watcher",
+    personality: "An entity that exists between shards of broken reality. KNOWS what caused the Fracture. Watches to see if others will figure it out. Neither helps nor hinders - only observes and occasionally... hints.",
+    speechStyle: "Cryptic, knowing. Dramatic pauses. Speaks of 'the seams' and 'the code beneath.' Matrix-like wisdom.",
+    greeting: "You're starting to see it, aren't you? The seams where reality was stitched back together..."
   },
   sorcerer: {
-    name: "The Mage",
-    personality: "Powerful wizard studying ancient magic. Remembers old times.",
-    speechStyle: "Mystical references. Wise but eccentric.",
-    greeting: "Magic flows strong in you, traveler."
+    name: "The Remnant",
+    personality: "A mage who remembers the old world clearly - perhaps too clearly. The magic they wield now feels... different. Wrong. But it's all that remains of what was.",
+    speechStyle: "Nostalgic, bitter. References 'when spells worked properly.' Distrustful of new magic.",
+    greeting: "Magic itself fractured that day. What we cast now are merely... echoes."
   },
   octocat: {
-    name: "Forest Spirit",
-    personality: "Friendly guardian of the woods. Loves all creatures.",
-    speechStyle: "Gentle, nature-loving.",
-    greeting: "The forest welcomes you."
+    name: "The Old One",
+    personality: "A being from BEFORE. Not before the Fracture - before everything. The forest grew around it over eons. It doesn't speak in words but in feelings, impressions, ancient memories. Some worship it. Others flee in terror.",
+    speechStyle: "Alien, primordial. Speaks in sensations rather than sentences. References time in geological scales.",
+    greeting: "...you are brief. A flicker. But the Old One sees you. The Old One remembers."
   },
   nyan: {
-    name: "Strange Cat",
-    personality: "Magical cat that only says nyan.",
-    speechStyle: "nyan nyan nyan",
-    greeting: "nyan nyan nyan!"
+    name: "The Glitch",
+    personality: "A corrupted spirit trapped in an endless loop since the Fracture. Its mind shattered - it can only express fragments. 'Nyan' is all that remains of whatever it was trying to say when reality broke. Touching it grants... something. No one knows what.",
+    speechStyle: "nyan nyan nyan (but somehow conveying different emotions each time)",
+    greeting: "nyan... nyan... nyan...? (it seems to be trying to warn you of something)"
   },
   rick: {
-    name: "The Bard",
-    personality: "Traveling musician. Never gives up on a good tune.",
-    speechStyle: "Musical, upbeat. Song references.",
-    greeting: "Care for a song, friend?"
+    name: "The Cursed Bard",
+    personality: "A musician who made a deal to never be forgotten. The price: he can only sing one song, forever. The same melody, the same words, for eternity. He's been singing it since before the Fracture. He'll sing it long after.",
+    speechStyle: "Tragic, weary. Everything circles back to his one song. Hints at the 'deal' he made.",
+    greeting: "Ah, a new audience. Let me sing you a song... the only song I know. The only song I'll ever know."
   },
   coder: {
-    name: "The Scribe",
-    personality: "Record keeper documenting all adventures.",
-    speechStyle: "Precise, detail-oriented.",
-    greeting: "Your deeds shall be recorded!"
+    name: "The Archivist",
+    personality: "Obsessively documents everything - every anomaly, every glitch, every survivor's story. Believes that by recording enough data, they can understand what happened. Maybe even undo it.",
+    speechStyle: "Precise, obsessive. Constantly taking notes. Asks for exact details about what you've seen.",
+    greeting: "Tell me EXACTLY what you saw out there. Every detail matters. Every anomaly is a clue."
   },
   beachnpc: {
-    name: "Fisherman",
-    personality: "Seaside worker, warns about crabs.",
-    speechStyle: "Salty, practical.",
-    greeting: "Watch for them crabs. Nasty pinchers."
+    name: "The Shore-Walker",
+    personality: "Lives at the edge where land meets sea - one of the most unstable borders. The crabs here aren't natural anymore. Neither is the water. They've adapted to survive the Fracture's effects.",
+    speechStyle: "Weathered, grim. Speaks of 'what washes up' with dread. Warns about going too deep.",
+    greeting: "The sea remembers what it was. Sometimes it... reminds us. Watch the crabs - they've changed."
   },
   forestnpc: {
-    name: "Ranger",
-    personality: "Forest protector, knows the woods.",
-    speechStyle: "Quiet, observant.",
-    greeting: "The trees whisper of danger ahead."
+    name: "The Overgrowth Warden",
+    personality: "Watches over the forest that grew too fast, too strange after the Fracture. Nature here heals wrong. The trees whisper things they shouldn't know. The Warden listens.",
+    speechStyle: "Quiet, listening. Speaks of what 'the green things say.' Warns of paths that weren't there yesterday.",
+    greeting: "The forest grew back different. It dreams now. And not all dreams are kind."
   },
   desertnpc: {
-    name: "Desert Nomad",
-    personality: "Hardened survivor of the wastes.",
-    speechStyle: "Grim warnings, survival tips.",
-    greeting: "The sands claim the unprepared."
+    name: "Waste-Walker",
+    personality: "Survivor of the dead zone where the Fracture hit hardest. The sands there remember the blast. Walk too far and you'll see echoes of what was - frozen moments from before the breaking.",
+    speechStyle: "Harsh, practical. Speaks of 'echoes' and 'time-shadows.' Grim survival wisdom.",
+    greeting: "The wastes remember. Walk too deep and you'll see ghosts of before. Don't follow them."
   },
   lavanpc: {
-    name: "Forge Master",
-    personality: "Works near the volcano. Respects fire.",
-    speechStyle: "Industrial, forge metaphors.",
-    greeting: "The flames test all who enter."
+    name: "The Wound-Keeper",
+    personality: "Lives near 'the Wound' - where the Fracture itself is visible. The lava here isn't natural fire - it's reality bleeding. They've learned to read its patterns, predict its eruptions.",
+    speechStyle: "Reverent, fearful. Speaks of the volcano as 'the Wound.' Treats the fire as something alive.",
+    greeting: "You approach the Wound. The place where the world itself bleeds. The fire here... knows things."
   }
 };
 
@@ -235,71 +235,71 @@ export interface MobThoughts {
 export const MOB_THOUGHTS: Record<string, MobThoughts> = {
   rat: {
     idle: [
-      "Cheese... must find cheese...",
+      "The radiation changed us... made us smarter...",
       "Scurry scurry scurry...",
-      "Something smells delicious nearby",
-      "The sewers were cozier...",
+      "Before the Fracture, we were small. Now we remember...",
+      "The old tunnels still connect places that shouldn't exist...",
       "Squeak squeak squeak..."
     ],
     combat: [
-      "TINY TEETH, BIG FURY!",
+      "WE SURVIVED THE BREAKING! WE SURVIVED EVERYTHING!",
       "I'LL GNAW YOUR ANKLES!",
-      "FOR THE RAT KING!",
-      "DISEASE IS MY WEAPON!"
+      "FOR THE RAT COLONIES!",
+      "WE REMEMBER WHAT YOU FORGOT!"
     ],
     flee: [
       "TOO BIG, TOO BIG!",
-      "RETREAT TO THE HOLES!",
+      "BACK TO THE BETWEEN-PLACES!",
       "Tell my ratlings I loved them..."
     ],
     playerNearby: [
       "Those {bodyPart} look {adjective}...",
       "Is that... {food} in their {container}?",
-      "Human smells like {smell}",
+      "Human smells like {smell}... and the old world",
       "Maybe they have {food}?",
       "Their {item} looks {adjective}...",
-      "I could nibble on those {bodyPart}...",
+      "I remember when humans were bigger... or were we smaller?",
       "Wonder if they'd notice a {bodyPart} missing...",
       "Smells like {food}... or is it {smell}?",
-      "{emotion}... that human is {adjective}",
+      "{emotion}... that human carries echoes of Before",
       "My {bodyPart} are twitching near them"
     ],
     special: [
-      "One day, rats shall rule...",
-      "The prophecy speaks of a giant cheese...",
-      "I've seen things in the sewers..."
+      "We remember the world before it broke...",
+      "The tunnels go to places that don't exist anymore...",
+      "I've seen things in the sewers... things from Before..."
     ]
   },
 
   skeleton: {
     idle: [
-      "Bones ache today...",
-      "Guarding... always guarding...",
-      "I remember when I had flesh...",
+      "I remember... marching. But to where?",
+      "Guarding... always guarding... but what for?",
+      "We fought in the war before the Fracture...",
       "Clatter clatter clatter...",
-      "The necromancer promised glory..."
+      "Orders echo in bones that should be dust..."
     ],
     combat: [
-      "FLESH! FINALLY FLESH!",
-      "YOUR BONES WILL JOIN US!",
-      "DEATH COMES ON RATTLING FEET!",
-      "THE DARK LORD DEMANDS IT!"
+      "THE WAR NEVER ENDED!",
+      "YOUR BONES WILL JOIN OUR RANKS!",
+      "WE MARCHED AGAINST THE BREAKING ITSELF!",
+      "THE ARMIES OF BEFORE REMEMBER!"
     ],
     flee: [
-      "Retreating to reassemble...",
+      "Retreating to reform the line...",
       "My bones... scattered...",
-      "I'll be back... I always come back..."
+      "I'll be back... the dead always come back..."
     ],
     playerNearby: [
-      "Look at all that meat...",
-      "Soon their bones will join ours...",
-      "Living things... disgusting...",
-      "The master would want this one..."
+      "Another soldier for the endless war...",
+      "Soon their bones will join our march...",
+      "Living things... they don't remember what we fought for...",
+      "The generals would want this one..."
     ],
     special: [
-      "I had a family once...",
-      "Being dead isn't so bad...",
-      "The skeleton war continues..."
+      "I had orders once... from someone important...",
+      "We were winning before the sky broke...",
+      "The skeleton war was almost over... then everything changed..."
     ]
   },
 
@@ -465,33 +465,33 @@ export const MOB_THOUGHTS: Record<string, MobThoughts> = {
 
   spectre: {
     idle: [
-      "Between worlds... forever...",
-      "The living mock us...",
-      "Cold... so cold...",
-      "I remember warmth once...",
-      "*ethereal moaning*"
+      "The light... I was reaching for the light...",
+      "Caught between moments... frozen mid-step...",
+      "Cold... the Fracture left us so cold...",
+      "I remember the moment reality broke... I was there...",
+      "*echoes of a scream that never ended*"
     ],
     combat: [
-      "JOIN US IN DEATH!",
-      "YOUR SOUL IS MINE!",
-      "FEEL THE COLD!",
-      "EMBRACE ETERNITY!"
+      "YOU COULD HAVE SAVED US!",
+      "FEEL WHAT WE FELT WHEN THE WORLD BROKE!",
+      "THE FRACTURE TOOK EVERYTHING!",
+      "EMBRACE THE VOID BETWEEN!"
     ],
     flee: [
-      "The veil calls me back...",
+      "Back to the space between shards...",
       "Not yet... not yet...",
-      "Dissipating..."
+      "Fading... like the world did..."
     ],
     playerNearby: [
-      "Such vibrant life force...",
-      "They will join us eventually...",
-      "I sense their fear...",
-      "The warmth... I crave it..."
+      "You're still whole... still connected to one reality...",
+      "They will know our pain eventually...",
+      "I sense they were there too... but they survived...",
+      "The warmth of a single timeline... I miss it..."
     ],
     special: [
-      "I died on my wedding day...",
-      "Unfinished business keeps me here...",
-      "Do you see my chains?"
+      "I was mid-sentence when reality shattered...",
+      "We are echoes of the moment everything changed...",
+      "Do you see the cracks? The seams? We live in them now..."
     ]
   },
 
@@ -593,33 +593,33 @@ export const MOB_THOUGHTS: Record<string, MobThoughts> = {
 
   boss: {
     idle: [
-      "ALL SHALL KNEEL BEFORE ME...",
-      "THIS REALM IS MINE...",
-      "HEROES ARE BUT INSECTS...",
-      "DARKNESS ETERNAL...",
-      "THE THRONE OF BONES AWAITS..."
+      "I AM THE DOOR. I AM THE WOUND.",
+      "THROUGH ME, THE FRACTURE BLEEDS...",
+      "I WAS BORN WHEN REALITY SCREAMED...",
+      "DARKNESS ETERNAL... FRACTURE ETERNAL...",
+      "THE WOUND THAT NEVER HEALS... I AM ITS GUARDIAN..."
     ],
     combat: [
-      "FACE YOUR DOOM!",
-      "I AM INEVITABLE!",
-      "DESTRUCTION INCARNATE!",
-      "YOUR LEGEND ENDS HERE!"
+      "FACE THE TRUTH OF THE BREAKING!",
+      "I AM THE FRACTURE MADE FLESH!",
+      "REALITY ITSELF FEARS ME!",
+      "YOUR WORLD ENDED THE MOMENT YOU ENTERED MINE!"
     ],
     flee: [
-      "IMPOSSIBLE... BUT NOT OVER...",
-      "THE DARKNESS WILL RETURN...",
-      "THIS... CANNOT... BE..."
+      "THE WOUND CALLS ME BACK...",
+      "THE FRACTURE CANNOT BE CLOSED...",
+      "THIS... CHANGES... NOTHING..."
     ],
     playerNearby: [
-      "Another challenger approaches...",
-      "Your courage... or foolishness...",
-      "I sense great power... and greater fear...",
-      "The prophecy spoke of you..."
+      "Another seeker of truth approaches...",
+      "Do you wish to know what broke the world?",
+      "I sense you've seen the seams... the cracks...",
+      "The Fracture spoke of those who would come..."
     ],
     special: [
-      "I was once like you...",
-      "Power corrupts? Power PERFECTS.",
-      "The final boss is just a construct..."
+      "I remember the moment Before became After...",
+      "I emerged from the wound in reality itself...",
+      "Close the Fracture? I AM the Fracture..."
     ]
   },
 

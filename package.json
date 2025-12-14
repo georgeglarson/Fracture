@@ -1,7 +1,7 @@
 {
-  "name": "pixelquest",
-  "version": "2.0.0",
-  "description": "PixelQuest - A modern HTML5 multiplayer RPG with AI-powered NPCs",
+  "name": "fracture",
+  "version": "3.0.0",
+  "description": "Fracture - A post-apocalyptic multiplayer RPG set in a shattered world",
   "private": false,
   "scripts": {
     "watch:client": "webpack serve --env NODE_ENV=dev --config ./webpack.config.js --mode development",
@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@venice-dev-tools/core": "^2025.11.6",
+    "better-sqlite3": "^12.5.0",
     "dotenv": "^17.2.3",
     "eventemitter3": "^5.0.1",
     "express": "^4.18.2",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/jquery": "^3.5.32",
     "@types/lodash": "^3.10.1",
     "@types/node": "^24.10.1",

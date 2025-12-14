@@ -103,6 +103,9 @@ export const ClientEvents = {
 
   // PvP
   PVP_DEATH: 'pvpDeath',
+
+  // Authentication
+  AUTH_FAIL: 'authFail',
 } as const;
 
 // Type for event names
@@ -204,6 +207,9 @@ export interface ClientEventPayloads {
 
   // PvP
   [ClientEvents.PVP_DEATH]: [killerId: number, killerName: string];
+
+  // Authentication
+  [ClientEvents.AUTH_FAIL]: [reason: string];
 }
 
 // Typed EventEmitter interface

@@ -1,6 +1,7 @@
 import express from 'express';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import * as http from 'http';
+import * as path from 'path';
 import * as _ from 'lodash';
 import {Utils} from './utils';
 
@@ -41,6 +42,11 @@ export class Server {
     var self = this;
 
     const app = express();
+
+    // Serve static client files from dist/client
+    const clientPath = path.join(__dirname, '../../client');
+    app.use(express.static(clientPath));
+
     const server = http.createServer(app);
 
     // Socket.IO configuration optimized for real-time games

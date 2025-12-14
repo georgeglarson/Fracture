@@ -7,7 +7,7 @@ export class FormatChecker {
 
   constructor() {
 
-    this.formats[Types.Messages.HELLO] = ['s', 'n', 'n', 'n']; // name, armor, weapon, gold
+    this.formats[Types.Messages.HELLO] = ['s', 'n', 'n', 'n', 's']; // name, armor, weapon, gold, password
     this.formats[Types.Messages.MOVE] = ['n', 'n'];
     this.formats[Types.Messages.LOOTMOVE] = ['n', 'n', 'n'];
     this.formats[Types.Messages.AGGRO] = ['n'];

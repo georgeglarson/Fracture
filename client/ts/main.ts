@@ -150,9 +150,10 @@ var initApp = function () {
     $('.play div').click(function (event) {
       var nameFromInput = $('#nameinput').val(),
         nameFromStorage = $('#playername').html(),
-        name = nameFromInput || nameFromStorage;
+        name = nameFromInput || nameFromStorage,
+        password = ($('#passwordinput').val() as string) || '';
 
-      app.tryStartingGame(name);
+      app.tryStartingGame(name, password, null);
     });
 
     document.addEventListener('touchstart', function () {
@@ -359,19 +360,20 @@ var initGame = function () {
     }
   });
 
-  $('#nameinput').keypress(function (event) {
-    var $name = $('#nameinput'),
-      name = $name.attr('value');
-
+  // Handle Enter key on both name and password inputs
+  $('#nameinput, #passwordinput').keypress(function (event) {
     if (event.keyCode === 13) {
+      event.preventDefault();
+      var name = ($('#nameinput').val() as string) || '',
+        password = ($('#passwordinput').val() as string) || '';
+
       if (name !== '') {
-        app.tryStartingGame(name, function () {
-          $name.blur(); // exit keyboard on mobile
+        app.tryStartingGame(name, password, function () {
+          $('#nameinput').blur();
+          $('#passwordinput').blur();
         });
-        return false; // prevent form submit
-      } else {
-        return false; // prevent form submit
       }
+      return false;
     }
   });
 

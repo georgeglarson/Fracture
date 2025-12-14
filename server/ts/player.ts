@@ -23,6 +23,7 @@ import {serializeProperties} from '../../shared/ts/items/item-types';
 import {MessageRouter} from './player/message-router';
 import {getDailyRewardService} from './player/daily-reward.service';
 import {getEconomyService} from './player/economy.service';
+import {IStorageService, CharacterData, DailyData, PlayerSaveState} from './storage/storage.interface';
 
 export class Player extends Character {
   // Shared message router instance (singleton pattern)
@@ -66,6 +67,9 @@ export class Player extends Character {
 
   // Achievement system
   title: string | null = null;
+
+  // Database character ID (for persistence)
+  characterId: string | null = null;
 
   zone_callback;
   move_callback;
@@ -1407,5 +1411,121 @@ export class Player extends Character {
    */
   loadInventory(data: (SerializedInventorySlot | null)[]) {
     this.inventory.loadFromData(data);
+  }
+
+  // ============ Persistence Methods ============
+
+  /**
+   * Load player state from storage
+   * Returns true if character was found and loaded, false if new character
+   */
+  loadFromStorage(storage: IStorageService): boolean {
+    const state = storage.loadPlayerState(this.name);
+    if (!state) {
+      return false;
+    }
+
+    // Set character ID
+    this.characterId = state.character.id;
+
+    // Restore progression
+    this.level = state.character.level;
+    this.xp = state.character.xp;
+    this.xpToNext = Formulas.xpToNextLevel(this.level);
+
+    // Restore economy
+    this.gold = state.character.gold;
+
+    // Restore equipment (if any)
+    if (state.character.armorKind) {
+      this.equipArmor(state.character.armorKind);
+    }
+    if (state.character.weaponKind) {
+      this.equipWeapon(state.character.weaponKind);
+    }
+
+    // Restore inventory
+    this.inventory.loadFromData(state.inventory);
+
+    // Restore achievements
+    const achievementService = getAchievementService();
+    achievementService.initPlayer(String(this.id), state.achievements);
+    this.title = state.achievements.selectedTitle || null;
+
+    console.log(`[Storage] Loaded character ${this.name} (${this.characterId}): Level ${this.level}, Gold ${this.gold}`);
+
+    return true;
+  }
+
+  /**
+   * Save player state to storage
+   */
+  saveToStorage(storage: IStorageService): void {
+    if (!this.characterId) {
+      console.warn(`[Storage] Cannot save player ${this.name}: No character ID`);
+      return;
+    }
+
+    const achievementService = getAchievementService();
+    const achievements = achievementService.getPlayerAchievements(this.id);
+
+    const state: PlayerSaveState = {
+      character: {
+        id: this.characterId,
+        name: this.name,
+        level: this.level,
+        xp: this.xp,
+        gold: this.gold,
+        armorKind: this.armor || null,
+        weaponKind: this.weapon || null,
+        x: this.x,
+        y: this.y
+      },
+      inventory: this.inventory.getSerializedSlots(),
+      achievements: achievements || { unlocked: [], progress: {}, selectedTitle: null },
+      daily: {
+        lastLogin: new Date().toISOString().split('T')[0],
+        currentStreak: 0,
+        longestStreak: 0,
+        totalLogins: 0
+      }
+    };
+
+    storage.savePlayerState(state);
+    console.log(`[Storage] Saved character ${this.name} (${this.characterId})`);
+  }
+
+  /**
+   * Get the full save state for this player
+   */
+  getSaveState(): PlayerSaveState | null {
+    if (!this.characterId) {
+      return null;
+    }
+
+    const achievementService = getAchievementService();
+    const achievements = achievementService.getPlayerAchievements(this.id);
+
+    return {
+      character: {
+        id: this.characterId,
+        name: this.name,
+        level: this.level,
+        xp: this.xp,
+        gold: this.gold,
+        armorKind: this.armor || null,
+        weaponKind: this.weapon || null,
+        x: this.x,
+        y: this.y
+      },
+      inventory: this.inventory.getSerializedSlots(),
+      achievements: achievements || { unlocked: [], progress: {}, selectedTitle: null },
+      daily: {
+        lastLogin: new Date().toISOString().split('T')[0],
+        currentStreak: 0,
+        longestStreak: 0,
+        totalLogins: 0
+      }
+    };
   }
 }
