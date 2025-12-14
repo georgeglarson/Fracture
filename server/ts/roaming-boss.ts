@@ -21,6 +21,7 @@ export class RoamingBoss extends Mob {
   // Roaming parameters
   roamInterval: NodeJS.Timeout | null = null;
   aggroInterval: NodeJS.Timeout | null = null;
+  difficultyInterval: NodeJS.Timeout | null = null;
 
   // World reference for player detection
   world: any = null;
@@ -32,6 +33,11 @@ export class RoamingBoss extends Mob {
   // Boss name for announcements
   bossName: string;
 
+  // Dynamic difficulty scaling
+  baseMaxHp: number = 0;
+  currentDifficultyMultiplier: number = 1.0;
+  damageMultiplier: number = 1.0;
+
   constructor(id: number, x: number, y: number, mapWidth: number, mapHeight: number) {
     // Use the BOSS entity kind
     super(id, Types.Entities.BOSS, x, y);
@@ -42,6 +48,7 @@ export class RoamingBoss extends Mob {
 
     // Bosses are tougher
     this.updateHitPoints();
+    this.baseMaxHp = this.maxHitPoints;
   }
 
   /**
@@ -68,6 +75,57 @@ export class RoamingBoss extends Mob {
         this.checkProximityAggro();
       }
     }, 500);
+
+    // Update difficulty based on player count every 30 seconds
+    this.difficultyInterval = setInterval(() => {
+      if (!this.isDead) {
+        this.updateDynamicDifficulty();
+      }
+    }, 30000);
+
+    // Initial difficulty update
+    this.updateDynamicDifficulty();
+  }
+
+  /**
+   * Calculate and apply dynamic difficulty based on player population
+   * More players = stronger boss (for group content)
+   */
+  updateDynamicDifficulty() {
+    if (!this.world) return;
+
+    const playerCount = Object.keys(this.world.players).length;
+
+    // Scale difficulty:
+    // 1 player: 1.0x (base)
+    // 2 players: 1.2x HP, 1.1x damage
+    // 5 players: 1.8x HP, 1.4x damage
+    // 10+ players: 3.0x HP, 2.0x damage (cap)
+
+    const hpMultiplier = Math.min(3.0, 1.0 + (playerCount - 1) * 0.2);
+    const dmgMultiplier = Math.min(2.0, 1.0 + (playerCount - 1) * 0.1);
+
+    // Only update if significantly changed (avoid constant updates)
+    if (Math.abs(hpMultiplier - this.currentDifficultyMultiplier) > 0.1) {
+      const oldMax = this.maxHitPoints;
+      const hpPercent = this.hitPoints / this.maxHitPoints;
+
+      this.currentDifficultyMultiplier = hpMultiplier;
+      this.damageMultiplier = dmgMultiplier;
+      this.maxHitPoints = Math.floor(this.baseMaxHp * hpMultiplier);
+
+      // Scale current HP proportionally
+      this.hitPoints = Math.floor(this.maxHitPoints * hpPercent);
+
+      console.log(`[RoamingBoss] Dynamic difficulty: ${playerCount} players → ${Math.round(hpMultiplier * 100)}% HP, ${Math.round(dmgMultiplier * 100)}% damage`);
+    }
+  }
+
+  /**
+   * Get damage multiplier for combat calculations
+   */
+  getDamageMultiplier(): number {
+    return this.damageMultiplier;
   }
 
   /**
@@ -81,6 +139,10 @@ export class RoamingBoss extends Mob {
     if (this.aggroInterval) {
       clearInterval(this.aggroInterval);
       this.aggroInterval = null;
+    }
+    if (this.difficultyInterval) {
+      clearInterval(this.difficultyInterval);
+      this.difficultyInterval = null;
     }
   }
 

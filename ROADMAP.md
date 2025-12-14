@@ -97,10 +97,12 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - [x] Added level achievements: Champion (30), Elite (40), Legend (50)
 - [ ] Prestige system (future)
 
-### Dynamic Difficulty
-- Skeleton King adapts to server population
-- More players = stronger boss
-- Solo players get scaled-down encounters
+### Dynamic Difficulty ✅
+- [x] Skeleton King scales with player population
+- [x] +20% HP / +10% damage per additional player
+- [x] Caps at 3x HP / 2x damage for 10+ players
+- [x] Updates every 30 seconds to adapt to player joins/leaves
+- [ ] Apply to other bosses (future)
 
 ---
 
