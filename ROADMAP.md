@@ -76,22 +76,26 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 
 ## GAME DESIGN IDEAS (Backlog)
 
-### Kill Streak System
-- Player kill streaks with escalating rewards
-- Streak interruption announcements ("X ended Y's rampage!")
-- Streak-based achievements/titles
+### Kill Streak System ✅
+- [x] Player kill streaks with escalating rewards (3→5→7→10→15→20 kills)
+- [x] Streak interruption announcements ("X ended Y's rampage!")
+- [x] XP/gold multipliers per tier (1.1x to 2.0x)
+- [x] 5-minute timeout window
+- [ ] Streak-based achievements/titles (future)
 
-### Nemesis System (Shadow of Mordor style)
-- Mobs that kill players gain power/levels
-- Named enemies that "remember" players
-- Revenge mechanic - bonus XP for killing your nemesis
-- Creates emergent stories: "The Skeleton that killed me 3x is now level 15!"
+### Nemesis System (Shadow of Mordor style) ✅
+- [x] Mobs that kill players gain power (15% per kill, max 3x)
+- [x] Named enemies after 2 player kills (e.g., "Grimslayer the Unbroken")
+- [x] Revenge mechanic - 2.5x XP / 2x gold for killing your nemesis
+- [x] Server broadcasts nemesis power-ups and deaths to all players
+- [ ] Nemesis persistence across sessions (future)
 
-### Level Cap Increase
-- Current cap: 20 (too low?)
-- Consider: 50 or 100 for longer progression
-- Prestige system? Reset for cosmetic rewards
-- Scaling curve adjustment needed
+### Level Cap Increase ✅
+- [x] Increased MAX_LEVEL from 20 to 50
+- [x] Adjusted XP curve: 1.25 multiplier (was 1.5) for sustainable late-game
+- [x] Extended zone levels: lavaland 15-35, boss 25-50
+- [x] Added level achievements: Champion (30), Elite (40), Legend (50)
+- [ ] Prestige system (future)
 
 ### Dynamic Difficulty
 - Skeleton King adapts to server population

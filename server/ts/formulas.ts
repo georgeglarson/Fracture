@@ -40,15 +40,16 @@ export class Formulas {
   // PROGRESSION FORMULAS
   // ============================================================================
 
-  static readonly MAX_LEVEL = 20;
+  static readonly MAX_LEVEL = 50;
 
   /**
-   * XP required to reach the next level (exponential curve)
-   * Level 1->2: 100, Level 2->3: 150, Level 5->6: 506, Level 10->11: 3844
+   * XP required to reach the next level (exponential curve with gentle scaling)
+   * Using 1.25 multiplier for sustainable late-game progression:
+   * Level 1->2: 100, Level 10->11: 745, Level 20->21: 5,527, Level 50: 70,064
    */
   static xpToNextLevel(currentLevel: number): number {
     if (currentLevel >= Formulas.MAX_LEVEL) return Infinity;
-    return Math.floor(100 * Math.pow(1.5, currentLevel - 1));
+    return Math.floor(100 * Math.pow(1.25, currentLevel - 1));
   }
 
   /**

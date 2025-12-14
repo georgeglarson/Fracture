@@ -118,7 +118,7 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
     name: 'Lavaland',
     description: 'Rivers of molten fire and demons',
     minLevel: 15,
-    maxLevel: 20,
+    maxLevel: 35,
     rarityBonus: 0.3,       // +30% rarity
     goldBonus: 0.35,
     xpBonus: 0.3,
@@ -136,8 +136,8 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
     id: 'boss',
     name: 'Skeleton King\'s Lair',
     description: 'The final challenge awaits',
-    minLevel: 20,
-    maxLevel: 25,
+    minLevel: 25,
+    maxLevel: 50,
     rarityBonus: 0.5,       // +50% rarity - best drops
     goldBonus: 0.5,
     xpBonus: 0.5,

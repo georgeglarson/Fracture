@@ -146,6 +146,33 @@ export const ACHIEVEMENTS: Achievement[] = [
     reward: { title: 'Veteran', gold: 250 },
     icon: 'achievement-veteran'
   },
+  {
+    id: 'champion',
+    name: 'Champion',
+    description: 'Reach level 30',
+    category: 'progression',
+    requirement: { type: 'level', target: 30 },
+    reward: { title: 'Champion', gold: 500, xp: 500 },
+    icon: 'achievement-champion'
+  },
+  {
+    id: 'elite',
+    name: 'Elite',
+    description: 'Reach level 40',
+    category: 'progression',
+    requirement: { type: 'level', target: 40 },
+    reward: { title: 'Elite', gold: 1000, xp: 1000 },
+    icon: 'achievement-elite'
+  },
+  {
+    id: 'legend',
+    name: 'Legend',
+    description: 'Reach level 50',
+    category: 'progression',
+    requirement: { type: 'level', target: 50 },
+    reward: { title: 'Legend', gold: 2500, xp: 2500 },
+    icon: 'achievement-legend'
+  },
 
   // === EXPLORATION ACHIEVEMENTS ===
   {

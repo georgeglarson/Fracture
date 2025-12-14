@@ -6,7 +6,6 @@ import {Sprite} from '../../../renderer/sprite';
 import {getSlotForKind, getRank} from '../../../../../shared/ts/equipment/equipment-types';
 
 export class Player extends Character {
-  MAX_LEVEL: 10;
 
   // Renderer
   nameOffsetY = -10;
