@@ -93,11 +93,9 @@ export class App {
       starting_callback();
     }
 
-    // Check if this is first time playing - show intro if so
-    const isFirstTime = !this.storage.hasAlreadyPlayed();
-
-    if (isFirstTime) {
-      // Fetch and play intro sequence
+    // Always show intro on fresh load (like a game intro cutscene)
+    // Fetch and play intro sequence
+    {
       try {
         const introData = await this.introSequence.fetchIntro(username);
         if (introData) {
