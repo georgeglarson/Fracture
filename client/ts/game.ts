@@ -1677,6 +1677,12 @@ export class Game {
     var bubble = this.bubbleManager.getBubbleById(character.id);
 
     if (bubble) {
+      // Check if character is visible on screen - hide bubble if not
+      if (!this.camera.isVisible(character)) {
+        bubble.element.css('display', 'none');
+        return;
+      }
+
       var s = this.renderer.scale,
         t = 16 * s, // tile size
         x = ((character.x - this.camera.x) * s),
@@ -1701,6 +1707,18 @@ export class Game {
 
       y = ((character.y - this.camera.y) * s) - (t * 1.25) - offsetY;
 
+      // Additional bounds check - ensure bubble stays within viewport
+      const viewportHeight = this.renderer.canvas.height;
+      const viewportWidth = this.renderer.canvas.width;
+
+      // If y would place bubble off-screen (negative or too low), hide it
+      if (y < -50 || y > viewportHeight) {
+        bubble.element.css('display', 'none');
+        return;
+      }
+
+      // Show bubble and position it
+      bubble.element.css('display', 'block');
       bubble.element.css('left', x - offset + 'px');
       bubble.element.css('top', y + 'px');
     }
@@ -1708,6 +1726,13 @@ export class Game {
 
   restart() {
     console.debug('Beginning restart');
+
+    // Reset camera to outdoor mode (fixes viewport stuck small after dying in building)
+    this.camera.setIndoorMode(false);
+    this.camera.rescale();
+
+    // Clear all bubbles
+    this.bubbleManager.clean();
 
     this.entityManager?.clearAll();
     this.initEntityGrid();
@@ -1723,9 +1748,8 @@ export class Game {
 
     this.storage.incrementRevives();
 
-    if (this.renderer.mobile || this.renderer.tablet) {
-      this.renderer.clearScreen(this.renderer.context);
-    }
+    // Clear screen on all devices for clean restart
+    this.renderer.clearScreen(this.renderer.context);
 
     console.debug('Finished restart');
   }
