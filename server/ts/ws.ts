@@ -47,6 +47,10 @@ export class Server {
     const clientPath = path.join(__dirname, '../../client');
     app.use(express.static(clientPath));
 
+    // Serve TTS cache files
+    const ttsPath = path.join(__dirname, '../../data/tts-cache');
+    app.use('/tts', express.static(ttsPath));
+
     const server = http.createServer(app);
 
     // Socket.IO configuration optimized for real-time games

@@ -6,10 +6,12 @@
 import { VeniceClient } from './venice-client';
 import { ProfileService } from './profile.service';
 import { PlayerProfile } from './types';
+import { FishAudioService, getFishAudioService } from './fish-audio.service';
 
 export interface NarrationResult {
   text: string;
   style: 'epic' | 'ominous' | 'humor' | 'info';
+  audioUrl?: string;
 }
 
 export class NarratorService {
@@ -85,7 +87,24 @@ Do NOT use quotes. Do NOT use the word "begins" or "journey". Speak as if narrat
       // Determine style based on event
       const style = this.getNarratorStyle(event);
 
-      return { text, style };
+      // Generate TTS audio if Fish Audio service is available
+      let audioUrl: string | undefined;
+      const fishAudio = getFishAudioService();
+      if (fishAudio) {
+        try {
+          const ttsStyle = style === 'ominous' ? 'dark' : 'epic';
+          const ttsResult = await fishAudio.narratorSpeech(text, ttsStyle);
+          if (ttsResult) {
+            audioUrl = ttsResult.audioUrl;
+            console.log(`[Narrator] TTS generated: ${audioUrl}`);
+          }
+        } catch (ttsError) {
+          console.warn('[Narrator] TTS generation failed:', ttsError);
+          // Continue without audio - TTS is optional
+        }
+      }
+
+      return { text, style, audioUrl };
     } catch (error) {
       console.error('Venice narrator error:', error);
       return null;

@@ -683,7 +683,7 @@ export class Game {
       }
     });
 
-    this.client.on(ClientEvents.WELCOME, function (id: number, name: string, x: number, y: number, hp: number) {
+    this.client.on(ClientEvents.WELCOME, function (id: number, name: string, x: number, y: number, hp: number, level: number, xp: number, xpToNext: number, gold: number) {
       console.info('Received player ID from server : ' + id);
       self.player.id = id;
       self.playerId = id;
@@ -705,6 +705,17 @@ export class Game {
         self.tryUnlockingAchievement('STILL_ALIVE');
       }, 1500);
 
+      // ALWAYS use server-provided progression/gold (Phase 2 persistence)
+      self.playerLevel = level;
+      self.playerXp = xp;
+      self.playerXpToNext = xpToNext;
+      self.playerGold = gold;
+      console.info('[Progression] Loaded from SERVER: Level ' + self.playerLevel + ', XP ' + self.playerXp + '/' + self.playerXpToNext + ', Gold ' + self.playerGold);
+
+      // Sync localStorage with server data (for UI caching)
+      self.storage.saveProgression(level, xp, xpToNext);
+      self.storage.saveGold(gold);
+
       if (!self.storage.hasAlreadyPlayed()) {
         self.storage.initPlayer(self.player.name);
         self.storage.savePlayer(self.renderer.getPlayerImage(),
@@ -714,21 +725,17 @@ export class Game {
       } else {
         self.showNotification('Welcome back to PixelQuest!');
         self.storage.setPlayerName(name);
-
-        // Load saved progression from localStorage
-        var savedProgression = self.storage.getProgression();
-        self.playerLevel = savedProgression.level;
-        self.playerXp = savedProgression.xp;
-        self.playerXpToNext = savedProgression.xpToNext;
-        console.info('[Progression] Loaded from storage: Level ' + self.playerLevel + ', XP ' + self.playerXp + '/' + self.playerXpToNext);
-
-        // Update UI with saved progression
-        if (self.playerxp_callback) {
-          self.playerxp_callback(self.playerXp, self.playerXpToNext, self.playerLevel);
-        }
       }
 
-      // Send daily check to server
+      // Update UI with server progression
+      if (self.playerxp_callback) {
+        self.playerxp_callback(self.playerXp, self.playerXpToNext, self.playerLevel);
+      }
+      if (self.playergold_callback) {
+        self.playergold_callback(self.playerGold);
+      }
+
+      // Send daily check to server (still uses localStorage for streak continuity)
       var dailyData = self.storage.getDailyData();
       self.client.sendDailyCheck(dailyData.lastLoginDate || '', dailyData.currentStreak);
 

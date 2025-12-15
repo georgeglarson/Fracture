@@ -193,7 +193,23 @@ export function createMessageHandlers(
       ctx.world.addPlayer(ctx);
       ctx.world.enter_callback(ctx);
 
-      ctx.send([Types.Messages.WELCOME, ctx.id, (ctx as any).name, ctx.x, ctx.y, ctx.hitPoints]);
+      // Get player's XP to next level (using Formulas)
+      const xpToNext = Formulas.xpToNextLevel((ctx as any).level || 1);
+
+      // Send expanded WELCOME with full player state
+      // [WELCOME, id, name, x, y, hp, level, xp, xpToNext, gold]
+      ctx.send([
+        Types.Messages.WELCOME,
+        ctx.id,
+        (ctx as any).name,
+        ctx.x,
+        ctx.y,
+        ctx.hitPoints,
+        (ctx as any).level || 1,
+        (ctx as any).xp || 0,
+        xpToNext,
+        (ctx as any).gold || 0
+      ]);
       (ctx as any).hasEnteredGame = true;
       (ctx as any).isDead = false;
 

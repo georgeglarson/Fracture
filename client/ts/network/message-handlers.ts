@@ -453,13 +453,18 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
 }
 
 function setupAIHandlers(game: Game, client: GameClient): void {
-  client.on(ClientEvents.NPC_TALK, function (npcKind, response) {
+  client.on(ClientEvents.NPC_TALK, function (npcKind, response, audioUrl) {
     if (game.currentNpcTalk) {
       var npc = game.currentNpcTalk;
       game.currentNpcTalk = null;
       if (response) {
         game.showBubbleFor(npc, response);
-        game.audioManager.playSound('npc');
+        // Play TTS audio if available, otherwise fall back to sound effect
+        if (audioUrl && audioUrl.length > 0) {
+          game.audioManager.playNpcVoice(audioUrl);
+        } else {
+          game.audioManager.playSound('npc');
+        }
       }
     }
   });
@@ -491,9 +496,14 @@ function setupAIHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.on(ClientEvents.NARRATOR, function (text, style) {
+  client.on(ClientEvents.NARRATOR, function (text, style, audioUrl) {
     if (text) {
       game.showNarratorText(text, style);
+      // Play narrator TTS audio if available
+      if (audioUrl && game.audioManager) {
+        console.log('[Narrator] Playing TTS audio:', audioUrl);
+        game.audioManager.playNpcVoice(audioUrl);
+      }
     }
   });
 

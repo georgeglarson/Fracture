@@ -197,13 +197,14 @@ export const Messages = {
 
   // Venice AI Messages
   NpcTalkResponse: class {
-    constructor(private npcKind: number, private response: string) {
+    constructor(private npcKind: number, private response: string, private audioUrl: string | null = null) {
     }
 
     serialize() {
       return [Types.Messages.NPCTALK_RESPONSE,
         this.npcKind,
-        this.response];
+        this.response,
+        this.audioUrl || ''];
     }
   },
 
@@ -291,14 +292,15 @@ export const Messages = {
 
   // AI Narrator - dynamic commentary on player actions
   Narrator: class {
-    constructor(private text: string, private style?: string) {
+    constructor(private text: string, private style?: string, private audioUrl?: string) {
       // style: 'epic' | 'humor' | 'ominous' | 'info'
     }
 
     serialize() {
       return [Types.Messages.NARRATOR,
         this.text,
-        this.style || 'epic'];
+        this.style || 'epic',
+        this.audioUrl || ''];
     }
   },
 

@@ -33,3 +33,7 @@ export { NewsService } from './news.service';
 
 // AI Players
 export * from './aiplayer';
+
+// Fish Audio TTS
+export { FishAudioService, initFishAudioService, getFishAudioService, VOICES } from './fish-audio.service';
+export type { VoiceType, TTSResult } from './fish-audio.service';

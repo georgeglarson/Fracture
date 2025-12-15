@@ -142,13 +142,13 @@ export interface ClientEventPayloads {
   [ClientEvents.BLINK]: [id: number];
 
   // Venice AI
-  [ClientEvents.NPC_TALK]: [npcId: number, response: string, options?: string[]];
+  [ClientEvents.NPC_TALK]: [npcId: number, response: string, audioUrl: string];
   [ClientEvents.COMPANION_HINT]: [hint: string];
   [ClientEvents.QUEST_OFFER]: [questId: string, title: string, description: string, objectives: any[], rewards: any];
   [ClientEvents.QUEST_STATUS]: [questId: string, status: string, objectives: any[]];
   [ClientEvents.QUEST_COMPLETE]: [questId: string, rewards: any];
   [ClientEvents.ITEM_LORE]: [itemKind: number, lore: string];
-  [ClientEvents.NARRATOR]: [title: string, message: string, style: string];
+  [ClientEvents.NARRATOR]: [title: string, message: string, style: string, audioUrl?: string];
   [ClientEvents.ENTITY_THOUGHT]: [entityId: number, thought: string, state: string];
   [ClientEvents.WORLD_EVENT]: [title: string, description: string, eventType: string];
   [ClientEvents.NEWS]: [headlines: string[]];

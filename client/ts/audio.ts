@@ -25,6 +25,9 @@ export class AudioManager {
   musicVolume = 1.0;
   sfxVolume = 1.0;
 
+  // NPC voice audio element for TTS playback
+  private npcVoiceAudio: HTMLAudioElement | null = null;
+
 
   constructor(game) {
     var self = this;
@@ -145,6 +148,51 @@ export class AudioManager {
     if (sound) {
       sound.volume = this.getSfxVolume();
       sound.play();
+    }
+  }
+
+  /**
+   * Play NPC voice from TTS audio URL
+   * Stops any currently playing NPC voice first
+   */
+  playNpcVoice(audioUrl: string) {
+    if (!this.enabled) return;
+
+    // Stop any currently playing NPC voice
+    if (this.npcVoiceAudio) {
+      this.npcVoiceAudio.pause();
+      this.npcVoiceAudio.currentTime = 0;
+    }
+
+    // Create new audio element for this voice
+    this.npcVoiceAudio = new Audio(audioUrl);
+    this.npcVoiceAudio.volume = this.getSfxVolume();
+
+    this.npcVoiceAudio.addEventListener('canplaythrough', () => {
+      if (this.npcVoiceAudio) {
+        this.npcVoiceAudio.play().catch(err => {
+          console.warn('[Audio] Failed to play NPC voice:', err);
+        });
+      }
+    }, { once: true });
+
+    this.npcVoiceAudio.addEventListener('error', (e) => {
+      console.error('[Audio] NPC voice failed to load:', audioUrl, e);
+    }, { once: true });
+
+    // Start loading
+    this.npcVoiceAudio.load();
+    console.log('[Audio] Playing NPC voice:', audioUrl);
+  }
+
+  /**
+   * Stop any currently playing NPC voice
+   */
+  stopNpcVoice() {
+    if (this.npcVoiceAudio) {
+      this.npcVoiceAudio.pause();
+      this.npcVoiceAudio.currentTime = 0;
+      this.npcVoiceAudio = null;
     }
   }
 

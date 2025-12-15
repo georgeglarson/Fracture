@@ -230,7 +230,10 @@ export class GameClient extends EventEmitter {
 
   receiveWelcome(data) {
     var id = data[1], name = data[2], x = data[3], y = data[4], hp = data[5];
-    this.emit(ClientEvents.WELCOME, id, name, x, y, hp);
+    // Extended WELCOME includes: level, xp, xpToNext, gold
+    var level = data[6] || 1, xp = data[7] || 0, xpToNext = data[8] || 100, gold = data[9] || 0;
+    console.info('[WELCOME] Received: id=' + id + ' level=' + level + ' xp=' + xp + '/' + xpToNext + ' gold=' + gold);
+    this.emit(ClientEvents.WELCOME, id, name, x, y, hp, level, xp, xpToNext, gold);
   }
 
   receiveMove(data) {
@@ -373,9 +376,9 @@ export class GameClient extends EventEmitter {
 
   // Venice AI receive methods
   receiveNpcTalkResponse(data) {
-    var npcKind = data[1], response = data[2];
-    console.log('[NpcTalk] Received response:', npcKind, response);
-    this.emit(ClientEvents.NPC_TALK, npcKind, response);
+    var npcKind = data[1], response = data[2], audioUrl = data[3] || '';
+    console.log('[NpcTalk] Received response:', npcKind, response, audioUrl ? '(with audio)' : '');
+    this.emit(ClientEvents.NPC_TALK, npcKind, response, audioUrl);
   }
 
   receiveCompanionHint(data) {
@@ -411,9 +414,9 @@ export class GameClient extends EventEmitter {
   }
 
   receiveNarrator(data) {
-    var text = data[1], style = data[2] || 'epic';
-    console.log('[Narrator] Received:', text, '(style:', style + ')');
-    this.emit(ClientEvents.NARRATOR, text, style);
+    var text = data[1], style = data[2] || 'epic', audioUrl = data[3] || '';
+    console.log('[Narrator] Received:', text, '(style:', style + ')', audioUrl ? '[with audio]' : '');
+    this.emit(ClientEvents.NARRATOR, text, style, audioUrl);
   }
 
   receiveEntityThought(data) {

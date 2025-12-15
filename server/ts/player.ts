@@ -10,7 +10,7 @@ import {Messages} from './message';
 import {Formulas} from './formulas';
 import {Properties} from './properties';
 import {Chest} from './chest';
-import {getVeniceService} from './ai';
+import {getVeniceService, getFishAudioService} from './ai';
 import {EquipmentManager} from './equipment/equipment-manager';
 import {EquipmentSlot, getSlotForKind} from '../../shared/ts/equipment/equipment-types';
 import {shopService, isMerchant, getShopInventory} from './shop/shop.service';
@@ -407,6 +407,7 @@ export class Player extends Character {
   async handleNpcTalk(npcKind: number) {
     console.log(`[Venice] handleNpcTalk called with npcKind: ${npcKind}`);
     const venice = getVeniceService();
+    const fishAudio = getFishAudioService();
     const npcType = Types.getKindAsString(npcKind);
     console.log(`[Venice] npcType resolved to: ${npcType}, venice service: ${venice ? 'available' : 'null'}`);
 
@@ -422,9 +423,24 @@ export class Player extends Character {
 
     if (!npcType) {
       console.log('[Venice] Unknown NPC type, sending fallback');
-      this.send(new Messages.NpcTalkResponse(npcKind, '...').serialize());
+      this.send(new Messages.NpcTalkResponse(npcKind, '...', null).serialize());
       return;
     }
+
+    // Helper function to generate TTS audio for dialogue
+    const generateTTS = async (text: string): Promise<string | null> => {
+      if (!fishAudio || !npcType) return null;
+      try {
+        const result = await fishAudio.textToSpeech(text, npcType);
+        if (result) {
+          console.log(`[FishAudio] Generated TTS for ${npcType}: ${result.audioUrl} (cached: ${result.cached})`);
+          return result.audioUrl;
+        }
+      } catch (error) {
+        console.error('[FishAudio] TTS error:', error);
+      }
+      return null;
+    };
 
     // If Venice isn't available, use static NPC personality greetings
     if (!venice) {
@@ -432,7 +448,8 @@ export class Player extends Character {
       const personality = NPC_PERSONALITIES[npcType.toLowerCase()];
       const fallback = personality ? personality.greeting : '...';
       console.log(`[Venice] No AI service, using static greeting: ${fallback}`);
-      this.send(new Messages.NpcTalkResponse(npcKind, fallback).serialize());
+      const audioUrl = await generateTTS(fallback);
+      this.send(new Messages.NpcTalkResponse(npcKind, fallback, audioUrl).serialize());
       return;
     }
 
@@ -444,11 +461,15 @@ export class Player extends Character {
         this.id.toString()
       );
       console.log(`[Venice] Got response: ${response}`);
-      this.send(new Messages.NpcTalkResponse(npcKind, response).serialize());
+
+      // Generate TTS for the dialogue (don't wait for it to complete before sending text)
+      const audioUrl = await generateTTS(response);
+      this.send(new Messages.NpcTalkResponse(npcKind, response, audioUrl).serialize());
     } catch (error) {
       console.error('Venice NPC talk error:', error);
       const fallback = venice.getFallback(npcType);
-      this.send(new Messages.NpcTalkResponse(npcKind, fallback).serialize());
+      const audioUrl = await generateTTS(fallback);
+      this.send(new Messages.NpcTalkResponse(npcKind, fallback, audioUrl).serialize());
     }
   }
 
@@ -760,11 +781,11 @@ export class Player extends Character {
       );
 
       if (narration) {
-        console.log(`[Narrator] AI response: "${narration.text}"`);
-        this.send(new Messages.Narrator(narration.text, narration.style).serialize());
+        console.log(`[Narrator] AI response: "${narration.text}"${narration.audioUrl ? ' [with audio]' : ''}`);
+        this.send(new Messages.Narrator(narration.text, narration.style, narration.audioUrl).serialize());
         this.lastNarrationTime = now;
       } else {
-        // Fallback to static narration
+        // Fallback to static narration (no audio for fallbacks)
         const fallback = venice.getStaticNarration(event, this.name, details);
         console.log(`[Narrator] Using fallback: "${fallback.text}"`);
         this.send(new Messages.Narrator(fallback.text, fallback.style).serialize());
@@ -772,7 +793,7 @@ export class Player extends Character {
       }
     } catch (error) {
       console.error('[Narrator] Error:', error);
-      // Use static fallback on error
+      // Use static fallback on error (no audio for fallbacks)
       const fallback = venice.getStaticNarration(event, this.name, details);
       this.send(new Messages.Narrator(fallback.text, fallback.style).serialize());
     }

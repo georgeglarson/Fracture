@@ -15,7 +15,7 @@ import {World} from './world';
 import {Server} from './ws';
 import {Metrics} from './metrics';
 import {Player} from './player';
-import {initVeniceService} from './ai';
+import {initVeniceService, initFishAudioService} from './ai';
 
 // Server singleton - PID file to prevent multiple instances
 const PID_FILE = path.join(__dirname, '../../.server.pid');
@@ -109,6 +109,18 @@ function main(config) {
     } else {
         console.warn("[Venice] NO API KEY FOUND! Set VENICE_API_KEY in .env file");
         console.warn("[Venice] Checked: process.env.VENICE_API_KEY =", process.env.VENICE_API_KEY ? 'set' : 'undefined');
+    }
+
+    // Initialize Fish Audio TTS service if API key is configured
+    const fishAudioApiKey = process.env.FISH_AUDIO_API_KEY || config.fish_audio_api_key;
+    if (fishAudioApiKey) {
+        const maskedKey = fishAudioApiKey.substring(0, 4) + '...' + fishAudioApiKey.substring(fishAudioApiKey.length - 4);
+        console.info(`[FishAudio] API key found: ${maskedKey}`);
+        initFishAudioService({ apiKey: fishAudioApiKey });
+        console.info("[FishAudio] TTS service initialized");
+    } else {
+        console.warn("[FishAudio] NO API KEY FOUND! Set FISH_AUDIO_API_KEY in .env file");
+        console.warn("[FishAudio] NPC voice acting will be disabled");
     }
 
     server.onConnect(function(connection) {
