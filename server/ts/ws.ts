@@ -4,6 +4,7 @@ import * as http from 'http';
 import * as path from 'path';
 import * as _ from 'lodash';
 import {Utils} from './utils';
+import { getIntroService } from './ai/intro.service';
 
 /**
  * Get CORS origins from environment or use defaults
@@ -40,6 +41,9 @@ export class Server {
 
     const app = express();
 
+    // Parse JSON bodies for API endpoints
+    app.use(express.json());
+
     // Serve static client files from dist/client
     const clientPath = path.join(__dirname, '../../client');
     app.use(express.static(clientPath));
@@ -47,6 +51,38 @@ export class Server {
     // Serve TTS cache files
     const ttsPath = path.join(__dirname, '../../data/tts-cache');
     app.use('/tts', express.static(ttsPath));
+
+    // API: Generate intro story with TTS
+    app.post('/api/intro', async (req, res) => {
+      const { playerName } = req.body;
+      if (!playerName || typeof playerName !== 'string') {
+        return res.status(400).json({ error: 'playerName is required' });
+      }
+
+      const introService = getIntroService();
+      if (!introService) {
+        // Service not initialized, return static intro
+        return res.json({
+          story: 'Reality shattered, and the world we knew ceased to exist. Welcome to the Fracture.',
+          lines: ['Reality shattered, and the world we knew ceased to exist.', 'Welcome to the Fracture.'],
+          voiceName: 'The Narrator',
+          cached: false
+        });
+      }
+
+      try {
+        const result = await introService.generateIntro(playerName);
+        if (result) {
+          res.json(result);
+        } else {
+          // AI failed, return static fallback
+          res.json(introService.getStaticIntro(playerName));
+        }
+      } catch (error) {
+        console.error('[API] Intro generation error:', error);
+        res.json(introService.getStaticIntro(playerName));
+      }
+    });
 
     const server = http.createServer(app);
 

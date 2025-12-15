@@ -15,7 +15,8 @@ import {World} from './world';
 import {Server} from './ws';
 import {Metrics} from './metrics';
 import {Player} from './player';
-import {initVeniceService, initFishAudioService} from './ai';
+import {initVeniceService, initFishAudioService, getVeniceClient} from './ai';
+import {initIntroService} from './ai/intro.service';
 
 // Server singleton - PID file to prevent multiple instances
 const PID_FILE = path.join(__dirname, '../../.server.pid');
@@ -106,6 +107,13 @@ function main(config) {
             timeout: parseInt(process.env.VENICE_TIMEOUT || '') || config.venice_timeout || 5000
         });
         console.info("[Venice] AI service initialized");
+
+        // Initialize intro service (depends on Venice)
+        const veniceClient = getVeniceClient();
+        if (veniceClient) {
+            initIntroService(veniceClient);
+            console.info("[IntroService] Initialized");
+        }
     } else {
         console.warn("[Venice] NO API KEY FOUND! Set VENICE_API_KEY in .env file");
         console.warn("[Venice] Checked: process.env.VENICE_API_KEY =", process.env.VENICE_API_KEY ? 'set' : 'undefined');

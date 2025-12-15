@@ -1,0 +1,202 @@
+/**
+ * Intro Story Service - Generate unique intro narratives for new players
+ * Single Responsibility: Create AI-generated intro stories with TTS
+ */
+
+import { VeniceClient } from './venice-client';
+import { FishAudioService, getFishAudioService, VOICES } from './fish-audio.service';
+
+// Fixed lore points that AI must include (picked randomly for variety)
+const LORE_FRAGMENTS = {
+  theEvent: [
+    'The Fracture - a cataclysm that shattered reality itself',
+    'The day the world broke, when dimensions collided',
+    'The Great Sundering that tore the fabric of existence',
+    'When the barrier between worlds cracked like glass'
+  ],
+  theWorld: [
+    'scattered remnants of a once-whole realm',
+    'floating islands of broken reality',
+    'shards of different dimensions fused together',
+    'twisted landscapes where nothing is as it seems'
+  ],
+  theHope: [
+    'Yet heroes emerge from the chaos',
+    'But in the cracks, opportunity awaits',
+    'From destruction comes rebirth',
+    'And some see fortune in the ruins'
+  ],
+  theMystery: [
+    'No one knows what caused the Fracture',
+    'The truth lies buried in the broken world',
+    'Ancient powers stir in the fragments',
+    'Something waits beyond the shattered veil'
+  ]
+};
+
+// Narrator voice pool - pick randomly for variety
+const NARRATOR_VOICES = [
+  { id: VOICES.horror_narrator, name: 'The Dark One', style: 'ominous' },
+  { id: VOICES.marcus_worm, name: 'The Grim Chronicler', style: 'gritty' },
+  { id: VOICES.raiden_shogun, name: 'The Sovereign', style: 'commanding' },
+];
+
+export interface IntroStoryResult {
+  story: string;
+  lines: string[];
+  audioUrl?: string;
+  voiceName: string;
+  cached: boolean;
+}
+
+export class IntroService {
+  private client: VeniceClient;
+  private storyCache: Map<string, IntroStoryResult> = new Map();
+
+  constructor(client: VeniceClient) {
+    this.client = client;
+  }
+
+  /**
+   * Pick a random element from an array
+   */
+  private pick<T>(arr: T[]): T {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  /**
+   * Generate a unique intro story
+   */
+  async generateIntro(playerName: string): Promise<IntroStoryResult | null> {
+    // Pick random lore elements
+    const theEvent = this.pick(LORE_FRAGMENTS.theEvent);
+    const theWorld = this.pick(LORE_FRAGMENTS.theWorld);
+    const theHope = this.pick(LORE_FRAGMENTS.theHope);
+    const theMystery = this.pick(LORE_FRAGMENTS.theMystery);
+
+    // Pick random narrator voice
+    const narrator = this.pick(NARRATOR_VOICES);
+
+    const prompt = `You are a dramatic narrator introducing a player to the world of Fracture, a dark fantasy MMO.
+
+LORE REQUIREMENTS (you MUST weave these into your narration):
+- The Event: ${theEvent}
+- The World: ${theWorld}
+- The Hope: ${theHope}
+- The Mystery: ${theMystery}
+
+PLAYER: ${playerName}
+
+VOICE STYLE: You are "${narrator.name}" - speak in a ${narrator.style} manner.
+
+Write a compelling intro narration in EXACTLY 4 sentences:
+1. Describe the Fracture event dramatically
+2. Paint the broken world that resulted
+3. Hint at the mystery and danger
+4. Welcome/challenge the player by name
+
+RULES:
+- Each sentence should be 15-25 words
+- Be evocative and atmospheric
+- NO clichés like "long ago" or "once upon a time"
+- End with addressing the player directly
+- Do NOT use quotation marks
+- Make it feel like a movie trailer narration
+
+Output ONLY the 4 sentences, one per line.`;
+
+    try {
+      const response = await this.client.call(prompt);
+      if (!response) return null;
+
+      // Split into lines, clean up
+      const lines = response
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .slice(0, 4); // Ensure max 4 lines
+
+      if (lines.length < 2) {
+        console.warn('[IntroService] AI returned too few lines');
+        return null;
+      }
+
+      const story = lines.join(' ');
+
+      // Generate TTS
+      let audioUrl: string | undefined;
+      const fishAudio = getFishAudioService();
+      if (fishAudio) {
+        try {
+          const ttsResult = await fishAudio.generateIntroSpeech(story, narrator.id);
+          if (ttsResult) {
+            audioUrl = ttsResult.audioUrl;
+            console.log(`[IntroService] TTS generated with voice "${narrator.name}": ${audioUrl}`);
+          }
+        } catch (ttsError) {
+          console.warn('[IntroService] TTS generation failed:', ttsError);
+        }
+      }
+
+      return {
+        story,
+        lines,
+        audioUrl,
+        voiceName: narrator.name,
+        cached: false
+      };
+    } catch (error) {
+      console.error('[IntroService] Generation error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get a static fallback intro (when AI fails)
+   */
+  getStaticIntro(playerName: string): IntroStoryResult {
+    const narrator = this.pick(NARRATOR_VOICES);
+
+    const intros = [
+      [
+        'Reality shattered like a mirror struck by divine fury, and the world we knew ceased to exist.',
+        'Now only fragments remain - twisted shards of land floating in an endless void of possibility.',
+        'Ancient powers stir in the broken places, and something watches from beyond the cracks.',
+        `${playerName}, you awaken in this fractured realm, where every step writes your legend.`
+      ],
+      [
+        'They called it the Fracture - the moment when dimensions collided and existence itself screamed.',
+        'Mountains float beside oceans, forests grow sideways, and the laws of nature bend like reeds.',
+        'None remember what triggered the cataclysm, but the answers lie buried in the chaos.',
+        `Rise, ${playerName}, and carve your name into the bones of this broken world.`
+      ],
+      [
+        'When the barrier between worlds cracked, reality poured through like sand through fingers.',
+        'What remains is beautiful in its destruction - a kaleidoscope of shattered realities fused as one.',
+        'Danger lurks in every shadow, but so does opportunity for those brave enough to seize it.',
+        `Welcome to the Fracture, ${playerName}. Your story begins in the ruins of everything.`
+      ]
+    ];
+
+    const lines = this.pick(intros);
+
+    return {
+      story: lines.join(' '),
+      lines,
+      voiceName: narrator.name,
+      cached: false
+    };
+  }
+}
+
+// Singleton
+let introService: IntroService | null = null;
+
+export function initIntroService(client: VeniceClient): IntroService {
+  introService = new IntroService(client);
+  return introService;
+}
+
+export function getIntroService(): IntroService | null {
+  return introService;
+}

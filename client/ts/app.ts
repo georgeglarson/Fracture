@@ -1,6 +1,7 @@
 import {Storage} from './utils/storage';
 import {Config} from './config';
 import * as _ from 'lodash';
+import {IntroSequence} from './ui/intro-sequence';
 
 export class App {
 
@@ -19,6 +20,7 @@ export class App {
   isDesktop;
   supportsWorkers;
   messageTimer;
+  introSequence: IntroSequence;
 
   constructor() {
     this.blinkInterval = null;
@@ -29,6 +31,7 @@ export class App {
     this.watchNameInputInterval = setInterval(this.toggleButton.bind(this), 100);
     this.$playButton = $('.play'),
       this.$playDiv = $('.play div');
+    this.introSequence = new IntroSequence();
   }
 
   setGame(game) {
@@ -83,12 +86,53 @@ export class App {
     }
   }
 
-  startGame(username, password, starting_callback) {
+  async startGame(username, password, starting_callback) {
     var self = this;
 
     if (starting_callback) {
       starting_callback();
     }
+
+    // Check if this is first time playing - show intro if so
+    const isFirstTime = !this.storage.hasAlreadyPlayed();
+
+    if (isFirstTime) {
+      // Fetch and play intro sequence
+      try {
+        const introData = await this.introSequence.fetchIntro(username);
+        if (introData) {
+          // Set up callbacks
+          this.introSequence.setCallbacks({
+            onComplete: () => {
+              self.proceedToGame(username, password);
+            },
+            onSkip: () => {
+              self.proceedToGame(username, password);
+            }
+          });
+
+          // Hide the login UI first
+          this.hideIntro(() => {});
+
+          // Play the intro
+          await this.introSequence.play(introData);
+          return;
+        }
+      } catch (error) {
+        console.warn('[App] Intro sequence failed, proceeding to game:', error);
+      }
+    }
+
+    // No intro or intro failed - proceed directly
+    this.proceedToGame(username, password);
+  }
+
+  /**
+   * Proceed to game after intro (or if skipped)
+   */
+  private proceedToGame(username: string, password: string): void {
+    var self = this;
+
     this.hideIntro(function () {
       if (!self.isDesktop) {
         // On mobile and tablet we load the map after the player has clicked

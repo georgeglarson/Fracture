@@ -280,6 +280,10 @@ export function getVeniceService(): VeniceService | null {
   return veniceService;
 }
 
+export function getVeniceClient(): VeniceClient | null {
+  return veniceService?.getServices().client || null;
+}
+
 // Re-export types for convenience
 export { NarrationResult } from './narrator.service';
 export { NewspaperResult, QuickStats } from './news.service';

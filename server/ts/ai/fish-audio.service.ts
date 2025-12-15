@@ -154,6 +154,13 @@ export class FishAudioService {
   }
 
   /**
+   * Convert text to speech for intro narration (uses specific voice ID)
+   */
+  async generateIntroSpeech(text: string, voiceId: string): Promise<TTSResult | null> {
+    return this.generateSpeech(text, voiceId, 'intro');
+  }
+
+  /**
    * Internal method to generate speech with any voice
    */
   private async generateSpeech(text: string, voiceId: string, context: string): Promise<TTSResult | null> {
