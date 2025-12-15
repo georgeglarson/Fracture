@@ -2,6 +2,7 @@ import {App} from './app';
 import {Game} from './game';
 import {Detect} from './utils/detect';
 import {VolumeUI} from './ui/volume-ui';
+import {TitleAnimation} from './ui/title-animation';
 import * as _ from 'lodash';
 
 
@@ -12,6 +13,10 @@ var initApp = function () {
   $(function () {
     app = new App();
     app.center();
+
+    // Initialize cinematic title animation
+    const titleAnim = new TitleAnimation();
+    titleAnim.init().catch(err => console.warn('[TitleAnimation] Error:', err));
 
     if (Detect.isWindows()) {
       // Workaround for graphical glitches on text

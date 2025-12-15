@@ -767,7 +767,7 @@ footer, header, hgroup, menu, nav, section {
 		
 		
 		/*Bubbles*/
-		#bubbles {width:1440px;height:672px;margin-bottom:-672px;position:relative;top:-672px;pointer-events:none;}
+		#bubbles {width:100vw;height:100vh;position:fixed;top:0;left:0;pointer-events:none;z-index:10;}
 		p {font-family:arial, sans-serif;font-size:12px;margin:0;padding:12px 0}
 	    .bubble p {font-family:"GraphicPixel"; font-size:18px;line-height:24px;}
 	    
@@ -929,7 +929,7 @@ footer, header, hgroup, menu, nav, section {
 		#respawn:active {background-position:-250px -952px;}
 		
 		/*Bubbles*/
-		#bubbles {width:960px;height:448px;margin-bottom:-448px;position:relative;top:-448px;pointer-events:none;}
+		#bubbles {width:100vw;height:100vh;position:fixed;top:0;left:0;pointer-events:none;z-index:10;}
 		p {font-family:arial, sans-serif;font-size:12px;margin:0;padding:0;line-height:35px;}
 	    .bubble p {font-family:"GraphicPixel"; font-size:14px;}
 
@@ -1092,7 +1092,7 @@ footer, header, hgroup, menu, nav, section {
 		#respawn:active {background-position:-250px -952px;}
 		
         /*Bubbles*/
-		#bubbles {width:960px;height:448px;margin-bottom:-448px;position:relative;top:-448px;pointer-events:none;}
+		#bubbles {width:100vw;height:100vh;position:fixed;top:0;left:0;pointer-events:none;z-index:10;}
 		p {font-family:arial, sans-serif;font-size:12px;margin:0;padding:0;}
 	    .bubble p {font-family:"GraphicPixel"; font-size:14px;line-height:35px;}
 
@@ -1254,7 +1254,7 @@ footer, header, hgroup, menu, nav, section {
 		#respawn:active {background-position:-125px -476px;}
 		
 		/*Bubbles*/
-		#bubbles {width:480px;height:224px;margin-bottom:-224px;position:relative;top:-224px;pointer-events:none;}
+		#bubbles {width:100vw;height:100vh;position:fixed;top:0;left:0;pointer-events:none;z-index:10;}
 		p {font-family:arial, sans-serif;font-size:12px;margin:0;padding:0;line-height:35px;}
 	    .bubble p {font-family:"GraphicPixel"; font-size:10px;}
 	    

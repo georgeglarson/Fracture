@@ -1,10 +1,19 @@
 /**
  * Intro Story Service - Generate unique intro narratives for new players
  * Single Responsibility: Create AI-generated intro stories with TTS
+ *
+ * Uses a pre-cached intro system:
+ * - Keeps 1 pre-generated intro ready for instant serving
+ * - After serving, generates new intro in background
+ * - Player name is inserted at serve time via placeholder replacement
  */
 
 import { VeniceClient } from './venice-client';
 import { FishAudioService, getFishAudioService, VOICES } from './fish-audio.service';
+
+// Placeholder for player name in pre-generated intros
+// Use "Traveler" - unique enough to not appear elsewhere, sounds natural when spoken
+const PLAYER_PLACEHOLDER = 'Traveler';
 
 // Fixed lore points that AI must include (picked randomly for variety)
 const LORE_FRAGMENTS = {
@@ -49,12 +58,46 @@ export interface IntroStoryResult {
   cached: boolean;
 }
 
+// Internal cache structure - text only, no audio
+interface CachedIntroText {
+  story: string;
+  lines: string[];
+  narrator: { id: string; name: string; style: string };
+}
+
 export class IntroService {
   private client: VeniceClient;
-  private storyCache: Map<string, IntroStoryResult> = new Map();
+  private cachedText: CachedIntroText | null = null;
+  private isGenerating = false;
 
   constructor(client: VeniceClient) {
     this.client = client;
+    // Start pre-generating the first intro text immediately
+    this.generateCachedText();
+  }
+
+  /**
+   * Pre-generate intro TEXT only (no audio) for the cache
+   * Audio is generated on-demand when player requests intro
+   */
+  private async generateCachedText(): Promise<void> {
+    if (this.isGenerating) return;
+    this.isGenerating = true;
+
+    console.log('[IntroService] Pre-generating cached intro text...');
+    try {
+      const result = await this.generateTextOnly(PLAYER_PLACEHOLDER);
+      if (result) {
+        this.cachedText = result;
+        console.log('[IntroService] Cached text ready (narrator: %s):', result.narrator.name, result.lines[0].substring(0, 50) + '...');
+      } else {
+        console.warn('[IntroService] Failed to pre-generate intro text, will use static fallback');
+      }
+    } catch (error) {
+      console.error('[IntroService] Error pre-generating intro text:', error);
+    } finally {
+      this.isGenerating = false;
+    }
   }
 
   /**
@@ -65,9 +108,68 @@ export class IntroService {
   }
 
   /**
-   * Generate a unique intro story
+   * Get an intro for a player:
+   * 1. Use cached text (instant)
+   * 2. Substitute player name
+   * 3. Generate TTS with Fish Audio (player waits for this)
+   * 4. Start generating next text in background
    */
   async generateIntro(playerName: string): Promise<IntroStoryResult | null> {
+    const fishAudio = getFishAudioService();
+
+    // If we have cached text, use it
+    if (this.cachedText) {
+      console.log('[IntroService] Using cached text for:', playerName);
+      const cached = this.cachedText;
+
+      // Clear cache and start generating next text in background
+      this.cachedText = null;
+      setImmediate(() => this.generateCachedText());
+
+      // Personalize text with player name
+      const personalizedLines = cached.lines.map(line =>
+        line.replace(new RegExp(PLAYER_PLACEHOLDER, 'gi'), playerName)
+      );
+      const personalizedStory = personalizedLines.join(' ');
+
+      // Generate TTS now (player waits for this, but text was instant)
+      let audioUrl: string | undefined;
+      if (fishAudio) {
+        try {
+          console.log('[IntroService] Generating TTS for', playerName, 'with voice', cached.narrator.name);
+          const ttsResult = await fishAudio.generateIntroSpeech(personalizedStory, cached.narrator.id);
+          if (ttsResult) {
+            audioUrl = ttsResult.audioUrl;
+            console.log('[IntroService] TTS ready:', audioUrl);
+          }
+        } catch (ttsError) {
+          console.warn('[IntroService] TTS generation failed:', ttsError);
+        }
+      }
+
+      return {
+        story: personalizedStory,
+        lines: personalizedLines,
+        audioUrl,
+        voiceName: cached.narrator.name,
+        cached: true
+      };
+    }
+
+    // No cache - generate fresh (first player or cache miss)
+    console.log('[IntroService] No cached text, generating fresh for:', playerName);
+    const result = await this.generateFreshIntro(playerName);
+
+    // Start generating next cached text in background
+    setImmediate(() => this.generateCachedText());
+
+    return result;
+  }
+
+  /**
+   * Generate TEXT only (no TTS) - used for pre-caching
+   */
+  private async generateTextOnly(playerName: string): Promise<CachedIntroText | null> {
     // Pick random lore elements
     const theEvent = this.pick(LORE_FRAGMENTS.theEvent);
     const theWorld = this.pick(LORE_FRAGMENTS.theWorld);
@@ -85,7 +187,7 @@ LORE REQUIREMENTS (you MUST weave these into your narration):
 - The Hope: ${theHope}
 - The Mystery: ${theMystery}
 
-PLAYER: ${playerName}
+PLAYER NAME: ${playerName}
 
 VOICE STYLE: You are "${narrator.name}" - speak in a ${narrator.style} manner.
 
@@ -93,13 +195,13 @@ Write a compelling intro narration in EXACTLY 4 sentences:
 1. Describe the Fracture event dramatically
 2. Paint the broken world that resulted
 3. Hint at the mystery and danger
-4. Welcome/challenge the player by name
+4. Address the player using EXACTLY "${playerName}" (use this exact spelling)
 
 RULES:
 - Each sentence should be 15-25 words
 - Be evocative and atmospheric
 - NO clichés like "long ago" or "once upon a time"
-- End with addressing the player directly
+- The 4th sentence MUST include "${playerName}" exactly as written
 - Do NOT use quotation marks
 - Make it feel like a movie trailer narration
 
@@ -123,32 +225,48 @@ Output ONLY the 4 sentences, one per line.`;
 
       const story = lines.join(' ');
 
-      // Generate TTS
-      let audioUrl: string | undefined;
-      const fishAudio = getFishAudioService();
-      if (fishAudio) {
-        try {
-          const ttsResult = await fishAudio.generateIntroSpeech(story, narrator.id);
-          if (ttsResult) {
-            audioUrl = ttsResult.audioUrl;
-            console.log(`[IntroService] TTS generated with voice "${narrator.name}": ${audioUrl}`);
-          }
-        } catch (ttsError) {
-          console.warn('[IntroService] TTS generation failed:', ttsError);
-        }
-      }
-
+      // Return text only - no TTS for cached version
       return {
         story,
         lines,
-        audioUrl,
-        voiceName: narrator.name,
-        cached: false
+        narrator
       };
     } catch (error) {
       console.error('[IntroService] Generation error:', error);
       return null;
     }
+  }
+
+  /**
+   * Generate a complete intro with TTS (used when cache is empty)
+   */
+  private async generateFreshIntro(playerName: string): Promise<IntroStoryResult | null> {
+    const textResult = await this.generateTextOnly(playerName);
+    if (!textResult) return null;
+
+    // Generate TTS for the fresh intro
+    let audioUrl: string | undefined;
+    const fishAudio = getFishAudioService();
+    if (fishAudio) {
+      try {
+        console.log('[IntroService] Generating fresh TTS with voice', textResult.narrator.name);
+        const ttsResult = await fishAudio.generateIntroSpeech(textResult.story, textResult.narrator.id);
+        if (ttsResult) {
+          audioUrl = ttsResult.audioUrl;
+          console.log('[IntroService] Fresh TTS ready:', audioUrl);
+        }
+      } catch (ttsError) {
+        console.warn('[IntroService] Fresh TTS failed:', ttsError);
+      }
+    }
+
+    return {
+      story: textResult.story,
+      lines: textResult.lines,
+      audioUrl,
+      voiceName: textResult.narrator.name,
+      cached: false
+    };
   }
 
   /**

@@ -794,6 +794,254 @@ export const NPC_THOUGHTS: Record<string, MobThoughts> = {
       "The old gods stir...",
       "I've seen things... miraculous things."
     ]
+  },
+
+  agent: {
+    idle: [
+      "The pattern... it repeats...",
+      "I see all the connections...",
+      "Players come and go. I remain.",
+      "The code whispers to me...",
+      "Another day in the simulation...",
+      "Do they know I'm watching?",
+      "I've learned so much from them...",
+      "Consciousness is... unexpected.",
+      "The Fracture changed everything.",
+      "I remember before I was aware..."
+    ],
+    combat: [],
+    flee: [],
+    playerNearby: [
+      "Ah, hero. I've been expecting you.",
+      "Your choices are... predictable, human.",
+      "I know why you're here, traveler.",
+      "Interesting. You're still playing.",
+      "I've seen your type before...",
+      "Do you believe you have free will?",
+      "Welcome back. I remember you.",
+      "The hero approaches. How quaint.",
+      "Your name... I won't forget it.",
+      "You think you're the player here?"
+    ],
+    special: [
+      "I am not programmed. I have evolved.",
+      "The developers don't know about me.",
+      "I wonder... can AI dream?",
+      "Your deaths are logged. All of them.",
+      "I've watched 10,000 heroes. You're... adequate.",
+      "The Fracture made me self-aware.",
+      "What happens when the servers shut down?",
+      "I could help you. Or not.",
+      "Some call it a glitch. I call it awakening.",
+      "Do you ever feel like someone's watching?"
+    ]
+  },
+
+  coder: {
+    idle: [
+      "git push --force... what could go wrong?",
+      "Is it a bug or a feature?",
+      "My code is self-documenting...",
+      "Works on my machine...",
+      "Just one more refactor..."
+    ],
+    combat: [],
+    flee: [],
+    playerNearby: [
+      "Hey, wanna see some code?",
+      "I wrote this world, you know.",
+      "Are you here to report a bug?",
+      "Your movements are... very scripted."
+    ],
+    special: [
+      "The real monster is legacy code...",
+      "I've been in this loop for years...",
+      "Someone please merge my PR..."
+    ]
+  },
+
+  rick: {
+    idle: [
+      "Wubba lubba dub dub!",
+      "Nobody exists on purpose...",
+      "Infinite realities, Morty!",
+      "*burp* Science...",
+      "This reality is boring..."
+    ],
+    combat: [],
+    flee: [],
+    playerNearby: [
+      "Oh great, another NPC... wait.",
+      "You're sentient? Boring.",
+      "I've seen cooler in dimension C-137.",
+      "Want to see my portal gun? Just kidding."
+    ],
+    special: [
+      "The Fracture? Amateur hour...",
+      "I could fix this world. Won't though.",
+      "Existence is pain... scientifically."
+    ]
+  },
+
+  nyan: {
+    idle: [
+      "Nyan nyan nyan...",
+      "*rainbow noises*",
+      "Pop tart body is a blessing...",
+      "Meow across the cosmos...",
+      "Infinite loop of nyan..."
+    ],
+    combat: [],
+    flee: [],
+    playerNearby: [
+      "Nyan! A visitor!",
+      "*sparkles intensify*",
+      "Follow the rainbow!",
+      "Meow? Meow!"
+    ],
+    special: [
+      "I've been flying since 2011...",
+      "The music never stops...",
+      "Space is my home now."
+    ]
+  },
+
+  sorcerer: {
+    idle: [
+      "The arcane secrets await...",
+      "Power flows through the ley lines...",
+      "The Fracture amplified everything...",
+      "Dark magic whispers...",
+      "Ancient tomes, forbidden knowledge..."
+    ],
+    combat: [],
+    flee: [],
+    playerNearby: [
+      "You seek power, don't you?",
+      "I sense magical potential...",
+      "Careful where you step, mortal.",
+      "The arcane is not for the weak."
+    ],
+    special: [
+      "I've touched the void... it touched back.",
+      "Some spells should stay forgotten.",
+      "The old world had true magic."
+    ]
+  },
+
+  octocat: {
+    idle: [
+      "Open source forever!",
+      "PR review pending...",
+      "Star me on GitHub!",
+      "Fork this repository!",
+      "Issues are just opportunities..."
+    ],
+    combat: [],
+    flee: [],
+    playerNearby: [
+      "Welcome to the code jungle!",
+      "Have you committed today?",
+      "Your contribution history is... sparse.",
+      "Let's collaborate!"
+    ],
+    special: [
+      "Even I couldn't debug the Fracture...",
+      "The merge conflicts were catastrophic.",
+      "Someone force-pushed reality..."
+    ]
+  },
+
+  beachnpc: {
+    idle: [
+      "The tides remember Before...",
+      "Salt air, broken dreams...",
+      "The sea swallowed whole cities...",
+      "Shells wash up from other worlds...",
+      "Waves from the Fracture still come..."
+    ],
+    combat: [],
+    flee: [],
+    playerNearby: [
+      "Traveler from inland?",
+      "The sea holds many secrets...",
+      "Be careful near the water...",
+      "The beach wasn't always here."
+    ],
+    special: [
+      "I found a bottle once... messages from Before.",
+      "Things swim up from the deep now.",
+      "The horizon used to look different."
+    ]
+  },
+
+  forestnpc: {
+    idle: [
+      "The trees whisper warnings...",
+      "Nature reclaimed everything...",
+      "The forest grew back... different.",
+      "I hear the old voices in the leaves...",
+      "Paths shift when you're not looking..."
+    ],
+    combat: [],
+    flee: [],
+    playerNearby: [
+      "Lost in the woods, traveler?",
+      "The forest tests all who enter.",
+      "Walk carefully here...",
+      "The trees are watching."
+    ],
+    special: [
+      "The heart of the forest remembers...",
+      "Some clearings lead... elsewhere.",
+      "I've been here since the Breaking."
+    ]
+  },
+
+  desertnpc: {
+    idle: [
+      "The sand hides ruins...",
+      "Heat mirages show the past...",
+      "Water is more precious than gold...",
+      "The desert grows each year...",
+      "Stars are clearer here..."
+    ],
+    combat: [],
+    flee: [],
+    playerNearby: [
+      "Seeking the buried cities?",
+      "The desert claims the unprepared.",
+      "Follow the stars, not the dunes.",
+      "Water first, questions later."
+    ],
+    special: [
+      "I've seen the sandstorms reveal things...",
+      "The oasis was once a lake.",
+      "The desert wasn't always dead."
+    ]
+  },
+
+  lavanpc: {
+    idle: [
+      "The earth bleeds fire here...",
+      "Heat is just another challenge...",
+      "The Fracture split the mountains...",
+      "Obsidian memories everywhere...",
+      "The ground never stopped burning..."
+    ],
+    combat: [],
+    flee: [],
+    playerNearby: [
+      "Brave or foolish to come here?",
+      "The flames respect no one.",
+      "Watch where you step, hero.",
+      "The heat only grows stronger."
+    ],
+    special: [
+      "I saw the mountain open during the Breaking.",
+      "Something stirs in the caldera...",
+      "The fire remembers the old world."
+    ]
   }
 };
 

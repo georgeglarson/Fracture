@@ -66,13 +66,14 @@ export class IntroSequence {
     this.isPlaying = true;
     this.lines = data.lines;
     this.currentLineIndex = 0;
+    this.audioFinished = null;
 
     // Create the overlay
     this.createOverlay(data);
 
-    // Start audio if available
+    // Start audio if available (store promise to wait for it later)
     if (data.audioUrl) {
-      this.playAudio(data.audioUrl);
+      this.audioFinished = this.playAudio(data.audioUrl);
     }
 
     // Animate the intro
@@ -251,15 +252,33 @@ export class IntroSequence {
   }
 
   /**
-   * Play TTS audio
+   * Play TTS audio and return a promise that resolves when done
    */
-  private playAudio(url: string): void {
-    this.audio = new Audio(url);
-    this.audio.volume = 0.8;
-    this.audio.play().catch(err => {
-      console.warn('[IntroSequence] Audio playback failed:', err);
+  private playAudio(url: string): Promise<void> {
+    return new Promise((resolve) => {
+      this.audio = new Audio(url);
+      this.audio.volume = 0.8;
+
+      // Resolve when audio ends
+      this.audio.addEventListener('ended', () => {
+        console.log('[IntroSequence] Audio finished playing');
+        resolve();
+      });
+
+      // Also resolve on error so we don't hang
+      this.audio.addEventListener('error', () => {
+        console.warn('[IntroSequence] Audio error, continuing');
+        resolve();
+      });
+
+      this.audio.play().catch(err => {
+        console.warn('[IntroSequence] Audio playback failed:', err);
+        resolve();
+      });
     });
   }
+
+  private audioFinished: Promise<void> | null = null;
 
   /**
    * Animate the intro sequence using anime.js
@@ -352,8 +371,15 @@ export class IntroSequence {
       this.skipButton.style.opacity = '1';
     }
 
-    // Auto-continue after a delay
-    await this.delay(3000);
+    // Wait for audio to finish before auto-completing
+    if (this.audioFinished) {
+      console.log('[IntroSequence] Waiting for audio to finish...');
+      await this.audioFinished;
+    }
+
+    // Small grace period after audio ends
+    await this.delay(1500);
+
     if (this.isPlaying) {
       this.complete();
     }
@@ -391,7 +417,12 @@ export class IntroSequence {
       this.skipButton.style.opacity = '1';
     }
 
-    await this.delay(3000);
+    // Wait for audio to finish before auto-completing
+    if (this.audioFinished) {
+      await this.audioFinished;
+    }
+
+    await this.delay(1500);
     if (this.isPlaying) {
       this.complete();
     }
@@ -427,7 +458,7 @@ export class IntroSequence {
   }
 
   /**
-   * Complete the intro
+   * Complete the intro with fracture effect
    */
   private complete(): void {
     if (!this.isPlaying) return;
@@ -438,8 +469,14 @@ export class IntroSequence {
       this.audio = null;
     }
 
-    // Fade out
-    if (this.overlay) {
+    // Try to use fracture effect with anime.js, fall back to simple fade
+    const animeAvailable = typeof (window as any).anime !== 'undefined' &&
+                           typeof (window as any).anime.animate === 'function';
+
+    if (this.overlay && animeAvailable) {
+      this.fractureComplete();
+    } else if (this.overlay) {
+      // Simple fade fallback
       this.overlay.style.transition = 'opacity 0.8s ease';
       this.overlay.style.opacity = '0';
       setTimeout(() => {
@@ -454,6 +491,160 @@ export class IntroSequence {
         this.callbacks.onComplete();
       }
     }
+  }
+
+  /**
+   * Create dramatic fracture/shatter effect for outro
+   */
+  private fractureComplete(): void {
+    if (!this.overlay) return;
+
+    const animeLib = (window as any).anime;
+
+    // Create fragment container
+    const fragmentContainer = document.createElement('div');
+    fragmentContainer.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 100001;
+      pointer-events: none;
+      perspective: 1000px;
+    `;
+    document.body.appendChild(fragmentContainer);
+
+    // Hide original content but keep background for fragments
+    const title = this.overlay.querySelector('.intro-title') as HTMLElement;
+    const lines = this.overlay.querySelectorAll('.intro-line');
+    const narrator = this.overlay.querySelector('.intro-narrator') as HTMLElement;
+
+    // Fade out text first
+    [title, ...Array.from(lines), narrator].forEach(el => {
+      if (el) (el as HTMLElement).style.opacity = '0';
+    });
+
+    // Create shattered glass fragments
+    const cols = 8;
+    const rows = 6;
+    const fragmentWidth = window.innerWidth / cols;
+    const fragmentHeight = window.innerHeight / rows;
+
+    const fragments: HTMLDivElement[] = [];
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const fragment = document.createElement('div');
+        const x = col * fragmentWidth;
+        const y = row * fragmentHeight;
+
+        // Add slight randomness to fragment size for more natural look
+        const widthVariance = (Math.random() - 0.5) * 20;
+        const heightVariance = (Math.random() - 0.5) * 20;
+
+        fragment.style.cssText = `
+          position: absolute;
+          left: ${x}px;
+          top: ${y}px;
+          width: ${fragmentWidth + widthVariance}px;
+          height: ${fragmentHeight + heightVariance}px;
+          background: linear-gradient(180deg, #0a0a12 0%, #1a1a2e 50%, #0a0a12 100%);
+          box-shadow: 0 0 20px rgba(97, 195, 255, 0.3), inset 0 0 30px rgba(0,0,0,0.5);
+          border: 1px solid rgba(97, 195, 255, 0.2);
+          transform-origin: center center;
+          backface-visibility: hidden;
+        `;
+
+        // Add crack line effect on some fragments
+        if (Math.random() > 0.6) {
+          const crackAngle = Math.random() * 180;
+          fragment.innerHTML = `<div style="
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+            top: 50%;
+            transform: rotate(${crackAngle}deg);
+          "></div>`;
+        }
+
+        fragmentContainer.appendChild(fragment);
+        fragments.push(fragment);
+      }
+    }
+
+    // Flash effect
+    const flash = document.createElement('div');
+    flash.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      z-index: 100002;
+      opacity: 0;
+      pointer-events: none;
+    `;
+    document.body.appendChild(flash);
+
+    // Hide original overlay
+    this.overlay.style.opacity = '0';
+
+    // Animate flash
+    animeLib.animate(flash, {
+      opacity: [0, 0.8, 0],
+      duration: 400,
+      ease: 'outQuad',
+      complete: () => flash.remove()
+    });
+
+    // Animate each fragment shattering outward
+    fragments.forEach((fragment, i) => {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+
+      // Calculate direction from center
+      const centerX = cols / 2;
+      const centerY = rows / 2;
+      const dirX = (col - centerX) / centerX;
+      const dirY = (row - centerY) / centerY;
+
+      // Random variations
+      const randomX = (Math.random() - 0.5) * 400;
+      const randomY = (Math.random() - 0.5) * 400;
+      const randomRotateX = (Math.random() - 0.5) * 180;
+      const randomRotateY = (Math.random() - 0.5) * 180;
+      const randomRotateZ = (Math.random() - 0.5) * 90;
+
+      // Delay based on distance from center (center breaks first)
+      const distance = Math.sqrt(dirX * dirX + dirY * dirY);
+      const delay = distance * 100;
+
+      animeLib.animate(fragment, {
+        translateX: dirX * 600 + randomX,
+        translateY: dirY * 400 + randomY + 200, // Slight downward bias
+        translateZ: -200 - Math.random() * 300,
+        rotateX: randomRotateX,
+        rotateY: randomRotateY,
+        rotateZ: randomRotateZ,
+        opacity: [1, 0],
+        scale: [1, 0.5 + Math.random() * 0.5],
+        duration: 1200 + Math.random() * 400,
+        delay: delay,
+        ease: 'outExpo'
+      });
+    });
+
+    // Cleanup after animation
+    setTimeout(() => {
+      fragmentContainer.remove();
+      this.cleanup();
+      if (this.callbacks?.onComplete) {
+        this.callbacks.onComplete();
+      }
+    }, 1800);
   }
 
   /**

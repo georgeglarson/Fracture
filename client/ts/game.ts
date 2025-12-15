@@ -1684,12 +1684,13 @@ export class Game {
       }
 
       var s = this.renderer.scale,
-        t = 16 * s, // tile size
-        x = ((character.x - this.camera.x) * s),
+        t = 16 * s, // tile size in canvas buffer pixels
+        // Calculate position in canvas buffer coordinates
+        bufferX = ((character.x - this.camera.x) * s),
+        bufferY = ((character.y - this.camera.y) * s),
         w = parseInt(bubble.element.css('width')) + 24,
         offset = (w / 2) - (t / 2),
-        offsetY,
-        y;
+        offsetY;
 
       if (character instanceof Npc) {
         offsetY = 0;
@@ -1705,13 +1706,23 @@ export class Game {
         }
       }
 
-      y = ((character.y - this.camera.y) * s) - (t * 1.25) - offsetY;
+      // Apply vertical offset for bubble placement above character head
+      bufferY = bufferY - (t * 1.25) - offsetY;
 
-      // Additional bounds check - ensure bubble stays within viewport
-      const viewportHeight = this.renderer.canvas.height;
-      const viewportWidth = this.renderer.canvas.width;
+      // Scale from canvas buffer coordinates to viewport coordinates
+      // Canvas is stretched from buffer size to viewport size via CSS
+      const canvasWidth = this.renderer.canvas.width;
+      const canvasHeight = this.renderer.canvas.height;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
 
-      // If y would place bubble off-screen (negative or too low), hide it
+      const scaleX = viewportWidth / canvasWidth;
+      const scaleY = viewportHeight / canvasHeight;
+
+      const x = (bufferX - offset) * scaleX;
+      const y = bufferY * scaleY;
+
+      // Bounds check - ensure bubble stays within viewport
       if (y < -50 || y > viewportHeight) {
         bubble.element.css('display', 'none');
         return;
@@ -1719,7 +1730,7 @@ export class Game {
 
       // Show bubble and position it
       bubble.element.css('display', 'block');
-      bubble.element.css('left', x - offset + 'px');
+      bubble.element.css('left', x + 'px');
       bubble.element.css('top', y + 'px');
     }
   }

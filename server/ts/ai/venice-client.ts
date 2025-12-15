@@ -22,14 +22,15 @@ export class VeniceClient {
   }
 
   /**
-   * Make a call to the Venice AI API
+   * Make a call to the Venice AI API with timeout
    * @param prompt - The prompt to send
    * @param maxTokens - Maximum tokens in response (default 100)
-   * @returns The response text or null on error
+   * @returns The response text or null on error/timeout
    */
   async call(prompt: string, maxTokens: number = 100): Promise<string | null> {
     try {
-      const response = await this.venice.chat.completions.create({
+      // Wrap API call with timeout
+      const apiCall = this.venice.chat.completions.create({
         model: this.model,
         messages: [{ role: 'user', content: prompt }],
         max_tokens: maxTokens,
@@ -37,13 +38,19 @@ export class VeniceClient {
         stream: false
       });
 
-      const content = (response as any).choices?.[0]?.message?.content;
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        setTimeout(() => reject(new Error(`Venice API timeout after ${this.timeout}ms`)), this.timeout);
+      });
+
+      const response = await Promise.race([apiCall, timeoutPromise]);
+
+      const content = (response as any)?.choices?.[0]?.message?.content;
       if (content) {
         return this.cleanResponse(content);
       }
       return null;
-    } catch (error) {
-      console.error('Venice API error:', error);
+    } catch (error: any) {
+      console.error('Venice API error:', error.message || error);
       return null;
     }
   }

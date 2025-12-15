@@ -859,45 +859,76 @@ export class Renderer {
     this.context.save();
     this.context.globalAlpha = alpha;
 
-    // Style based on state
-    let color = '#c0c0c0';  // Default light grey for idle
+    // Style based on state - using high contrast colors for readability
+    let bgColor = 'rgba(30, 30, 40, 0.85)';  // Dark background
+    let textColor = '#ffffff';  // White text by default
+    let borderColor = 'rgba(100, 100, 120, 0.8)';  // Subtle border
+
     if (entity.thoughtState === 'combat') {
-      color = '#ff6666';  // Red for combat
+      bgColor = 'rgba(60, 20, 20, 0.9)';
+      textColor = '#ffcccc';  // Light pink - much easier to read than red
+      borderColor = 'rgba(150, 80, 80, 0.8)';
     } else if (entity.thoughtState === 'playerNearby') {
-      color = '#ffdd77';  // Brighter yellow when player nearby
+      bgColor = 'rgba(40, 40, 20, 0.9)';
+      textColor = '#ffffdd';  // Light cream - easier on eyes than yellow
+      borderColor = 'rgba(120, 120, 80, 0.8)';
     } else if (entity.thoughtState === 'special') {
-      color = '#dd99ff';  // Brighter purple for special thoughts
+      bgColor = 'rgba(40, 25, 50, 0.9)';
+      textColor = '#eeddff';  // Light lavender
+      borderColor = 'rgba(120, 100, 140, 0.8)';
     }
 
     // Position above the entity (higher than names)
     const x = (entity.x + 8) * this.scale;
     const y = (entity.y - 10) * this.scale;  // Above the entity
 
-    // Set up font for measurement and drawing
-    this.context.font = 'italic 14px GraphicPixel';
+    // Set up font - using clean sans-serif for readability
+    const fontSize = 13;
+    this.context.font = `italic ${fontSize}px Arial, sans-serif`;
     this.context.textAlign = 'center';
+    this.context.textBaseline = 'middle';
 
     // Measure text for background
     const text = entity.currentThought;
     const metrics = this.context.measureText(text);
     const textWidth = metrics.width;
-    const textHeight = 14;  // Approximate height based on font size
-    const padding = 4;
+    const textHeight = fontSize;
+    const paddingX = 8;
+    const paddingY = 5;
+    const cornerRadius = 6;
 
-    // Draw semi-transparent dark background
-    this.context.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    this.context.fillRect(
-      x - textWidth / 2 - padding,
-      y - textHeight + 2,
-      textWidth + padding * 2,
-      textHeight + padding
-    );
+    // Background dimensions
+    const bgX = x - textWidth / 2 - paddingX;
+    const bgY = y - textHeight / 2 - paddingY;
+    const bgWidth = textWidth + paddingX * 2;
+    const bgHeight = textHeight + paddingY * 2;
 
-    // Draw thought text
-    this.context.fillStyle = color;
-    this.context.strokeStyle = '#000000';
+    // Draw rounded rectangle background
+    this.context.beginPath();
+    this.context.moveTo(bgX + cornerRadius, bgY);
+    this.context.lineTo(bgX + bgWidth - cornerRadius, bgY);
+    this.context.quadraticCurveTo(bgX + bgWidth, bgY, bgX + bgWidth, bgY + cornerRadius);
+    this.context.lineTo(bgX + bgWidth, bgY + bgHeight - cornerRadius);
+    this.context.quadraticCurveTo(bgX + bgWidth, bgY + bgHeight, bgX + bgWidth - cornerRadius, bgY + bgHeight);
+    this.context.lineTo(bgX + cornerRadius, bgY + bgHeight);
+    this.context.quadraticCurveTo(bgX, bgY + bgHeight, bgX, bgY + bgHeight - cornerRadius);
+    this.context.lineTo(bgX, bgY + cornerRadius);
+    this.context.quadraticCurveTo(bgX, bgY, bgX + cornerRadius, bgY);
+    this.context.closePath();
+
+    // Fill background
+    this.context.fillStyle = bgColor;
+    this.context.fill();
+
+    // Draw border
+    this.context.strokeStyle = borderColor;
     this.context.lineWidth = 1;
-    this.context.strokeText(text, x, y);
+    this.context.stroke();
+
+    // Draw thought text with subtle shadow for readability
+    this.context.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    this.context.fillText(text, x + 1, y + 1);
+    this.context.fillStyle = textColor;
     this.context.fillText(text, x, y);
 
     this.context.restore();

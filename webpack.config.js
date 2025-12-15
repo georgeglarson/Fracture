@@ -54,6 +54,7 @@ module.exports = env => {
           { from: 'client/sprites/', to: 'sprites/' },
           { from: 'client/ts/map/mapworker.js', to: 'mapworker.js' },
           { from: 'client/ts/lib/', to: 'lib/' },
+          { from: 'client/lib/anime.umd.min.js', to: 'lib/anime.umd.min.js' },
           { from: 'client/config/config.prod.json', to: 'client/config/config.json' },
         ],
       }),
