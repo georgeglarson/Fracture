@@ -1,5 +1,5 @@
 /**
- * Venice AI Types for PixelQuest
+ * Venice AI Types for Fracture
  */
 
 export interface NpcPersonality {

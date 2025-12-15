@@ -91,7 +91,7 @@ function main(config) {
             }
         }, 1000);
 
-    console.info("Starting PixelQuest game server...");
+    console.info("Starting Fracture game server...");
 
     // Initialize Venice AI service if API key is configured
     // Priority: environment variable > config file

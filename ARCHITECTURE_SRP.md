@@ -1,4 +1,4 @@
-# PixelQuest - Architecture & SRP Analysis
+# Fracture - Architecture & SRP Analysis
 
 **Purpose:** Identify and isolate all systems, pipelines, and responsibilities for Single Responsibility Principle refactoring.
 

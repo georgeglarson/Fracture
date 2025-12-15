@@ -171,7 +171,7 @@ export class GameClient extends EventEmitter {
 
     this.connection.on('reconnect_failed', function () {
       console.error('Failed to reconnect after all attempts');
-      self.emit(ClientEvents.DISCONNECTED, 'Unable to reconnect to PixelQuest. Please refresh the page.');
+      self.emit(ClientEvents.DISCONNECTED, 'Unable to reconnect to Fracture. Please refresh the page.');
     });
 
     this.connection.on('disconnect', function (reason) {

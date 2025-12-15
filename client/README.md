@@ -1,7 +1,7 @@
-PixelQuest client documentation
+Fracture client documentation
 ===============================
 
-The client side for PixelQuest has been converted to a modern development toolset.
+The client side for Fracture has been converted to a modern development toolset.
 
 Current technologies used are:
 

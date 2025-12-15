@@ -1,8 +1,8 @@
-# PixelQuest: Creative Direction
+# Fracture: Creative Direction
 
 ## The Problem
 
-PixelQuest has evolved far beyond BrowserQuest with:
+Fracture has evolved far beyond its BrowserQuest origins with:
 - AI-powered NPC dialogue (Venice)
 - Living world with mob thoughts
 - Achievement system
@@ -11,7 +11,7 @@ PixelQuest has evolved far beyond BrowserQuest with:
 - Daily rewards
 - XP/leveling progression
 
-**But it still looks and feels like BrowserQuest.** Players may dismiss it as "seen this before."
+**But it still looks and feels like BrowserQuest.** The new name and creative direction fix this.
 
 ---
 
@@ -29,7 +29,7 @@ The world exists in the aftermath of "The Fracture" - an event that tore reality
 2. **Makes AI dialogue feel natural** - NPCs speak cryptically because reality itself is unstable
 3. **Justifies the weird** - Talking mobs, respawning, the strange geography
 4. **Creates mystery** - Players want to understand what happened
-5. **Unique identity** - No longer "BrowserQuest clone" but something new
+5. **Unique identity** - No longer a clone, but something original
 
 ---
 
@@ -190,7 +190,7 @@ Start with Tier 1 (narrative reframing) + selective Tier 2 (tile swaps around ke
 ### Phase 2: UI Polish
 - [ ] New title screen
 - [ ] Updated "About" text with new lore
-- [ ] Rename game from "PixelQuest" to final name?
+- [x] Rename game to "Fracture" ✓
 - [ ] Achievement descriptions rewritten for lore
 
 ### Phase 3: Visual Identity (Aseprite)
@@ -237,7 +237,7 @@ The word "FRACTURE" on the title screen:
 
 ## Summary
 
-By reframing the existing assets through a post-Fracture lens, PixelQuest becomes:
+By reframing the existing assets through a post-Fracture lens, the game becomes:
 
 1. **Distinct** - Not a BrowserQuest clone, but inspired-by
 2. **Cohesive** - The weird stuff makes sense

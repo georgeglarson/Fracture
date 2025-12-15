@@ -372,7 +372,7 @@ footer, header, hgroup, menu, nav, section {
         
     .left-ornament, .right-ornament, #character, #character div, .button, .button div, #respawn, #scroll, #instructions, .icon, #tilt, .parchment-left, .parchment-middle, .parchment-right, .avatar, .facebook, .twitter, .close, #note, .ribbon .top, .ribbon .bottom, #about .img, .ext-link {background:url('../img/1/spritesheet.png');image-rendering:-moz-crisp-edges; image-rendering:-webkit-optimize-contrast;}
 
-    /* PixelQuest Logo - CSS Text */
+    /* Fracture Logo - CSS Text */
     #logo {font-family:'GraphicPixel', sans-serif;color:#FFD700;text-shadow:4px 4px 0 #8B4513, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 6px 0 #5C3317;letter-spacing:4px;text-align:center;background:none !important;}
 
     /* Hire Me Banner - appears on level up */

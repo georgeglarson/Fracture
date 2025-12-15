@@ -1,4 +1,4 @@
-# PixelQuest Roadmap
+# Fracture Roadmap
 
 > A living document tracking the path from foundation to addictive, successful game.
 
@@ -7,7 +7,8 @@
 We have a fully playable core game with SRP architecture, roaming bosses, and AI-powered NPCs.
 
 **Recent Milestones:**
-- `v2.0.0-pixelquest` - Full rebrand from BrowserQuest-Ultra
+- `v2.0.0-pixelquest` - Rebrand from BrowserQuest-Ultra
+- `v3.0.0-fracture` - Full rebrand to Fracture
 - `v1.1.0-spec-kit` - Spec-driven development setup
 - `v1.0.0-engine-foundation` - Complete SRP refactor
 

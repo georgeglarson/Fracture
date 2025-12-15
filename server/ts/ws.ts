@@ -18,6 +18,9 @@ function getCorsOrigins(): string[] {
   return [
     'http://localhost:8008',
     'http://45.77.216.118:8008',
+    'https://fracture.venice.guru',
+    'https://fracture.georgelarson.me',
+    // Legacy domains (keep for transition)
     'https://bq.venice.guru',
     'https://pq.venice.guru',
     'https://pixelquest.venice.guru',

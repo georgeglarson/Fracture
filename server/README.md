@@ -1,4 +1,4 @@
-PixelQuest server documentation
+Fracture server documentation
 ===============================
 
 The game server requires nodejs 6.x or greater.

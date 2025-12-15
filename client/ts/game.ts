@@ -721,9 +721,9 @@ export class Game {
         self.storage.savePlayer(self.renderer.getPlayerImage(),
           self.player.getSpriteName(),
           self.player.getWeaponName());
-        self.showNotification('Welcome to PixelQuest!');
+        self.showNotification('Welcome to Fracture!');
       } else {
-        self.showNotification('Welcome back to PixelQuest!');
+        self.showNotification('Welcome back to Fracture!');
         self.storage.setPlayerName(name);
       }
 

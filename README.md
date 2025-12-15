@@ -1,5 +1,5 @@
-PixelQuest
-==========
+Fracture
+========
 
 A modern HTML5/TypeScript multiplayer RPG with AI-powered NPCs.
 

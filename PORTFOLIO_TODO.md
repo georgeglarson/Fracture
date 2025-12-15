@@ -20,8 +20,8 @@ Do this after the game is "done enough" to show off.
 - [ ] Brief blog post: "Building AI-powered NPCs in a Browser MMO"
 
 ## Rebrand
-- [ ] Rename to PixelQuest (or similar)
-- [ ] Update all references
+- [x] Rename to Fracture ✓
+- [x] Update all references ✓
 - [ ] New favicon/logo if needed
 
 ---

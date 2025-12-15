@@ -346,7 +346,7 @@ export class App {
       if (!achievement.hidden) {
         self.setAchievementData($a, achievement.name, achievement.desc);
       }
-      $a.find('.twitter').attr('href', 'http://twitter.com/share?text=I%20unlocked%20the%20%27' + achievement.name + '%27%20achievement%20on%20%23PixelQuest%21');
+      $a.find('.twitter').attr('href', 'http://twitter.com/share?text=I%20unlocked%20the%20%27' + achievement.name + '%27%20achievement%20on%20%23Fracture%21');
       $a.show();
       $a.find('a').click(function () {
         var url = $(this).attr('href');

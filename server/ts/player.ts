@@ -1,4 +1,4 @@
-// PixelQuest Player - with AI Narrator integration
+// Fracture Player - with AI Narrator integration
 import * as _ from 'lodash';
 import {FormatChecker} from './format';
 import {Character} from './character';

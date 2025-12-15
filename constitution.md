@@ -1,4 +1,4 @@
-# PixelQuest Constitution
+# Fracture Constitution
 
 > Project governing principles and development guidelines. All implementations must adhere to these standards.
 

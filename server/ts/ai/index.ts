@@ -1,5 +1,5 @@
 /**
- * Venice AI Module for PixelQuest
+ * Venice AI Module for Fracture
  *
  * This module provides AI-powered features:
  * - NPC Dialogue (DialogueService)

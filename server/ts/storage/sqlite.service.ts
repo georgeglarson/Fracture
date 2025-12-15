@@ -17,7 +17,7 @@ import {
 import { SerializedInventorySlot } from '../../../shared/ts/inventory/inventory-types.js';
 import { PlayerAchievements, createEmptyPlayerAchievements } from '../../../shared/ts/achievements/achievement-data.js';
 
-const DB_PATH = path.join(process.cwd(), 'server', 'data', 'pixelquest.db');
+const DB_PATH = path.join(process.cwd(), 'server', 'data', 'fracture.db');
 
 export class SQLiteStorageService implements IStorageService {
   private db: Database.Database | null = null;

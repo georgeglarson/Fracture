@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "project": "PixelQuest",
+  "project": "Fracture",
   "specsDir": "specs",
   "workflow": {
     "phases": ["specify", "plan", "tasks", "implement"],
