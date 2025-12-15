@@ -3,9 +3,6 @@
  * Single Responsibility: Display animated intro with voice narration
  */
 
-// Import anime.js (UMD build loaded as global)
-declare const anime: any;
-
 export interface IntroData {
   story: string;
   lines: string[];
@@ -268,11 +265,17 @@ export class IntroSequence {
    * Animate the intro sequence using anime.js
    */
   private async animateIntro(): Promise<void> {
-    if (!this.overlay || typeof anime === 'undefined') {
-      console.warn('[IntroSequence] anime.js not loaded, using fallback animation');
+    // Check if anime.js v4 is loaded (it exports anime.animate)
+    const animeAvailable = typeof (window as any).anime !== 'undefined' &&
+                           typeof (window as any).anime.animate === 'function';
+
+    if (!this.overlay || !animeAvailable) {
+      console.warn('[IntroSequence] anime.js not loaded or wrong version, using fallback');
       await this.fallbackAnimation();
       return;
     }
+
+    const animeLib = (window as any).anime;
 
     // Inject CSS animation for particles
     const style = document.createElement('style');
@@ -289,12 +292,11 @@ export class IntroSequence {
     // Title animation
     const title = this.overlay.querySelector('.intro-title');
     if (title) {
-      anime({
-        targets: title,
+      animeLib.animate(title, {
         opacity: [0, 1],
         translateY: [-20, 0],
         duration: 1500,
-        easing: 'easeOutExpo'
+        ease: 'outExpo'
       });
     }
 
@@ -306,12 +308,11 @@ export class IntroSequence {
       if (!this.isPlaying) break;
 
       const line = this.lineElements[i];
-      anime({
-        targets: line,
+      animeLib.animate(line, {
         opacity: [0, 1],
         translateY: [20, 0],
         duration: 800,
-        easing: 'easeOutQuad'
+        ease: 'outQuad'
       });
 
       // Calculate delay based on line length (rough approximation of speech timing)
@@ -327,24 +328,22 @@ export class IntroSequence {
     const continueHint = this.overlay.querySelector('.intro-continue');
 
     if (narrator) {
-      anime({
-        targets: narrator,
+      animeLib.animate(narrator, {
         opacity: [0, 1],
         duration: 1000,
-        easing: 'easeOutQuad'
+        ease: 'outQuad'
       });
     }
 
     await this.delay(1500);
 
     if (continueHint) {
-      anime({
-        targets: continueHint,
+      animeLib.animate(continueHint, {
         opacity: [0, 0.7],
         duration: 1000,
-        easing: 'easeOutQuad',
+        ease: 'outQuad',
         loop: true,
-        direction: 'alternate'
+        alternate: true
       });
     }
 
