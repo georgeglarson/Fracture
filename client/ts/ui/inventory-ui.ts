@@ -157,6 +157,21 @@ export class InventoryUI {
         ">
       `;
 
+      // Hotkey indicator for first 5 slots
+      if (i < 5) {
+        html += `
+          <span style="
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: 9px;
+            font-weight: bold;
+            color: #888;
+            text-shadow: 1px 1px 1px #000;
+          ">${i + 1}</span>
+        `;
+      }
+
       if (slot) {
         const spriteName = Types.getKindAsString(slot.kind);
         html += `
@@ -200,7 +215,7 @@ export class InventoryUI {
         color: #888;
         text-align: center;
       ">
-        Left-click: Use/Equip | Right-click: Options | Press 'I' to close
+        Left-click: Use/Equip | Right-click: Options | Keys 1-5: Quick use | Press 'I' to close
       </div>
     `;
 
@@ -223,46 +238,51 @@ export class InventoryUI {
       closeBtn.addEventListener('click', () => this.hide());
     }
 
-    // Slot handlers
+    // Slot handlers - attach to ALL slots, check slot existence at click time
     const slotElements = this.panel.querySelectorAll('.inventory-slot');
     slotElements.forEach((el) => {
       const slotIndex = parseInt((el as HTMLElement).dataset.slot || '0');
-      const slot = this.slots[slotIndex];
 
-      if (slot) {
-        // Left-click: use or equip
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.hideContextMenu();
+      // Left-click: use or equip
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.hideContextMenu();
 
-          if (this.callbacks) {
-            if (isStackable(slot.kind)) {
-              // Consumable: use it
-              this.callbacks.onUse(slotIndex);
-            } else if (isEquipment(slot.kind)) {
-              // Equipment: equip it
-              this.callbacks.onEquip(slotIndex);
-            }
-          }
-        });
+        // Look up slot at click time, not render time
+        const slot = this.slots[slotIndex];
+        if (!slot || !this.callbacks) return;
 
-        // Right-click: context menu
-        (el as HTMLElement).addEventListener('contextmenu', (e: MouseEvent) => {
-          e.preventDefault();
-          e.stopPropagation();
+        if (isStackable(slot.kind)) {
+          // Consumable: use it
+          this.callbacks.onUse(slotIndex);
+        } else if (isEquipment(slot.kind)) {
+          // Equipment: equip it
+          this.callbacks.onEquip(slotIndex);
+        }
+      });
+
+      // Right-click: context menu
+      (el as HTMLElement).addEventListener('contextmenu', (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const slot = this.slots[slotIndex];
+        if (slot) {
           this.showContextMenu(slotIndex, e.clientX, e.clientY);
-        });
+        }
+      });
 
-        // Hover effects
-        el.addEventListener('mouseenter', () => {
+      // Hover effects
+      el.addEventListener('mouseenter', () => {
+        const slot = this.slots[slotIndex];
+        if (slot) {
           (el as HTMLElement).style.transform = 'scale(1.05)';
           (el as HTMLElement).style.zIndex = '1';
-        });
-        el.addEventListener('mouseleave', () => {
-          (el as HTMLElement).style.transform = 'scale(1)';
-          (el as HTMLElement).style.zIndex = '0';
-        });
-      }
+        }
+      });
+      el.addEventListener('mouseleave', () => {
+        (el as HTMLElement).style.transform = 'scale(1)';
+        (el as HTMLElement).style.zIndex = '0';
+      });
     });
   }
 

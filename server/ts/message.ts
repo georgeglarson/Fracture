@@ -133,9 +133,12 @@ export const Messages = {
     }
 
     serialize() {
+      // Include mob HP for health bar display
       return [Types.Messages.DAMAGE,
         this.entity.id,
-        this.points];
+        this.points,
+        this.entity.hitPoints || 0,
+        this.entity.maxHitPoints || 0];
     }
   },
 

@@ -2320,6 +2320,21 @@ export class Game {
     }
   }
 
+  /**
+   * Use an inventory slot by index (for hotkeys 1-5)
+   */
+  useInventorySlot(slotIndex: number) {
+    if (!this.inventoryManager) return;
+
+    const slot = this.inventoryManager.getSlot(slotIndex);
+    if (!slot) return;
+
+    // Only use consumables via hotkey
+    if (this.inventoryManager.isSlotConsumable(slotIndex)) {
+      this.client.sendInventoryUse(slotIndex);
+    }
+  }
+
   initMinimap() {
     if (this.minimapUI) return;
 

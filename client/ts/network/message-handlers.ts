@@ -404,10 +404,15 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.on(ClientEvents.DAMAGE, function (mobId, points) {
+  client.on(ClientEvents.DAMAGE, function (mobId, points, hp, maxHp) {
     var mob = game.getEntityById(mobId);
     if (mob && points) {
       game.infoManager.addDamageInfo(points, mob.x, mob.y - 15, 'inflicted');
+      // Update mob health for health bar display
+      if (hp !== undefined && maxHp !== undefined) {
+        mob.hitPoints = hp;
+        mob.maxHitPoints = maxHp;
+      }
       // Refresh combat timer when dealing damage
       game.audioManager.refreshCombat();
     }

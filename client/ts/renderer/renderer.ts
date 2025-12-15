@@ -424,6 +424,7 @@ export class Renderer {
         this.drawEntityName(entity);
         this.drawEntityThought(entity);  // AI thought bubbles
         this.drawAggroIndicator(entity);  // Aggro warning for mobs targeting player
+        this.drawMobHealthBar(entity);   // Health bar for damaged mobs
       }
 
       this.context.save();
@@ -733,6 +734,110 @@ export class Renderer {
     this.context.fillText('!', x, y);
 
     this.context.restore();
+  }
+
+  // Mob Health Bar - shows HP for damaged mobs or hovered mobs
+  drawMobHealthBar(entity) {
+    if (!Types.isMob(entity.kind)) return;
+
+    // Show for damaged mobs or hovered mobs
+    const isDamaged = entity.maxHitPoints > 0 &&
+                      entity.hitPoints !== undefined &&
+                      entity.hitPoints < entity.maxHitPoints;
+    const isHovered = entity.isHighlighted;
+
+    if (!isDamaged && !isHovered) return;
+
+    this.context.save();
+
+    const s = this.scale;
+    const barWidth = 32 * s;
+    const barHeight = 4 * s;
+    const x = (entity.x + 8) * s - barWidth / 2;
+    const y = (entity.y - 8) * s;
+
+    // Draw mob name above health bar
+    const mobName = Types.getKindAsString(entity.kind);
+    const displayName = this.formatMobName(mobName);
+
+    this.context.font = (8 * s) + 'px GraphicPixel';
+    this.context.textAlign = 'center';
+    this.context.textBaseline = 'bottom';
+
+    // Name shadow
+    this.context.fillStyle = '#000';
+    this.context.fillText(displayName, (entity.x + 8) * s + 1, y - 2 + 1);
+    // Name text (color based on mob type)
+    const nameColor = this.getMobNameColor(entity.kind);
+    this.context.fillStyle = nameColor;
+    this.context.fillText(displayName, (entity.x + 8) * s, y - 2);
+
+    // Only draw health bar if mob has HP info
+    if (entity.maxHitPoints > 0 && entity.hitPoints !== undefined) {
+      const hpPercent = Math.max(0, entity.hitPoints / entity.maxHitPoints);
+
+      // Background (dark)
+      this.context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      this.context.fillRect(x - 1, y - 1, barWidth + 2, barHeight + 2);
+
+      // HP bar background (dark red)
+      this.context.fillStyle = '#3a0000';
+      this.context.fillRect(x, y, barWidth, barHeight);
+
+      // HP bar fill (green to yellow to red based on health)
+      let barColor: string;
+      if (hpPercent > 0.5) {
+        barColor = '#44cc44';  // Green
+      } else if (hpPercent > 0.25) {
+        barColor = '#cccc44';  // Yellow
+      } else {
+        barColor = '#cc4444';  // Red
+      }
+      this.context.fillStyle = barColor;
+      this.context.fillRect(x, y, barWidth * hpPercent, barHeight);
+
+      // Border
+      this.context.strokeStyle = '#222';
+      this.context.lineWidth = 1;
+      this.context.strokeRect(x - 1, y - 1, barWidth + 2, barHeight + 2);
+    }
+
+    this.context.restore();
+  }
+
+  // Format mob name for display (capitalize, handle special cases)
+  formatMobName(name: string): string {
+    const specialNames: Record<string, string> = {
+      'skeleton2': 'Greater Skeleton',
+      'eye': 'Evil Eye',
+      'deathknight': 'Death Knight',
+      'boss': 'Skeleton King',
+      'rat': 'Rat',
+      'crab': 'Crab',
+      'bat': 'Bat',
+      'goblin': 'Goblin',
+      'skeleton': 'Skeleton',
+      'snake': 'Snake',
+      'ogre': 'Ogre',
+      'spectre': 'Spectre',
+    };
+    return specialNames[name] || name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  // Get color for mob name based on difficulty
+  getMobNameColor(kind: number): string {
+    // Boss mobs get special colors
+    const kindName = Types.getKindAsString(kind);
+    if (kindName === 'boss' || kindName === 'deathknight') {
+      return '#ff6666';  // Red for bosses
+    }
+    if (kindName === 'skeleton2' || kindName === 'eye' || kindName === 'spectre') {
+      return '#ffaa66';  // Orange for elites
+    }
+    if (kindName === 'ogre' || kindName === 'snake') {
+      return '#ffff66';  // Yellow for medium
+    }
+    return '#ffffff';  // White for normal mobs
   }
 
   // AI Thought Bubbles - "Ant Farm" feature

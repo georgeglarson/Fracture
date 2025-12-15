@@ -456,6 +456,12 @@ var initGame = function () {
         }
         return false;
       }
+      // 1-5 keys - Quick use inventory slots (for consumables)
+      if (key >= 49 && key <= 53 && game.ready && game.started) { // Keys 1-5
+        const slotIndex = key - 49; // Convert to 0-4
+        game.useInventorySlot(slotIndex);
+        return false;
+      }
       if (key === 73) { // I - Toggle inventory
         console.log('[KeyPress] I key pressed, game.ready:', game.ready, 'game.started:', game.started);
         // Toggle inventory even if game isn't ready - the UI should still show
