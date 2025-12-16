@@ -18,6 +18,49 @@ import type { Game } from '../game';
 import type { GameClient } from './gameclient';
 import { ClientEvents } from './client-events';
 
+// Kill notification batching system
+const killBuffer: Map<string, number> = new Map();
+let killBufferTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function addKillToBuffer(mobName: string, game: Game) {
+  const current = killBuffer.get(mobName) || 0;
+  killBuffer.set(mobName, current + 1);
+
+  // Clear existing timeout and set a new one
+  if (killBufferTimeout) {
+    clearTimeout(killBufferTimeout);
+  }
+
+  // Flush after 1 second of no kills
+  killBufferTimeout = setTimeout(() => {
+    flushKillBuffer(game);
+  }, 1000);
+}
+
+function flushKillBuffer(game: Game) {
+  if (killBuffer.size === 0) return;
+
+  // Build combined message
+  const messages: string[] = [];
+  killBuffer.forEach((count, mobName) => {
+    if (count === 1) {
+      const article = ['a', 'e', 'i', 'o', 'u'].includes(mobName[0]) ? 'an' : 'a';
+      messages.push(`${article} ${mobName}`);
+    } else {
+      messages.push(`${count} ${mobName}s`);
+    }
+  });
+
+  if (messages.length === 1) {
+    game.showNotification(`You killed ${messages[0]}`);
+  } else {
+    game.showNotification(`You killed ${messages.join(', ')}`);
+  }
+
+  killBuffer.clear();
+  killBufferTimeout = null;
+}
+
 /**
  * Sets up all network message handlers for the game client
  */
@@ -304,6 +347,12 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
         if (game.fractureAtmosphere) {
           game.fractureAtmosphere.onPlayerDamage();
         }
+        // Low health warning (below 25%)
+        const healthPercent = points / player.maxHitPoints;
+        if (healthPercent <= 0.25 && healthPercent > 0) {
+          game.audioManager.playSound('glitch1');
+          game.showNotification('Health critical!');
+        }
         if (game.playerhurt_callback) {
           game.playerhurt_callback();
         }
@@ -416,6 +465,16 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
       if (hp !== undefined && maxHp !== undefined) {
         mob.hitPoints = hp;
         mob.maxHitPoints = maxHp;
+
+        // If mob HP reaches 0, mark as dying immediately to prevent targeting
+        // before DESPAWN message arrives (fixes "immortal mob" race condition)
+        if (hp <= 0 && !mob.isDying) {
+          mob.isDying = true;
+          // If player is targeting this mob, disengage
+          if (game.player.target && game.player.target.id === mob.id) {
+            game.player.disengage();
+          }
+        }
       }
       // Refresh combat timer when dealing damage
       game.audioManager.refreshCombat();
@@ -429,14 +488,12 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
     if (mobName === 'eye') mobName = 'evil eye';
     if (mobName === 'deathknight') mobName = 'death knight';
 
+    // Boss kills always show immediately
     if (mobName === 'boss') {
       game.showNotification('You killed the skeleton king');
     } else {
-      if (_.include(['a', 'e', 'i', 'o', 'u'], mobName[0])) {
-        game.showNotification('You killed an ' + mobName);
-      } else {
-        game.showNotification('You killed a ' + mobName);
-      }
+      // Batch regular kills to reduce spam
+      addKillToBuffer(mobName, game);
     }
 
     // Start fading out combat music after kill

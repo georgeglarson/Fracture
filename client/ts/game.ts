@@ -757,6 +757,10 @@ export class Game {
           self.player.getSpriteName(),
           self.player.getWeaponName());
         self.showNotification('Welcome to Fracture!');
+        // First-time player hints
+        self.showFirstTimeHints();
+        // Auto-show minimap for new players
+        self.initMinimap();
       } else {
         self.showNotification('Welcome back to Fracture!');
         self.storage.setPlayerName(name);
@@ -1206,6 +1210,10 @@ export class Game {
    *
    */
   makePlayerAttack(mob) {
+    // Don't attack dying/dead mobs (prevents immortal mob bug)
+    if (mob.isDying || mob.isDead) {
+      return;
+    }
     this.createAttackLink(this.player, mob);
     this.client.sendAttack(mob);
   }
@@ -1631,7 +1639,13 @@ export class Game {
           character.hit();
 
           if (character.id === this.playerId) {
-            this.client.sendHit(character.target);
+            // Don't send HIT for dying/dead targets
+            if (character.target && !character.target.isDying && !character.target.isDead) {
+              this.client.sendHit(character.target);
+            } else if (character.target && (character.target.isDying || character.target.isDead)) {
+              // Target died, disengage
+              character.disengage();
+            }
           }
 
           if (character instanceof Player && this.camera.isVisible(character)) {
@@ -2012,6 +2026,24 @@ export class Game {
 
   showNotification(message: string) {
     this.uiManager?.showNotification(message);
+  }
+
+  /**
+   * Show first-time player hints with delays
+   */
+  showFirstTimeHints() {
+    const hints = [
+      { delay: 2000, message: 'Click anywhere to move' },
+      { delay: 5000, message: 'Press I for inventory' },
+      { delay: 8000, message: 'Press Q for quick heal' },
+      { delay: 11000, message: 'Press ? for all controls' }
+    ];
+
+    hints.forEach(hint => {
+      setTimeout(() => {
+        this.showNotification(hint.message);
+      }, hint.delay);
+    });
   }
 
   showNarratorText(text: string, style: string = 'epic') {

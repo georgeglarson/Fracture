@@ -37,9 +37,29 @@ q:before, q:after {
 	content: none;
 }
 
-/* remember to define focus styles! */
+/* Focus styles for accessibility */
 :focus {
-	outline: 0;
+	outline: 2px solid #4a9eff;
+	outline-offset: 2px;
+}
+
+/* Hide focus outline for mouse users, show for keyboard users */
+:focus:not(:focus-visible) {
+	outline: none;
+}
+
+:focus-visible {
+	outline: 2px solid #4a9eff;
+	outline-offset: 2px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
 }
 
 /* Accessibility utilities */
