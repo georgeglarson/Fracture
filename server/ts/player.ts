@@ -57,6 +57,9 @@ export class Player extends Character {
   get weaponLevel(): number { return this.equipment.weaponLevel; }
   get armorLevel(): number { return this.equipment.armorLevel; }
 
+  // Client IP for rate limiting
+  get clientIp(): string { return this.connection.clientIp; }
+
   // Progression system
   level: number = 1;
   xp: number = 0;

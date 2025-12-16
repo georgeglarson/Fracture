@@ -196,6 +196,7 @@ export class Connection {
   _connection: Socket;
   _server: Server;
   id: string;
+  clientIp: string;
   listen_callback;
   close_callback;
   private _currentZone: string | null = null;
@@ -204,6 +205,8 @@ export class Connection {
     this._connection = connection;
     this._server = server;
     this.id = id;
+    // Extract client IP from socket handshake
+    this.clientIp = connection.handshake.address || '127.0.0.1';
     const self = this;
 
     // HANDLE DISPATCHER IN HERE

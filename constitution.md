@@ -84,10 +84,11 @@ All significant features must follow the spec-kit workflow:
 
 ### Testing Requirements
 
-- Unit tests for business logic
+- Unit tests for business logic (target: 60%+ coverage)
 - Integration tests for API endpoints
 - Manual gameplay validation for each feature
 - No feature ships without test coverage
+- Test framework: Vitest (configured in `vitest.config.ts`)
 
 ### Commit Standards
 
@@ -113,5 +114,5 @@ This constitution evolves with the project. Amendments require:
 
 ---
 
-*Last updated: 2025-12-06*
-*Version: 1.0.0*
+*Last updated: 2025-12-16*
+*Version: 1.1.0*

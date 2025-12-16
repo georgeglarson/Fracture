@@ -1,7 +1,9 @@
 {
   "version": "2.0.0",
   "project": "Fracture",
-  "specsDir": "specs",
+  "specsDir": "../specs",
+  "constitutionPath": "../constitution.md",
+  "roadmapPath": "../ROADMAP.md",
   "workflow": {
     "phases": ["specify", "plan", "tasks", "implement"],
     "requireConstitutionCheck": true

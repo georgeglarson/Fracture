@@ -2,9 +2,11 @@
 
 > A living document tracking the path from foundation to addictive, successful game.
 
-## Current State: Phase 3 Active - Content & Features
+## Current State: Code Quality Refactor (020) Active
 
 We have a fully playable core game with SRP architecture, roaming bosses, and AI-powered NPCs.
+
+**Current Focus**: Technical debt reduction before adding more features. See `specs/020-code-quality-refactor/`.
 
 **Recent Milestones:**
 - `v2.0.0-pixelquest` - Rebrand from BrowserQuest-Ultra
@@ -39,6 +41,24 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 ---
 
 ## ACTIVE PRIORITIES (December 2024)
+
+### P0: Code Quality Refactor (020) 🔵
+**Status:** Planning Complete - Implementation Starting
+**Impact:** Enables sustainable development, prevents regression, improves maintainability
+**Spec:** `specs/020-code-quality-refactor/`
+
+**Key Deliverables:**
+- [ ] Testing infrastructure (Vitest)
+- [ ] Structured logging (Pino)
+- [ ] Rate limiting (security)
+- [ ] TypeScript strict mode
+- [ ] Player class decomposition (1,552 → <400 lines)
+- [ ] Game class decomposition (2,627 → <600 lines)
+- [ ] Error handling coverage (10% → 90%)
+
+**Why Now:** Technical debt is blocking velocity. Every new feature risks regression without tests.
+
+---
 
 ### P0: Venice AI Fix ✅
 **Status:** Complete - API key updated
@@ -311,4 +331,4 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 ---
 
 *This roadmap is not a timeline. It's a direction.*
-*Last updated: 2025-12-14*
+*Last updated: 2025-12-16*

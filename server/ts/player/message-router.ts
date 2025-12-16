@@ -6,6 +6,16 @@
  */
 
 import {Types} from '../../../shared/ts/gametypes';
+import {
+  checkAuthLimit,
+  checkChatLimit,
+  checkCombatLimit,
+  checkShopLimit,
+  RateLimitResult
+} from '../middleware/rate-limiter.js';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('MessageRouter');
 
 /**
  * Interface for a message handler context
@@ -15,6 +25,7 @@ export interface MessageHandlerContext {
   // Player identity
   id: number;
   name: string;
+  clientIp: string; // For rate limiting
 
   // Player state
   hasEnteredGame: boolean;
@@ -123,12 +134,18 @@ export interface MessageHandlerContext {
 export type MessageHandler = (ctx: MessageHandlerContext, message: any[]) => void | Promise<void>;
 
 /**
+ * Rate limit type for a handler
+ */
+type RateLimitType = 'auth' | 'chat' | 'combat' | 'shop' | 'none';
+
+/**
  * Message handler configuration
  */
 interface HandlerConfig {
   handler: MessageHandler;
   requiresGame?: boolean; // Must have entered game (default: true)
   requiresAlive?: boolean; // Must not be dead (default: false)
+  rateLimit?: RateLimitType; // Rate limit to apply (default: 'none')
 }
 
 /**
@@ -145,6 +162,7 @@ export function createMessageHandlers(
 
   // HELLO - Initial handshake (special case, allowed before game entry)
   handlers.set(Types.Messages.HELLO, {
+    rateLimit: 'auth', // 5 attempts per minute per IP
     handler: (ctx, msg) => {
       const name = Utils.sanitize(msg[1]);
       const password = msg[5] || ''; // Password is now at index 5
@@ -238,6 +256,7 @@ export function createMessageHandlers(
 
   // CHAT - Chat message
   handlers.set(Types.Messages.CHAT, {
+    rateLimit: 'chat', // 5 messages per 10 seconds
     handler: (ctx, msg) => {
       let chatMsg = Utils.sanitize(msg[1]);
       if (chatMsg && chatMsg !== '') {
@@ -303,6 +322,7 @@ export function createMessageHandlers(
 
   // HIT - Deal damage
   handlers.set(Types.Messages.HIT, {
+    rateLimit: 'combat', // 20 hits per second
     handler: (ctx, msg) => {
       const mob = ctx.world.getEntityById(msg[1]);
       if (mob) {
@@ -454,6 +474,7 @@ export function createMessageHandlers(
 
   // SHOP_BUY - Shop purchase
   handlers.set(Types.Messages.SHOP_BUY, {
+    rateLimit: 'shop', // 10 transactions per minute
     handler: (ctx, msg) => {
       ctx.handleShopBuy(msg[1], msg[2]);
     }
@@ -578,8 +599,37 @@ export class MessageRouter {
   }
 
   /**
+   * Check rate limit for a handler
+   * @returns true if allowed, false if rate limited
+   */
+  private async checkRateLimit(
+    ctx: MessageHandlerContext,
+    rateLimit: RateLimitType | undefined
+  ): Promise<RateLimitResult> {
+    if (!rateLimit || rateLimit === 'none') {
+      return { allowed: true };
+    }
+
+    // Use IP for auth (pre-login), player ID for everything else
+    const key = rateLimit === 'auth' ? ctx.clientIp : String(ctx.id);
+
+    switch (rateLimit) {
+      case 'auth':
+        return checkAuthLimit(key);
+      case 'chat':
+        return checkChatLimit(key);
+      case 'combat':
+        return checkCombatLimit(key);
+      case 'shop':
+        return checkShopLimit(key);
+      default:
+        return { allowed: true };
+    }
+  }
+
+  /**
    * Route a message to its handler
-   * Returns true if handled, false if no handler found
+   * Returns true if handled, false if no handler found or rate limited
    */
   async route(ctx: MessageHandlerContext, message: any[]): Promise<boolean> {
     const action = parseInt(message[0]);
@@ -593,6 +643,19 @@ export class MessageRouter {
     const requiresGame = config.requiresGame !== false;
     if (requiresGame && !ctx.hasEnteredGame) {
       return false;
+    }
+
+    // Check rate limit
+    if (config.rateLimit) {
+      const rateLimitResult = await this.checkRateLimit(ctx, config.rateLimit);
+      if (!rateLimitResult.allowed) {
+        log.warn(
+          { playerId: ctx.id, action, rateLimit: config.rateLimit, retryAfter: rateLimitResult.retryAfter },
+          'Rate limit exceeded'
+        );
+        // Silently drop rate-limited messages
+        return true; // Return true to indicate message was "handled" (rejected)
+      }
     }
 
     // Execute handler
