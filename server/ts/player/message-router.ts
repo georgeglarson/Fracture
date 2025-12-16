@@ -320,7 +320,8 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.HURT, {
     handler: (ctx, msg) => {
       const mob = ctx.world.getEntityById(msg[1]);
-      if (mob && ctx.hitPoints > 0) {
+      // Check mob exists, is not dead, and player is alive
+      if (mob && !mob.isDead && ctx.hitPoints > 0) {
         (ctx as any).hitPoints -= Formulas.dmg(mob.weaponLevel, ctx.armorLevel);
         ctx.world.handleHurtEntity(ctx);
 

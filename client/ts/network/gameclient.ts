@@ -340,8 +340,8 @@ export class GameClient extends EventEmitter {
   }
 
   receiveDamage(data) {
-    var id = data[1], dmg = data[2];
-    this.emit(ClientEvents.DAMAGE, id, dmg);
+    var id = data[1], dmg = data[2], hp = data[3], maxHp = data[4];
+    this.emit(ClientEvents.DAMAGE, id, dmg, hp, maxHp);
   }
 
   receivePopulation(data) {

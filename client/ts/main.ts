@@ -345,11 +345,12 @@ var initGame = function () {
       $chat = $('#chatinput');
 
     if (key === 13) {
-      if ($chat.attr('value') !== '') {
+      const chatText = ($chat.val() as string) || '';
+      if (chatText !== '') {
         if (game.player) {
-          game.say($chat.attr('value'));
+          game.say(chatText);
         }
-        $chat.attr('value', '');
+        $chat.val('');
         app.hideChat();
         $('#foreground').focus();
         return false;

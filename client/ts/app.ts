@@ -93,6 +93,14 @@ export class App {
       starting_callback();
     }
 
+    // Check for skipintro URL parameter (for testing)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('skipintro')) {
+      console.log('[App] Skipping intro (skipintro parameter)');
+      this.proceedToGame(username, password);
+      return;
+    }
+
     // Always show intro on fresh load (like a game intro cutscene)
     // Fetch and play intro sequence
     {

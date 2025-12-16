@@ -131,7 +131,6 @@ footer, header, hgroup, menu, nav, section {
     #canvas, #bar-container, #bubbles, #chatbox, #canvasborder, #foreground, #background, footer, #container, #achievement-notification {-moz-user-select:none;-webkit-user-select:none;-o-user-select:none;-ms-user-select:none;}
 
     /* Fullscreen mode: hide duplicate elements */
-    .game #chatbox {display:none !important;}
     .game #population {display:none !important;}
     .game #notifications {display:none !important;}
     .game footer {display:none !important;}
@@ -166,6 +165,14 @@ footer, header, hgroup, menu, nav, section {
     /* Show statusbar only during game */
     .game #statusbar {
         display: flex !important;
+    }
+    /* Position chatbox above status bar during game */
+    .game #chatbox {
+        bottom: 70px !important;
+        z-index: 9999 !important;
+    }
+    .game #chatbox.active {
+        bottom: 70px !important;
     }
     .statusbar-left {
         display: flex !important;
