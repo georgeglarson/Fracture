@@ -97,7 +97,9 @@ export class Party {
     // If leader left, transfer to oldest member (first in map)
     if (playerId === this.leaderId) {
       const firstMember = this.members.keys().next().value;
-      this.leaderId = firstMember;
+      if (firstMember !== undefined) {
+        this.leaderId = firstMember;
+      }
       return this.leaderId;
     }
 

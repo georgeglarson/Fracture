@@ -33,7 +33,7 @@ const AI_NAMES = [
 ];
 
 // Chat messages that feel like real players
-const CHAT_TEMPLATES = {
+const CHAT_TEMPLATES: Record<string, string[]> = {
   idle: [
     'anyone know where the good loot is?',
     'this game is pretty cool',
@@ -99,10 +99,10 @@ let aiPlayerIdCounter = 100000; // Start high to avoid collision with real playe
 export class AIPlayer extends Character {
   // Player-like properties (must match Player for getState())
   name: string;
-  armor: number;
-  weapon: number;
-  armorLevel: number;
-  weaponLevel: number;
+  armor!: number;      // Initialized in constructor via setRandomEquipment()
+  weapon!: number;     // Initialized in constructor via setRandomEquipment()
+  armorLevel!: number; // Initialized in constructor via setRandomEquipment()
+  weaponLevel!: number; // Initialized in constructor via setRandomEquipment()
 
   // AI-specific properties
   personality: Personality;
@@ -128,7 +128,7 @@ export class AIPlayer extends Character {
   private targetY: number | null = null;
 
   // Haters list (mobs targeting this AI)
-  haters = {};
+  haters: Record<string | number, any> = {};
 
   // Required Player-like properties
   hasEnteredGame = true;
@@ -221,8 +221,9 @@ export class AIPlayer extends Character {
   }
 
   private setRandomPosition(): void {
-    if (this.world && this.world.map) {
-      const pos = this.world.map.getRandomStartingPosition();
+    const map = this.world?.map as any;
+    if (map) {
+      const pos = map.getRandomStartingPosition();
       this.setPosition(pos.x, pos.y);
     }
   }
@@ -416,9 +417,10 @@ export class AIPlayer extends Character {
     this.targetY = this.y + Math.floor(Math.random() * range * 2) - range;
 
     // Clamp to valid positions
-    if (this.world.map) {
-      this.targetX = Math.max(0, Math.min(this.world.map.width - 1, this.targetX));
-      this.targetY = Math.max(0, Math.min(this.world.map.height - 1, this.targetY));
+    const map = this.world?.map as any;
+    if (map) {
+      this.targetX = Math.max(0, Math.min(map.width - 1, this.targetX));
+      this.targetY = Math.max(0, Math.min(map.height - 1, this.targetY));
     }
   }
 

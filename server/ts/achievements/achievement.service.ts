@@ -13,9 +13,9 @@ export class AchievementService {
   // Per-player achievement state (keyed by player ID)
   private playerAchievements: Map<string, PlayerAchievements> = new Map();
 
-  // Callbacks to send messages to players
-  private sendCallback: (playerId: string, message: any[]) => void;
-  private broadcastCallback: (message: any[]) => void;
+  // Callbacks to send messages to players (set via setSendCallback/setBroadcastCallback)
+  private sendCallback!: (playerId: string, message: any[]) => void;
+  private broadcastCallback!: (message: any[]) => void;
 
   constructor() {}
 

@@ -230,6 +230,7 @@ export interface MobThoughts {
   flee: string[];        // When low health or retreating
   playerNearby: string[];// When player is close but not fighting
   special?: string[];    // Unique personality quirks
+  [key: string]: string[] | undefined;  // Allow string indexing
 }
 
 export const MOB_THOUGHTS: Record<string, MobThoughts> = {
