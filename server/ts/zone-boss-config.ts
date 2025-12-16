@@ -39,8 +39,8 @@ export interface ZoneBossConfig {
 // Zone boss definitions - one per zone (excluding village which is safe)
 export const ZONE_BOSSES: ZoneBossConfig[] = [
   {
-    id: 'giant_crab',
-    name: 'Giant Crab',
+    id: 'the_harvester',
+    name: 'The Harvester',
     kind: Types.Entities.CRAB,
     zoneId: 'beach',
     hp: 300,
@@ -52,12 +52,12 @@ export const ZONE_BOSSES: ZoneBossConfig[] = [
     xpMultiplier: 3,
     goldMultiplier: 2.5,
     dropBonus: 0.15,
-    spawnTitle: 'The Giant Crab Emerges!',
-    spawnMessage: 'A massive crustacean crawls from the depths, its claws gleaming in the sun.'
+    spawnTitle: 'The Harvester Emerges!',
+    spawnMessage: 'A mutated scavenger crawls from merged oceans, chitin warped by dimensional flux.'
   },
   {
-    id: 'goblin_warlord',
-    name: 'Goblin Warlord',
+    id: 'glitch_stalker',
+    name: 'Glitch Stalker',
     kind: Types.Entities.GOBLIN,
     zoneId: 'forest',
     hp: 500,
@@ -69,12 +69,12 @@ export const ZONE_BOSSES: ZoneBossConfig[] = [
     xpMultiplier: 4,
     goldMultiplier: 3,
     dropBonus: 0.2,
-    spawnTitle: 'The Goblin Warlord Arrives!',
-    spawnMessage: 'A cunning goblin commander emerges from the shadows, rallying its brethren.'
+    spawnTitle: 'The Glitch Stalker Manifests!',
+    spawnMessage: 'Reality stutters as a corrupted hunter phases between dimensions, hunting prey.'
   },
   {
-    id: 'bone_dragon',
-    name: 'Bone Dragon',
+    id: 'the_forgotten',
+    name: 'The Forgotten',
     kind: Types.Entities.SKELETON2,
     zoneId: 'cave',
     hp: 800,
@@ -86,12 +86,12 @@ export const ZONE_BOSSES: ZoneBossConfig[] = [
     xpMultiplier: 5,
     goldMultiplier: 4,
     dropBonus: 0.25,
-    spawnTitle: 'The Bone Dragon Awakens!',
-    spawnMessage: 'Ancient bones rattle to life as a skeletal terror rises from the depths.'
+    spawnTitle: 'The Forgotten Awakens!',
+    spawnMessage: 'An echo of creatures that no longer exist rises from the collapsed depths.'
   },
   {
-    id: 'sand_wurm',
-    name: 'Sand Wurm',
+    id: 'null_devourer',
+    name: 'Null Devourer',
     kind: Types.Entities.SNAKE,
     zoneId: 'desert',
     hp: 1000,
@@ -103,12 +103,12 @@ export const ZONE_BOSSES: ZoneBossConfig[] = [
     xpMultiplier: 6,
     goldMultiplier: 5,
     dropBonus: 0.3,
-    spawnTitle: 'The Sand Wurm Surfaces!',
-    spawnMessage: 'The ground trembles as a colossal serpent bursts from the dunes.'
+    spawnTitle: 'The Null Devourer Surfaces!',
+    spawnMessage: 'The void between realities tears open as an entity of pure hunger emerges.'
   },
   {
-    id: 'demon_lord',
-    name: 'Demon Lord',
+    id: 'core_guardian',
+    name: 'Core Guardian',
     kind: Types.Entities.SPECTRE,
     zoneId: 'lavaland',
     hp: 1500,
@@ -120,12 +120,12 @@ export const ZONE_BOSSES: ZoneBossConfig[] = [
     xpMultiplier: 8,
     goldMultiplier: 6,
     dropBonus: 0.35,
-    spawnTitle: 'The Demon Lord Descends!',
-    spawnMessage: 'Fire and shadow coalesce as a lord of the underworld manifests.'
+    spawnTitle: 'The Core Guardian Manifests!',
+    spawnMessage: 'Raw dimensional energy coalesces into a guardian born from the breach itself.'
   },
   {
-    id: 'skeleton_king',
-    name: 'Skeleton King',
+    id: 'the_architect',
+    name: 'The Architect',
     kind: Types.Entities.BOSS,
     zoneId: 'boss',
     hp: 2500,
@@ -137,8 +137,8 @@ export const ZONE_BOSSES: ZoneBossConfig[] = [
     xpMultiplier: 10,
     goldMultiplier: 8,
     dropBonus: 0.5,
-    spawnTitle: 'The Skeleton King Has Risen!',
-    spawnMessage: 'A powerful undead lord roams the land, hunting all who cross its path.'
+    spawnTitle: 'The Architect Has Awakened!',
+    spawnMessage: 'The entity that caused the Fracture stirs. Reality itself trembles in its presence.'
   }
 ];
 

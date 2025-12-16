@@ -26,12 +26,12 @@ export interface ZoneDefinition {
   areas: ZoneBounds[];
 }
 
-// Zone definitions with progression from south (village) to north (boss)
+// Zone definitions with progression from south (refuge) to north (fracture source)
 export const ZONE_DATA: Record<string, ZoneDefinition> = {
   village: {
     id: 'village',
-    name: 'Village',
-    description: 'A peaceful starting town',
+    name: 'The Refuge',
+    description: 'Last safe haven in the fractured world. Survivors gather here.',
     minLevel: 1,
     maxLevel: 3,
     rarityBonus: 0,
@@ -46,8 +46,8 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
 
   beach: {
     id: 'beach',
-    name: 'Sandy Beach',
-    description: 'Crabs roam the shoreline',
+    name: 'Shattered Coast',
+    description: 'Where reality meets the void. Waves crash against broken fragments of what was.',
     minLevel: 2,
     maxLevel: 5,
     rarityBonus: 0.05,      // +5% rarity
@@ -63,8 +63,8 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
 
   forest: {
     id: 'forest',
-    name: 'Dark Forest',
-    description: 'Goblins lurk among the trees',
+    name: 'Glitch Woods',
+    description: 'Trees frozen mid-corruption. Digital artifacts flicker between the branches.',
     minLevel: 3,
     maxLevel: 7,
     rarityBonus: 0.1,       // +10% rarity
@@ -79,14 +79,14 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
 
   cave: {
     id: 'cave',
-    name: 'Caverns',
-    description: 'Dark tunnels filled with skeletons',
+    name: 'The Underdepths',
+    description: 'Collapsed infrastructure echoes with whispers of civilization that was.',
     minLevel: 7,
     maxLevel: 12,
     rarityBonus: 0.15,      // +15% rarity
     goldBonus: 0.2,
     xpBonus: 0.15,
-    armorDropBonus: 0.15,   // Caves are good for armor
+    armorDropBonus: 0.15,   // Good for armor
     weaponDropBonus: 0.1,
     areas: [
       { x: 112, y: 193, w: 58, h: 50 },
@@ -96,8 +96,8 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
 
   desert: {
     id: 'desert',
-    name: 'Scorched Desert',
-    description: 'A harsh wasteland with deadly creatures',
+    name: 'The Null Zone',
+    description: 'Where reality has been erased. Nothing survives here for long.',
     minLevel: 10,
     maxLevel: 15,
     rarityBonus: 0.2,       // +20% rarity
@@ -115,8 +115,8 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
 
   lavaland: {
     id: 'lavaland',
-    name: 'Lavaland',
-    description: 'Rivers of molten fire and demons',
+    name: 'The Core Breach',
+    description: 'Heart of the Fracture. Raw dimensional energy tears through reality.',
     minLevel: 15,
     maxLevel: 35,
     rarityBonus: 0.3,       // +30% rarity
@@ -134,8 +134,8 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
 
   boss: {
     id: 'boss',
-    name: 'Skeleton King\'s Lair',
-    description: 'The final challenge awaits',
+    name: 'Reality\'s Edge',
+    description: 'Where the Fracture originated. The Architect waits.',
     minLevel: 25,
     maxLevel: 50,
     rarityBonus: 0.5,       // +50% rarity - best drops
