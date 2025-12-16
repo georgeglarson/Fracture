@@ -30,9 +30,9 @@ export class Server {
   _connections: { [id: string]: Connection } = {};
   _counter = 0;
   io: SocketIOServer;
-  connection_callback;
-  error_callback;
-  status_callback;
+  connection_callback: ((connection: Connection) => void) | null = null;
+  error_callback: (() => void) | null = null;
+  status_callback: (() => string) | null = null;
 
   constructor(port: number, host: string = 'localhost') {
     this.port = port;
@@ -53,7 +53,7 @@ export class Server {
     app.use('/tts', express.static(ttsPath));
 
     // API: Generate intro story with TTS
-    app.post('/api/intro', async (req, res) => {
+    app.post('/api/intro', async (req: any, res: any) => {
       const { playerName } = req.body;
       if (!playerName || typeof playerName !== 'string') {
         return res.status(400).json({ error: 'playerName is required' });
@@ -135,8 +135,8 @@ export class Server {
     return '5' + Utils.random(99) + '' + (this._counter++);
   }
 
-  broadcast(message) {
-    this.forEachConnection(function (connection) {
+  broadcast(message: any): void {
+    this.forEachConnection(function (connection: Connection) {
       connection.send(message);
     });
   }
@@ -163,31 +163,31 @@ export class Server {
     return sockets.length;
   }
 
-  onRequestStatus(status_callback) {
+  onRequestStatus(status_callback: () => string): void {
     this.status_callback = status_callback;
   }
 
-  onConnect(callback) {
+  onConnect(callback: (connection: Connection) => void): void {
     this.connection_callback = callback;
   }
 
-  onError(callback) {
+  onError(callback: () => void): void {
     this.error_callback = callback;
   }
 
-  forEachConnection(callback) {
+  forEachConnection(callback: (connection: Connection) => void): void {
     _.each(this._connections, callback);
   }
 
-  addConnection(connection) {
+  addConnection(connection: Connection): void {
     this._connections[connection.id] = connection;
   }
 
-  removeConnection(id) {
+  removeConnection(id: string): void {
     delete this._connections[id];
   }
 
-  getConnection(id) {
+  getConnection(id: string): Connection {
     return this._connections[id];
   }
 }
@@ -197,8 +197,8 @@ export class Connection {
   _server: Server;
   id: string;
   clientIp: string;
-  listen_callback;
-  close_callback;
+  listen_callback: ((message: any) => void) | null = null;
+  close_callback: (() => void) | null = null;
   private _currentZone: string | null = null;
 
   constructor(id: string, connection: Socket, server: Server) {
@@ -229,23 +229,23 @@ export class Connection {
     });
   }
 
-  onClose(callback) {
+  onClose(callback: () => void): void {
     this.close_callback = callback;
   }
 
-  listen(callback) {
+  listen(callback: (message: any) => void): void {
     this.listen_callback = callback;
   }
 
-  broadcast(message) {
+  broadcast(message: any): void {
     throw new Error('Not implemented');
   }
 
-  send(message) {
+  send(message: any): void {
     this._connection.emit('message', message);
   }
 
-  sendUTF8(data) {
+  sendUTF8(data: any): void {
     this._connection.emit('message', data);
   }
 
@@ -310,7 +310,7 @@ export class Connection {
     this._connection.to(`party:${partyId}`).emit('message', message);
   }
 
-  close(logError?) {
+  close(logError?: string): void {
     console.info('Closing connection to player ' + this.id + '. Error: ' + logError);
     this._connection.disconnect();
   }

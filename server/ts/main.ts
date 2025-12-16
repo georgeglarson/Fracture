@@ -73,18 +73,18 @@ process.on('exit', releaseServerLock);
 process.on('SIGINT', () => { releaseServerLock(); process.exit(0); });
 process.on('SIGTERM', () => { releaseServerLock(); process.exit(0); });
 
-function main(config) {
+function main(config: any): void {
     var WorldServer = World,
         server = new Server(config.port),
         metrics = config.metrics_enabled ? new Metrics(config) : null,
-        worlds = [],
+        worlds: World[] = [],
         lastTotalPlayers = 0,
         checkPopulationInterval = setInterval(function() {
             if(metrics && metrics.isReady) {
-                metrics.getTotalPlayers(function(totalPlayers) {
+                metrics.getTotalPlayers(function(totalPlayers: number) {
                     if(totalPlayers !== lastTotalPlayers) {
                         lastTotalPlayers = totalPlayers;
-                        worlds.forEach(function(world) {
+                        worlds.forEach(function(world: World) {
                             world.updatePopulation(totalPlayers);
                         });
                     }
@@ -131,26 +131,26 @@ function main(config) {
         console.warn("[FishAudio] NPC voice acting will be disabled");
     }
 
-    server.onConnect(function(connection) {
-        var world, // the one in which the player will be spawned
+    server.onConnect(function(connection: any) {
+        var world: World | undefined, // the one in which the player will be spawned
             connect = function() {
-                if(world) {
+                if(world && world.connect_callback) {
                     world.connect_callback(new Player(connection, world));
                 }
             };
 
         if(metrics) {
-            metrics.getOpenWorldCount(function(open_world_count) {
+            metrics.getOpenWorldCount(function(open_world_count: number) {
                 console.log('open world count: ' + open_world_count);
                 // choose the least populated world among open worlds
-                world = worlds.find(world => world.playerCount < config.nb_players_per_world && world.playerCount < open_world_count);
+                world = worlds.find((w: World) => w.playerCount < config.nb_players_per_world && w.playerCount < open_world_count);
                 connect();
             });
         }
         else {
             // simply fill each world sequentially until they are full
-            world = worlds.find(world => world.playerCount < config.nb_players_per_world);
-            world.updatePopulation();
+            world = worlds.find((w: World) => w.playerCount < config.nb_players_per_world);
+            if (world) world.updatePopulation();
             connect();
         }
     });
@@ -160,12 +160,12 @@ function main(config) {
     });
 
     var onPopulationChange = function() {
-        metrics.updatePlayerCounters(worlds, function(totalPlayers) {
-            worlds.forEach(function(world) {
+        metrics!.updatePlayerCounters(worlds, function(totalPlayers: number) {
+            worlds.forEach(function(world: World) {
                 world.updatePopulation(totalPlayers);
             });
         });
-        metrics.updateWorldDistribution(getWorldDistribution(worlds));
+        metrics!.updateWorldDistribution(getWorldDistribution(worlds));
     };
 
     Array.from({length: config.nb_worlds}, (_, i) => {
@@ -183,7 +183,7 @@ function main(config) {
     });
 
     if(config.metrics_enabled) {
-        metrics.ready(function() {
+        metrics!.ready(function() {
             onPopulationChange(); // initialize all counters to 0 when the server starts
         });
     }
@@ -193,16 +193,16 @@ function main(config) {
     // });
 }
 
-function getWorldDistribution(worlds) {
-    var distribution = [];
+function getWorldDistribution(worlds: World[]): number[] {
+    var distribution: number[] = [];
 
-    worlds.forEach(function(world) {
+    worlds.forEach(function(world: World) {
         distribution.push(world.playerCount);
     });
     return distribution;
 }
 
-function getConfigFile(path, callback) {
+function getConfigFile(path: string, callback: (config: any) => void): void {
     fs.readFile(path, 'utf8', function(err, json_string) {
         if(err) {
             console.error("Could not open config file:", err.path);
@@ -221,7 +221,7 @@ process.argv.forEach(function (val, index, array) {
     }
 });
 
-getConfigFile(configPath, function(config) {
+getConfigFile(configPath, function(config: any) {
     // Acquire singleton lock before starting
     if (!acquireServerLock()) {
         process.exit(1);

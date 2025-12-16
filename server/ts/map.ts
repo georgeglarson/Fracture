@@ -3,26 +3,31 @@ import * as _ from 'lodash';
 import {Checkpoint} from './checkpoint';
 import {Utils} from './utils';
 
+interface Position {
+  x: number;
+  y: number;
+}
+
 export class Map {
   isLoaded = false;
-  width;
-  height;
-  collisions;
-  mobAreas;
-  chestAreas;
-  staticChests;
-  staticEntities;
-  zoneWidth;
-  zoneHeight;
-  groupWidth;
-  groupHeight;
-  grid;
-  ready_func;
-  connectedGroups;
-  checkpoints;
-  startingAreas;
+  width: number = 0;
+  height: number = 0;
+  collisions: number[] = [];
+  mobAreas: any[] = [];
+  chestAreas: any[] = [];
+  staticChests: any[] = [];
+  staticEntities: Record<string, any> = {};
+  zoneWidth: number = 0;
+  zoneHeight: number = 0;
+  groupWidth: number = 0;
+  groupHeight: number = 0;
+  grid: number[][] = [];
+  ready_func: (() => void) | null = null;
+  connectedGroups: Record<string, Position[]> = {};
+  checkpoints: Record<number, Checkpoint> = {};
+  startingAreas: Checkpoint[] = [];
 
-  constructor(filepath) {
+  constructor(filepath: string) {
     var self = this;
 
 
@@ -40,7 +45,7 @@ export class Map {
     });
   }
 
-  initMap(map) {
+  initMap(map: any) {
     this.width = map.width;
     this.height = map.height;
     this.collisions = map.collisions;
@@ -64,15 +69,15 @@ export class Map {
     }
   }
 
-  ready(f) {
+  ready(f: () => void) {
     this.ready_func = f;
   }
 
-  tileIndexToGridPosition(tileNum) {
+  tileIndexToGridPosition(tileNum: number) {
     var x = 0,
       y = 0;
 
-    var getX = function (num, w) {
+    var getX = function (num: number, w: number) {
       if (num == 0) {
         return 0;
       }
@@ -86,7 +91,7 @@ export class Map {
     return {x: x, y: y};
   }
 
-  GridPositionToTileIndex(x, y) {
+  GridPositionToTileIndex(x: number, y: number) {
     return (y * this.width) + x + 1;
   }
 
@@ -110,24 +115,24 @@ export class Map {
     }
   }
 
-  isOutOfBounds(x, y) {
+  isOutOfBounds(x: number, y: number) {
     return x <= 0 || x >= this.width || y <= 0 || y >= this.height;
   }
 
-  isColliding(x, y) {
+  isColliding(x: number, y: number) {
     if (this.isOutOfBounds(x, y)) {
       return false;
     }
     return this.grid[y][x] === 1;
   }
 
-  GroupIdToGroupPosition(id) {
+  GroupIdToGroupPosition(id: string): Position {
     var posArray = id.split('-');
 
     return pos(parseInt(posArray[0]), parseInt(posArray[1]));
   }
 
-  forEachGroup(callback) {
+  forEachGroup(callback: (groupId: string) => void) {
     var width = this.groupWidth,
       height = this.groupHeight;
 
@@ -138,7 +143,7 @@ export class Map {
     }
   }
 
-  getGroupIdFromPosition(x, y) {
+  getGroupIdFromPosition(x: number, y: number) {
     var w = this.zoneWidth,
       h = this.zoneHeight,
       gx = Math.floor((x - 1) / w),
@@ -147,7 +152,7 @@ export class Map {
     return gx + '-' + gy;
   }
 
-  getAdjacentGroupPositions(id) {
+  getAdjacentGroupPositions(id: string) {
     var self = this,
       position = this.GroupIdToGroupPosition(id),
       x = position.x,
@@ -158,33 +163,33 @@ export class Map {
         pos(x - 1, y + 1), pos(x, y + 1), pos(x + 1, y + 1)];
 
     // groups connected via doors
-    _.each(this.connectedGroups[id], function (position) {
+    _.each(this.connectedGroups[id], function (position: Position) {
       // don't add a connected group if it's already part of the surrounding ones.
-      if (!_.any(list, function (groupPos) {
+      if (!_.some(list, function (groupPos: Position) {
           return equalPositions(groupPos, position);
         })) {
         list.push(position);
       }
     });
 
-    return _.reject(list, function (pos) {
-      return pos.x < 0 || pos.y < 0 || pos.x >= self.groupWidth || pos.y >= self.groupHeight;
+    return _.reject(list, function (p: Position) {
+      return p.x < 0 || p.y < 0 || p.x >= self.groupWidth || p.y >= self.groupHeight;
     });
   }
 
-  forEachAdjacentGroup(groupId, callback) {
+  forEachAdjacentGroup(groupId: string, callback: (groupId: string) => void) {
     if (groupId) {
-      _.each(this.getAdjacentGroupPositions(groupId), function (pos) {
-        callback(pos.x + '-' + pos.y);
+      _.each(this.getAdjacentGroupPositions(groupId), function (p: Position) {
+        callback(p.x + '-' + p.y);
       });
     }
   }
 
-  initConnectedGroups(doors) {
+  initConnectedGroups(doors: any[]) {
     var self = this;
 
     this.connectedGroups = {};
-    _.each(doors, function (door) {
+    _.each(doors, function (door: any) {
       var groupId = self.getGroupIdFromPosition(door.x, door.y),
         connectedGroupId = self.getGroupIdFromPosition(door.tx, door.ty),
         connectedPosition = self.GroupIdToGroupPosition(connectedGroupId);
@@ -197,13 +202,13 @@ export class Map {
     });
   }
 
-  initCheckpoints(cpList) {
+  initCheckpoints(cpList: any[]) {
     var self = this;
 
     this.checkpoints = {};
     this.startingAreas = [];
 
-    _.each(cpList, function (cp) {
+    _.each(cpList, function (cp: any) {
       var checkpoint = new Checkpoint(cp.id, cp.x, cp.y, cp.w, cp.h);
       self.checkpoints[checkpoint.id] = checkpoint;
       if (cp.s === 1) {
@@ -212,7 +217,7 @@ export class Map {
     });
   }
 
-  getCheckpoint(id) {
+  getCheckpoint(id: number) {
     return this.checkpoints[id];
   }
 
@@ -225,10 +230,10 @@ export class Map {
   }
 }
 
-var pos = function (x, y) {
+var pos = function (x: number, y: number): Position {
   return {x: x, y: y};
 };
 
-var equalPositions = function (pos1, pos2) {
-  return pos1.x === pos2.x && pos2.y === pos2.y;
+var equalPositions = function (pos1: Position, pos2: Position) {
+  return pos1.x === pos2.x && pos1.y === pos2.y;
 };

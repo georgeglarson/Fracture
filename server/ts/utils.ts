@@ -3,24 +3,24 @@ import {Types} from '../../shared/ts/gametypes';
 
 export class Utils {
 
-  static sanitize(string) {
+  static sanitize(string: string): string {
     // Strip unsafe tags, then escape as html entities.
     return sanitizer.escape(sanitizer.sanitize(string));
   }
 
-  static random(range) {
+  static random(range: number): number {
     return Math.floor(Math.random() * range);
   }
 
-  static randomRange(min, max) {
+  static randomRange(min: number, max: number): number {
     return min + (Math.random() * (max - min));
   }
 
-  static randomInt(min, max) {
+  static randomInt(min: number, max: number): number {
     return min + Math.floor(Math.random() * (max - min + 1));
   }
 
-  static clamp(min, max, value) {
+  static clamp(min: number, max: number, value: number): number {
     if (value < min) {
       return min;
     } else if (value > max) {
@@ -30,8 +30,8 @@ export class Utils {
     }
   }
 
-  static randomOrientation() {
-    var o, r = Utils.random(4);
+  static randomOrientation(): number {
+    var o: number = Types.Orientations.DOWN, r = Utils.random(4);
 
     if (r === 0)
       o = Types.Orientations.LEFT;
@@ -45,7 +45,7 @@ export class Utils {
     return o;
   }
 
-  static Mixin(target, source) {
+  static Mixin(target: Record<string, any>, source: Record<string, any>): Record<string, any> {
     if (source) {
       for (var key, keys = Object.keys(source), l = keys.length; l--;) {
         key = keys[l];
@@ -58,7 +58,7 @@ export class Utils {
     return target;
   }
 
-  static distanceTo(x, y, x2, y2) {
+  static distanceTo(x: number, y: number, x2: number, y2: number): number {
     var distX = Math.abs(x - x2);
     var distY = Math.abs(y - y2);
 

@@ -188,7 +188,7 @@ export const Types: any = {
   }
 };
 
-var kinds = {
+var kinds: Record<string, any[]> = {
   warrior: [Types.Entities.WARRIOR, 'player'],
 
   rat: [Types.Entities.RAT, 'mob'],
@@ -245,12 +245,14 @@ var kinds = {
   beachnpc: [Types.Entities.BEACHNPC, 'npc'],
   forestnpc: [Types.Entities.FORESTNPC, 'npc'],
   desertnpc: [Types.Entities.DESERTNPC, 'npc'],
-  lavanpc: [Types.Entities.LAVANPC, 'npc'],
-
-  getType: function (kind) {
-    return kinds[Types.getKindAsString(kind)][1];
-  }
+  lavanpc: [Types.Entities.LAVANPC, 'npc']
 };
+
+// Helper function to get entity type from kind
+function getTypeFromKind(kind: number): string | undefined {
+  const kindStr = Types.getKindAsString(kind);
+  return kindStr && kinds[kindStr] ? kinds[kindStr][1] : undefined;
+}
 
 Types.rankedWeapons = [
   Types.Entities.SWORD1,
@@ -271,109 +273,111 @@ Types.rankedArmors = [
   Types.Entities.GOLDENARMOR
 ];
 
-Types.getWeaponRank = function (weaponKind) {
+Types.getWeaponRank = function (weaponKind: number): number {
   return _.indexOf(Types.rankedWeapons, weaponKind);
 };
 
-Types.getArmorRank = function (armorKind) {
+Types.getArmorRank = function (armorKind: number): number {
   return _.indexOf(Types.rankedArmors, armorKind);
 };
 
-Types.isPlayer = function (kind) {
-  return kinds.getType(kind) === 'player';
+Types.isPlayer = function (kind: number): boolean {
+  return getTypeFromKind(kind) === 'player';
 };
 
-Types.isMob = function (kind) {
-  return kinds.getType(kind) === 'mob';
+Types.isMob = function (kind: number): boolean {
+  return getTypeFromKind(kind) === 'mob';
 };
 
-Types.isNpc = function (kind) {
-  return kinds.getType(kind) === 'npc';
+Types.isNpc = function (kind: number): boolean {
+  return getTypeFromKind(kind) === 'npc';
 };
 
-Types.isCharacter = function (kind) {
+Types.isCharacter = function (kind: number): boolean {
   return Types.isMob(kind) || Types.isNpc(kind) || Types.isPlayer(kind);
 };
 
-Types.isArmor = function (kind) {
-  return kinds.getType(kind) === 'armor';
+Types.isArmor = function (kind: number): boolean {
+  return getTypeFromKind(kind) === 'armor';
 };
 
-Types.isWeapon = function (kind) {
-  return kinds.getType(kind) === 'weapon';
+Types.isWeapon = function (kind: number): boolean {
+  return getTypeFromKind(kind) === 'weapon';
 };
 
-Types.isObject = function (kind) {
-  return kinds.getType(kind) === 'object';
+Types.isObject = function (kind: number): boolean {
+  return getTypeFromKind(kind) === 'object';
 };
 
-Types.isChest = function (kind) {
+Types.isChest = function (kind: number): boolean {
   return kind === Types.Entities.CHEST;
 };
 
-Types.isItem = function (kind) {
+Types.isItem = function (kind: number): boolean {
   return Types.isWeapon(kind)
     || Types.isArmor(kind)
     || (Types.isObject(kind) && !Types.isChest(kind));
 };
 
-Types.isHealingItem = function (kind) {
+Types.isHealingItem = function (kind: number): boolean {
   return kind === Types.Entities.FLASK
     || kind === Types.Entities.BURGER;
 };
 
-Types.isExpendableItem = function (kind) {
+Types.isExpendableItem = function (kind: number): boolean {
   return Types.isHealingItem(kind)
     || kind === Types.Entities.FIREPOTION
     || kind === Types.Entities.CAKE;
 };
 
-Types.getKindFromString = function (kind) {
+Types.getKindFromString = function (kind: string): number | undefined {
   if (kind in kinds) {
     return kinds[kind][0];
   }
+  return undefined;
 };
 
-Types.getKindAsString = function (kind) {
+Types.getKindAsString = function (kind: number): string | undefined {
   for (var k in kinds) {
     if (kinds[k][0] === kind) {
       return k;
     }
   }
+  return undefined;
 };
 
-Types.forEachKind = function (callback) {
+Types.forEachKind = function (callback: (kind: number, kindName: string) => void): void {
   for (var k in kinds) {
     callback(kinds[k][0], k);
   }
 };
 
-Types.forEachArmor = function (callback) {
-  Types.forEachKind(function (kind, kindName) {
+Types.forEachArmor = function (callback: (kind: number, kindName: string) => void): void {
+  Types.forEachKind(function (kind: number, kindName: string) {
     if (Types.isArmor(kind)) {
       callback(kind, kindName);
     }
   });
 };
 
-Types.forEachMobOrNpcKind = function (callback) {
-  Types.forEachKind(function (kind, kindName) {
+Types.forEachMobOrNpcKind = function (callback: (kind: number, kindName: string) => void): void {
+  Types.forEachKind(function (kind: number, kindName: string) {
     if (Types.isMob(kind) || Types.isNpc(kind)) {
       callback(kind, kindName);
     }
   });
 };
 
-Types.forEachArmorKind = function (callback) {
-  Types.forEachKind(function (kind, kindName) {
+Types.forEachArmorKind = function (callback: (kind: number, kindName: string) => void): void {
+  Types.forEachKind(function (kind: number, kindName: string) {
     if (Types.isArmor(kind)) {
       callback(kind, kindName);
     }
   });
 };
 
-Types.getOrientationAsString = function (orientation) {
-  let normalized;
+Types.getOrientationAsString = function (orientation: number): string | undefined {
+  let normalized: string | undefined;
   switch (orientation) {
     case Types.Orientations.LEFT:
       normalized = 'left';
@@ -392,8 +396,8 @@ Types.getOrientationAsString = function (orientation) {
   return normalized;
 };
 
-Types.getRandomItemKind = function (item) {
-  var all = _.union(this.rankedWeapons, this.rankedArmors),
+Types.getRandomItemKind = function (item: any): number {
+  var all = _.union(Types.rankedWeapons, Types.rankedArmors),
     forbidden = [Types.Entities.SWORD1, Types.Entities.CLOTHARMOR],
     itemKinds = _.difference(all, forbidden),
     i = Math.floor(Math.random() * _.size(itemKinds));
@@ -401,13 +405,14 @@ Types.getRandomItemKind = function (item) {
   return itemKinds[i];
 };
 
-Types.getMessageTypeAsString = function (type) {
-  var typeName;
-  _.each(Types.Messages, function (value, name) {
-    if (value === type) {
+Types.getMessageTypeAsString = function (type: number): string {
+  var typeName: string | undefined;
+  for (const name of Object.keys(Types.Messages)) {
+    if ((Types.Messages as Record<string, number>)[name] === type) {
       typeName = name;
+      break;
     }
-  });
+  }
   if (!typeName) {
     typeName = 'UNKNOWN';
   }

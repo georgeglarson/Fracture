@@ -127,9 +127,10 @@ export class SpawnManager {
     const self = this;
     let count = 0;
 
-    _.each(this.map.staticEntities, function(kindName, tid) {
+    Object.entries(this.map.staticEntities).forEach(([tid, kindName]: [string, string]) => {
       const kind = Types.getKindFromString(kindName);
-      const pos = self.map!.tileIndexToGridPosition(tid);
+      if (kind === undefined) return;
+      const pos = self.map!.tileIndexToGridPosition(parseInt(tid));
 
       if (Types.isNpc(kind)) {
         self.entityManager!.addNpc(kind, pos.x + 1, pos.y);

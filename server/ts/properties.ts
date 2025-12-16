@@ -266,33 +266,35 @@ export const Properties = {
     weapon: 7,
     aggro: 8            // Boss has maximum aggro range
   },
-  getArmorLevel: kind => {
+  getArmorLevel: (kind: number): number | undefined => {
     try {
       if (Types.isMob(kind)) {
-        return Properties[Types.getKindAsString(kind)].armor;
+        return (Properties as Record<string, any>)[Types.getKindAsString(kind) as string].armor;
       } else {
         return Types.getArmorRank(kind) + 1;
       }
     } catch (e) {
       console.error('No level found for armor: ' + Types.getKindAsString(kind));
+      return undefined;
     }
   },
-  getWeaponLevel: kind => {
+  getWeaponLevel: (kind: number): number | undefined => {
     try {
       if (Types.isMob(kind)) {
-        return Properties[Types.getKindAsString(kind)].weapon;
+        return (Properties as Record<string, any>)[Types.getKindAsString(kind) as string].weapon;
       } else {
         return Types.getWeaponRank(kind) + 1;
       }
     } catch (e) {
       console.error('No level found for weapon: ' + Types.getKindAsString(kind));
+      return undefined;
     }
   },
-  getHitPoints: kind => {
-    return Properties[Types.getKindAsString(kind)].hp;
+  getHitPoints: (kind: number): number => {
+    return (Properties as Record<string, any>)[Types.getKindAsString(kind) as string].hp;
   },
-  getAggroRange: kind => {
-    const props = Properties[Types.getKindAsString(kind)];
+  getAggroRange: (kind: number): number => {
+    const props = (Properties as Record<string, any>)[Types.getKindAsString(kind) as string];
     return props?.aggro || 0; // Default to 0 (no aggro) if not defined
   }
 };

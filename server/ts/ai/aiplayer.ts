@@ -212,8 +212,8 @@ export class AIPlayer extends Character {
 
     this.armor = armors[Math.floor(Math.random() * armors.length)];
     this.weapon = weapons[Math.floor(Math.random() * weapons.length)];
-    this.armorLevel = Properties.getArmorLevel(this.armor);
-    this.weaponLevel = Properties.getWeaponLevel(this.weapon);
+    this.armorLevel = Properties.getArmorLevel(this.armor) ?? 1;
+    this.weaponLevel = Properties.getWeaponLevel(this.weapon) ?? 1;
   }
 
   private updateHitPoints(): void {

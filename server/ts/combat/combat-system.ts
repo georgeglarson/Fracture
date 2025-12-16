@@ -162,7 +162,7 @@ export class CombatSystem {
       }
     }
 
-    if (entity.type === 'mob' && attacker) {
+    if (entity.type === 'mob' && attacker && damage !== undefined) {
       // Let the mob's attacker (player) know how much damage was inflicted
       this.world.pushToPlayer(attacker, new Messages.Damage(entity, damage));
     }

@@ -3,7 +3,7 @@ import {Types} from '../../shared/ts/gametypes';
 import * as _ from 'lodash';
 
 export class FormatChecker {
-  formats = [];
+  formats: Record<number, string[]> = {};
 
   constructor() {
 
@@ -57,7 +57,7 @@ export class FormatChecker {
     this.formats[Types.Messages.INVENTORY_PICKUP] = ['n']; // itemEntityId
   }
 
-  check(msg) {
+  check(msg: any[]): boolean {
     var message = msg.slice(0),
       type = message[0],
       format = this.formats[type];

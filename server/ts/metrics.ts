@@ -2,13 +2,13 @@ import * as _ from 'lodash';
 import {World} from './world';
 
 export class Metrics {
-  config;
-  client;
+  config: any;
+  client: any;
   isReady = false;
-  ready_callback;
+  ready_callback: (() => void) | null = null;
 
 
-  constructor(config) {
+  constructor(config: any) {
     var self = this;
 
     this.config = config;
@@ -25,11 +25,11 @@ export class Metrics {
     });
   }
 
-  ready(callback) {
+  ready(callback: () => void): void {
     this.ready_callback = callback;
   }
 
-  updatePlayerCounters(worlds, updatedCallback) {
+  updatePlayerCounters(worlds: World[], updatedCallback?: (total: number) => void): void {
     var self = this,
       config = this.config,
       numServers = _.size(config.game_servers),
@@ -43,8 +43,8 @@ export class Metrics {
         var total_players = 0;
 
         // Recalculate the total number of players and set it
-        _.each(config.game_servers, function (server) {
-          self.client.get('player_count_' + server.name, function (error, result) {
+        _.each(config.game_servers, function (server: any) {
+          self.client.get('player_count_' + server.name, function (error: any, result: any) {
             var count = result ? parseInt(result) : 0;
 
             total_players += count;
@@ -64,18 +64,18 @@ export class Metrics {
     }
   }
 
-  updateWorldDistribution(worlds) {
+  updateWorldDistribution(worlds: number[]): void {
     this.client.set('world_distribution_' + this.config.server_name, worlds);
   }
 
-  getOpenWorldCount(callback) {
-    this.client.get('world_count_' + this.config.server_name, function (error, result) {
+  getOpenWorldCount(callback: (result: any) => void): void {
+    this.client.get('world_count_' + this.config.server_name, function (error: any, result: any) {
       callback(result);
     });
   }
 
-  getTotalPlayers(callback) {
-    this.client.get('total_players', function (error, result) {
+  getTotalPlayers(callback: (result: any) => void): void {
+    this.client.get('total_players', function (error: any, result: any) {
       callback(result);
     });
   }

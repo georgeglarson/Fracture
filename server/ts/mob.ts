@@ -30,8 +30,8 @@ export class Mob extends Character {
 
     this.spawningX = x;
     this.spawningY = y;
-    this.armorLevel = Properties.getArmorLevel(this.kind);
-    this.weaponLevel = Properties.getWeaponLevel(this.kind);
+    this.armorLevel = Properties.getArmorLevel(this.kind) ?? 1;
+    this.weaponLevel = Properties.getWeaponLevel(this.kind) ?? 1;
     this.aggroRange = Properties.getAggroRange(this.kind);
     this.updateHitPoints();
   }
