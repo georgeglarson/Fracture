@@ -23,12 +23,12 @@ import {getStorageService} from './storage/sqlite.service';
 
 export class World {
 
-  id;
-  maxPlayers;
-  server;
+  id: string | number;
+  maxPlayers: number;
+  server: any;
   ups = 50;
 
-  map = null;
+  map: Map | null = null;
 
   // Entity manager (initialized in run() after map is ready)
   entityManager: EntityManager | null = null;
@@ -41,12 +41,12 @@ export class World {
   get npcs() { return this.entityManager?.npcs ?? {}; }
   get itemCount() { return this.entityManager?.itemCount ?? 0; }
 
-  attackers = {};
-  equipping = {};
+  attackers: Record<number | string, any> = {};
+  equipping: Record<number | string, any> = {};
 
   // Zone manager for zone-based loot and notifications
   zoneManager: ZoneManager;
-  hurt = {};
+  hurt: Record<number | string, any> = {};
 
   // Spatial manager (initialized in run() after map is ready)
   spatialManager: SpatialManager | null = null;
@@ -73,15 +73,15 @@ export class World {
 
   playerCount = 0;
 
-  removed_callback;
-  added_callback;
-  regen_callback;
-  thought_callback;
-  aggro_callback;
-  init_callback;
-  connect_callback;
-  enter_callback;
-  attack_callback;
+  removed_callback: (() => void) | null = null;
+  added_callback: (() => void) | null = null;
+  regen_callback: (() => void) | null = null;
+  thought_callback: (() => void) | null = null;
+  aggro_callback: (() => void) | null = null;
+  init_callback: (() => void) | null = null;
+  connect_callback: ((player: any) => void) | null = null;
+  enter_callback: ((player: any) => void) | null = null;
+  attack_callback: ((attacker: any) => void) | null = null;
 
   // AI Players (Westworld feature)
   aiPlayerManager: AIPlayerManager | null = null;
@@ -92,7 +92,7 @@ export class World {
   // Storage service for player persistence
   private storageService: IStorageService | null = null;
 
-  constructor(id, maxPlayers, websocketServer) {
+  constructor(id: string | number, maxPlayers: number, websocketServer: any) {
     var self = this;
 
     this.id = id;
@@ -101,17 +101,17 @@ export class World {
     this.zoneManager = getZoneManager();
 
 
-    this.onPlayerConnect(function (player) {
+    this.onPlayerConnect(function (player: any) {
       player.onRequestPosition(function () {
         if (player.lastCheckpoint) {
           return player.lastCheckpoint.getRandomPosition();
         } else {
-          return self.map.getRandomStartingPosition();
+          return self.map!.getRandomStartingPosition();
         }
       });
     });
 
-    this.onPlayerEnter(function (player) {
+    this.onPlayerEnter(function (player: any) {
       console.info(player.name + ' has joined ' + self.id);
 
       if (!player.hasEnteredGame) {
@@ -128,10 +128,11 @@ export class World {
       self.pushToPlayer(player, new Messages.Population(self.playerCount));
       self.pushRelevantEntityListTo(player);
 
-      const move_callback = function (x, y) {
+      const move_callback = function (x: number, y: number) {
         console.debug(player.name + ' is moving to (' + x + ', ' + y + ').');
 
         player.forEachAttacker(function (mob: Mob) {
+          if (!mob.target) return;
           var target = self.getEntityById(mob.target);
           if (target) {
             var pos = self.findPositionNextTo(mob, target);
@@ -158,11 +159,11 @@ export class World {
         }
       });
 
-      player.onBroadcast(function (message, ignoreSelf) {
+      player.onBroadcast(function (message: any, ignoreSelf: boolean) {
         self.pushToAdjacentGroups(player.group, message, ignoreSelf ? player.id : null);
       });
 
-      player.onBroadcastToZone(function (message, ignoreSelf) {
+      player.onBroadcastToZone(function (message: any, ignoreSelf: boolean) {
         self.pushToGroup(player.group, message, ignoreSelf ? player.id : null);
       });
 
@@ -193,7 +194,7 @@ export class World {
     });
 
     // Called when an entity is attacked by another entity
-    this.onEntityAttack(function (attacker) {
+    this.onEntityAttack(function (attacker: any) {
       var target = self.getEntityById(attacker.target);
       if (target && attacker.type === 'mob') {
         var pos = self.findPositionNextTo(attacker, target);
@@ -202,7 +203,7 @@ export class World {
     });
 
     this.onRegenTick(function () {
-      self.forEachCharacter(function (character) {
+      self.forEachCharacter(function (character: any) {
         if (!character.hasFullHealth()) {
           character.regenHealthBy(Math.floor(character.maxHitPoints / 25));
 
@@ -226,14 +227,14 @@ export class World {
       let totalEntities = 0;
 
       // For each group with players, generate thoughts for nearby mobs/npcs
-      _.each(self.groups, function (group: any, groupId: string) {
+      Object.entries(self.groups).forEach(([groupId, group]: [string, any]) => {
         if (!group.players || group.players.length === 0) return;
         groupsWithPlayers++;
 
         // Get all mobs and NPCs in this group
         // group.entities is an object: { entityId: entity }
         const entities: any[] = [];
-        _.each(group.entities, function (entity: any, entityId: string) {
+        Object.entries(group.entities).forEach(([entityId, entity]: [string, any]) => {
           if (entity && (entity.type === 'mob' || entity.type === 'npc')) {
             entities.push(entity);
           }
@@ -313,47 +314,49 @@ export class World {
     });
   }
 
-  run(mapFilePath) {
+  run(mapFilePath: string) {
     var self = this;
 
     this.map = new Map(mapFilePath);
 
     this.map.ready(function () {
+      const map = self.map!; // We know map exists inside ready()
+
       // Initialize spatial manager for zone groups
       self.spatialManager = new SpatialManager();
-      self.spatialManager.setMap(self.map);
+      self.spatialManager.setMap(map);
       self.spatialManager.initZoneGroups();
 
       // Initialize entity manager
       self.entityManager = new EntityManager();
       self.entityManager.setGroupContext({
-        handleEntityGroupMembership: (entity) => self.handleEntityGroupMembership(entity),
-        removeFromGroups: (entity) => self.removeFromGroups(entity)
+        handleEntityGroupMembership: (entity: any) => self.handleEntityGroupMembership(entity),
+        removeFromGroups: (entity: any) => self.removeFromGroups(entity)
       });
 
       // Initialize message broadcaster now that groups exist
       self.broadcaster = new MessageBroadcaster(
         self.server,
         self.groups,
-        self.map,
-        { getEntityById: (id) => self.getEntityById(id) }
+        map,
+        { getEntityById: (id: number) => self.getEntityById(id) }
       );
 
       // Wire spatial manager to broadcaster
       self.spatialManager!.setBroadcaster({
-        pushToGroup: (groupId, message, ignoredPlayer) => self.pushToGroup(groupId, message, ignoredPlayer)
+        pushToGroup: (groupId: string, message: any, ignoredPlayerId?: string | number) => self.pushToGroup(groupId, message, ignoredPlayerId)
       });
 
       // Initialize combat system
       self.combatSystem = new CombatSystem({
-        getEntityById: (id) => self.getEntityById(id),
-        pushToPlayer: (player, message) => self.pushToPlayer(player, message),
-        pushToAdjacentGroups: (groupId, message, ignoredPlayer) => self.pushToAdjacentGroups(groupId, message, ignoredPlayer),
-        pushBroadcast: (message) => self.pushBroadcast(message),
-        getDroppedItem: (mob) => self.getDroppedItem(mob),
-        handleItemDespawn: (item) => self.handleItemDespawn(item),
-        removeEntity: (entity) => self.removeEntity(entity),
-        handleEntityGroupMembership: (entity) => self.handleEntityGroupMembership(entity)
+        getEntityById: (id: number) => self.getEntityById(id),
+        pushToPlayer: (player: any, message: any) => self.pushToPlayer(player, message),
+        pushToAdjacentGroups: (groupId: string, message: any, ignoredPlayer?: string | number) => self.pushToAdjacentGroups(groupId, message, ignoredPlayer),
+        pushBroadcast: (message: any) => self.pushBroadcast(message),
+        getDroppedItem: (mob: any) => self.getDroppedItem(mob),
+        handleItemDespawn: (item: any) => self.handleItemDespawn(item),
+        removeEntity: (entity: any) => self.removeEntity(entity),
+        handleEntityGroupMembership: (entity: any) => self.handleEntityGroupMembership(entity)
       });
 
       // Wire entity manager dependencies
@@ -362,29 +365,29 @@ export class World {
 
       // Initialize nemesis service context
       nemesisService.setContext({
-        pushBroadcast: (message) => self.pushBroadcast(message),
-        getMobName: (kind) => Types.getKindAsString(kind),
-        getMob: (mobId) => self.entityManager?.mobs[mobId],
-        getPlayer: (playerId) => self.entityManager?.players[playerId],
+        pushBroadcast: (message: any) => self.pushBroadcast(message),
+        getMobName: (kind: number) => Types.getKindAsString(kind),
+        getMob: (mobId: number) => self.entityManager?.mobs[mobId],
+        getPlayer: (playerId: number) => self.entityManager?.players[playerId],
       });
 
-      self.map.generateCollisionGrid();
+      map.generateCollisionGrid();
 
       // Initialize spawn manager
       self.spawnManager = new SpawnManager();
-      self.spawnManager.setMap(self.map);
+      self.spawnManager.setMap(map);
       self.spawnManager.setEntityManager({
-        addNpc: (kind, x, y) => self.addNpc(kind, x, y),
-        addMob: (mob) => self.addMob(mob),
-        addItem: (item) => self.addItem(item),
-        addStaticItem: (item) => self.addStaticItem(item),
-        addItemFromChest: (kind, x, y) => self.addItemFromChest(kind, x, y),
-        createItem: (kind, x, y) => self.createItem(kind, x, y),
-        createChest: (x, y, items) => self.createChest(x, y, items),
-        removeEntity: (entity) => self.removeEntity(entity)
+        addNpc: (kind: number, x: number, y: number) => self.addNpc(kind, x, y),
+        addMob: (mob: any) => self.addMob(mob),
+        addItem: (item: any) => self.addItem(item),
+        addStaticItem: (item: any) => self.addStaticItem(item),
+        addItemFromChest: (kind: number, x: number, y: number) => self.addItemFromChest(kind, x, y),
+        createItem: (kind: number, x: number, y: number) => self.createItem(kind, x, y),
+        createChest: (x: number, y: number, items: any[]) => self.createChest(x, y, items),
+        removeEntity: (entity: any) => self.removeEntity(entity)
       });
       self.spawnManager.setBroadcaster({
-        pushToAdjacentGroups: (groupId, message) => self.pushToAdjacentGroups(groupId, message)
+        pushToAdjacentGroups: (groupId: string, message: any) => self.pushToAdjacentGroups(groupId, message)
       });
       self.spawnManager.setWorldContext(self);
 
@@ -432,7 +435,7 @@ export class World {
     }, 5000);
   }
 
-  setUpdatesPerSecond(ups) {
+  setUpdatesPerSecond(ups: number) {
     this.ups = ups;
   }
 
@@ -446,47 +449,47 @@ export class World {
     return this.storageService;
   }
 
-  onInit(callback) {
+  onInit(callback: () => void) {
     this.init_callback = callback;
   }
 
-  onPlayerConnect(callback) {
+  onPlayerConnect(callback: (player: any) => void) {
     this.connect_callback = callback;
   }
 
-  onPlayerEnter(callback) {
+  onPlayerEnter(callback: (player: any) => void) {
     this.enter_callback = callback;
   }
 
-  onPlayerAdded(callback) {
+  onPlayerAdded(callback: () => void) {
     this.added_callback = callback;
   }
 
-  onPlayerRemoved(callback) {
+  onPlayerRemoved(callback: () => void) {
     this.removed_callback = callback;
   }
 
-  onRegenTick(callback) {
+  onRegenTick(callback: () => void) {
     this.regen_callback = callback;
   }
 
-  onThoughtTick(callback) {
+  onThoughtTick(callback: () => void) {
     this.thought_callback = callback;
   }
 
-  onAggroTick(callback) {
+  onAggroTick(callback: () => void) {
     this.aggro_callback = callback;
   }
 
-  pushRelevantEntityListTo(player) {
+  pushRelevantEntityListTo(player: any) {
     var entities;
 
     if (player && (player.group in this.groups)) {
       entities = _.keys(this.groups[player.group].entities);
-      entities = _.reject(entities, function (id) {
+      entities = _.reject(entities, function (id: string) {
         return id == player.id;
       });
-      entities = _.map(entities, function (id: any) {
+      entities = _.map(entities, function (id: string) {
         return parseInt(id);
       });
       if (entities) {
@@ -495,10 +498,10 @@ export class World {
     }
   }
 
-  pushSpawnsToPlayer(player, ids) {
+  pushSpawnsToPlayer(player: any, ids: number[]) {
     var self = this;
 
-    _.each(ids, function (id) {
+    _.each(ids, function (id: number) {
       var entity = self.getEntityById(id);
       if (entity) {
         self.pushToPlayer(player, new Messages.Spawn(entity));
@@ -508,23 +511,23 @@ export class World {
     console.debug('Pushed ' + _.size(ids) + ' new spawns to ' + player.id);
   }
 
-  pushToPlayer(player, message) {
+  pushToPlayer(player: any, message: any) {
     this.broadcaster?.pushToPlayer(player, message);
   }
 
-  pushToGroup(groupId, message, ignoredPlayer?) {
+  pushToGroup(groupId: string, message: any, ignoredPlayer?: string | number) {
     this.broadcaster?.pushToGroup(groupId, message, ignoredPlayer);
   }
 
-  pushToAdjacentGroups(groupId, message, ignoredPlayer?) {
+  pushToAdjacentGroups(groupId: string, message: any, ignoredPlayer?: string | number) {
     this.broadcaster?.pushToAdjacentGroups(groupId, message, ignoredPlayer);
   }
 
-  pushToPreviousGroups(player, message) {
+  pushToPreviousGroups(player: any, message: any) {
     this.broadcaster?.pushToPreviousGroups(player, message);
   }
 
-  pushBroadcast(message, ignoredPlayer?) {
+  pushBroadcast(message: any, ignoredPlayer?: string | number) {
     this.broadcaster?.pushBroadcast(message, ignoredPlayer);
   }
 
@@ -532,95 +535,95 @@ export class World {
     this.broadcaster?.processQueues();
   }
 
-  addEntity(entity) {
+  addEntity(entity: any) {
     this.entityManager?.addEntity(entity);
   }
 
-  removeEntity(entity) {
+  removeEntity(entity: any) {
     this.entityManager?.removeEntity(entity);
   }
 
-  addPlayer(player) {
+  addPlayer(player: any) {
     this.entityManager?.addPlayer(player);
   }
 
-  removePlayer(player) {
+  removePlayer(player: any) {
     this.entityManager?.removePlayer(player);
   }
 
-  addMob(mob) {
+  addMob(mob: any) {
     this.entityManager?.addMob(mob);
   }
 
-  addNpc(kind, x, y) {
+  addNpc(kind: number, x: number, y: number) {
     return this.entityManager?.addNpc(kind, x, y);
   }
 
-  addItem(item) {
+  addItem(item: any) {
     return this.entityManager?.addItem(item);
   }
 
-  createItem(kind, x, y) {
+  createItem(kind: number, x: number, y: number) {
     return this.entityManager?.createItem(kind, x, y);
   }
 
-  createItemWithProperties(kind, x, y, existingProperties?) {
+  createItemWithProperties(kind: number, x: number, y: number, existingProperties?: any) {
     return this.entityManager?.createItemWithProperties(kind, x, y, existingProperties);
   }
 
-  createChest(x, y, items) {
+  createChest(x: number, y: number, items: any[]) {
     return this.entityManager?.createChest(x, y, items);
   }
 
-  addStaticItem(item) {
+  addStaticItem(item: any) {
     return this.entityManager?.addStaticItem(item);
   }
 
-  addItemFromChest(kind, x, y) {
+  addItemFromChest(kind: number, x: number, y: number) {
     return this.entityManager?.addItemFromChest(kind, x, y);
   }
 
   /**
    * The mob will no longer be registered as an attacker of its current target.
    */
-  clearMobAggroLink(mob) {
+  clearMobAggroLink(mob: any) {
     this.combatSystem?.clearMobAggroLink(mob);
   }
 
-  clearMobHateLinks(mob) {
+  clearMobHateLinks(mob: any) {
     this.combatSystem?.clearMobHateLinks(mob);
   }
 
-  forEachEntity(callback) {
+  forEachEntity(callback: (entity: any) => void) {
     this.entityManager?.forEachEntity(callback);
   }
 
-  forEachPlayer(callback) {
+  forEachPlayer(callback: (player: any) => void) {
     this.entityManager?.forEachPlayer(callback);
   }
 
-  forEachMob(callback) {
+  forEachMob(callback: (mob: Mob) => void) {
     this.entityManager?.forEachMob(callback);
   }
 
-  forEachCharacter(callback) {
+  forEachCharacter(callback: (character: any) => void) {
     this.entityManager?.forEachCharacter(callback);
   }
 
-  handleMobHate(mobId, playerId, hatePoints) {
+  handleMobHate(mobId: number, playerId: number, hatePoints: number) {
     this.combatSystem?.handleMobHate(mobId, playerId, hatePoints);
   }
 
-  chooseMobTarget(mob, hateRank?) {
+  chooseMobTarget(mob: any, hateRank?: number) {
     this.combatSystem?.chooseMobTarget(mob, hateRank);
   }
 
-  onEntityAttack(callback) {
+  onEntityAttack(callback: (attacker: any) => void) {
     this.attack_callback = callback;
     this.combatSystem?.onEntityAttack(callback);
   }
 
-  getEntityById(id) {
+  getEntityById(id: number) {
     return this.entityManager?.getEntityById(id);
   }
 
@@ -628,15 +631,15 @@ export class World {
     return this.entityManager?.getPlayerCount() ?? 0;
   }
 
-  broadcastAttacker(character) {
+  broadcastAttacker(character: any) {
     this.combatSystem?.broadcastAttacker(character);
   }
 
-  handleHurtEntity(entity, attacker?, damage?) {
+  handleHurtEntity(entity: any, attacker?: any, damage?: number) {
     this.combatSystem?.handleHurtEntity(entity, attacker, damage);
   }
 
-  despawn(entity) {
+  despawn(entity: any) {
     this.pushToAdjacentGroups(entity.group, entity.despawn());
 
     if (entity.id in this.entities) {
@@ -646,18 +649,18 @@ export class World {
 
   // spawnStaticEntities() moved to SpawnManager
 
-  isValidPosition(x, y) {
+  isValidPosition(x: number, y: number) {
     if (this.map && _.isNumber(x) && _.isNumber(y) && !this.map.isOutOfBounds(x, y) && !this.map.isColliding(x, y)) {
       return true;
     }
     return false;
   }
 
-  handlePlayerVanish(player) {
+  handlePlayerVanish(player: any) {
     this.combatSystem?.handlePlayerVanish(player);
   }
 
-  setPlayerCount(count) {
+  setPlayerCount(count: number) {
     this.playerCount = count;
   }
 
@@ -671,12 +674,12 @@ export class World {
     }
   }
 
-  getDroppedItem(mob) {
-    var kind = Types.getKindAsString(mob.kind),
-      baseDrops = Properties[kind].drops,
+  getDroppedItem(mob: any) {
+    var kind = Types.getKindAsString(mob.kind) as string,
+      baseDrops = (Properties as Record<string, any>)[kind].drops,
       v = Utils.random(100),
       p = 0,
-      item = null;
+      item: any = null;
 
     // Get zone at mob position for loot bonuses
     const zone = this.zoneManager.getZoneAt(mob.x, mob.y);
@@ -699,41 +702,41 @@ export class World {
     return item;
   }
 
-  onMobMoveCallback(mob) {
+  onMobMoveCallback(mob: any) {
     this.pushToAdjacentGroups(mob.group, new Messages.Move(mob));
     this.handleEntityGroupMembership(mob);
   }
 
-  findPositionNextTo(entity, target) {
+  findPositionNextTo(entity: any, target: any) {
     var valid = false,
-      pos;
+      pos: { x: number; y: number };
 
     while (!valid) {
       pos = entity.getPositionNextTo(target);
       valid = this.isValidPosition(pos.x, pos.y);
     }
-    return pos;
+    return pos!;
   }
 
   // Spatial group methods - delegate to SpatialManager
 
-  removeFromGroups(entity) {
+  removeFromGroups(entity: any) {
     return this.spatialManager?.removeFromGroups(entity) ?? [];
   }
 
-  addAsIncomingToGroup(entity, groupId) {
+  addAsIncomingToGroup(entity: any, groupId: string) {
     this.spatialManager?.addAsIncomingToGroup(entity, groupId);
   }
 
-  addToGroup(entity, groupId) {
+  addToGroup(entity: any, groupId: string) {
     return this.spatialManager?.addToGroup(entity, groupId) ?? [];
   }
 
-  logGroupPlayers(groupId) {
+  logGroupPlayers(groupId: string) {
     this.spatialManager?.logGroupPlayers(groupId);
   }
 
-  handleEntityGroupMembership(entity) {
+  handleEntityGroupMembership(entity: any) {
     return this.spatialManager?.handleEntityGroupMembership(entity) ?? false;
   }
 
@@ -741,7 +744,7 @@ export class World {
     this.spatialManager?.processGroups();
   }
 
-  moveEntity(entity, x, y) {
+  moveEntity(entity: any, x: number, y: number) {
     if (entity) {
       entity.setPosition(x, y);
       this.handleEntityGroupMembership(entity);
@@ -750,31 +753,31 @@ export class World {
 
   // Spawn methods - delegate to SpawnManager
 
-  handleItemDespawn(item) {
+  handleItemDespawn(item: any) {
     this.spawnManager?.handleItemDespawn(item);
   }
 
-  handleEmptyMobArea(area) {
+  handleEmptyMobArea(area: any) {
     this.spawnManager?.handleEmptyMobArea(area);
   }
 
-  handleEmptyChestArea(area) {
+  handleEmptyChestArea(area: any) {
     this.spawnManager?.handleEmptyChestArea(area);
   }
 
-  handleChestDespawn(chest) {
+  handleChestDespawn(chest: any) {
     this.spawnManager?.handleChestDespawn(chest);
   }
 
-  handleOpenedChest(chest, player) {
+  handleOpenedChest(chest: any, player: any) {
     this.spawnManager?.handleOpenedChest(chest, player);
   }
 
-  tryAddingMobToChestArea(mob) {
+  tryAddingMobToChestArea(mob: any) {
     this.spawnManager?.tryAddingMobToChestArea(mob);
   }
 
-  updatePopulation(totalPlayers) {
+  updatePopulation(totalPlayers?: number) {
     this.pushBroadcast(new Messages.Population(this.playerCount, totalPlayers ? totalPlayers : this.playerCount));
   }
 }

@@ -38,12 +38,12 @@ export class Player extends Character {
 
   hasEnteredGame = false;
   isDead = false;
-  haters = {};
-  lastCheckpoint = null;
-  disconnectTimeout = null;
+  haters: Record<number | string, any> = {};
+  lastCheckpoint: any = null;
+  disconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   formatChecker: FormatChecker;
-  name;
-  firepotionTimeout;
+  name!: string;
+  firepotionTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Equipment management (unified handling of all equipment slots)
   private equipment: EquipmentManager = new EquipmentManager();
@@ -74,15 +74,15 @@ export class Player extends Character {
   // Database character ID (for persistence)
   characterId: string | null = null;
 
-  zone_callback;
-  move_callback;
-  lootmove_callback;
-  message_callback;
-  exit_callback;
-  broadcast_callback;
-  broadcastzone_callback;
-  orient_callback;
-  requestpos_callback;
+  zone_callback: ((zoneId: number) => void) | null = null;
+  move_callback: ((x: number, y: number) => void) | null = null;
+  lootmove_callback: ((x: number, y: number) => void) | null = null;
+  message_callback: ((message: any[]) => void) | null = null;
+  exit_callback: (() => void) | null = null;
+  broadcast_callback: ((message: any, ignoreSelf: boolean) => void) | null = null;
+  broadcastzone_callback: ((message: any, ignoreSelf: boolean) => void) | null = null;
+  orient_callback: ((orientation: number) => void) | null = null;
+  requestpos_callback: (() => { x: number; y: number }) | null = null;
 
   constructor(private connection: Connection, private world: World) {
     super(connection.id, 'player', Types.Entities.WARRIOR, 0, 0);
@@ -92,7 +92,7 @@ export class Player extends Character {
 
     this.formatChecker = new FormatChecker();
 
-    this.connection.listen(async function (message) {
+    this.connection.listen(async function (message: any[]) {
       var action = parseInt(message[0]);
 
       console.debug('Received: ' + message);
@@ -125,7 +125,9 @@ export class Player extends Character {
       if (self.firepotionTimeout) {
         clearTimeout(self.firepotionTimeout);
       }
-      clearTimeout(self.disconnectTimeout);
+      if (self.disconnectTimeout) {
+        clearTimeout(self.disconnectTimeout);
+      }
       if (self.exit_callback) {
         self.exit_callback();
       }
@@ -159,59 +161,59 @@ export class Player extends Character {
     return basestate.concat(state);
   }
 
-  send(message) {
+  send(message: any) {
     this.connection.send(message);
   }
 
-  broadcast(message, ignoreSelf?) {
+  broadcast(message: any, ignoreSelf?: boolean) {
     if (this.broadcast_callback) {
       this.broadcast_callback(message, ignoreSelf === undefined ? true : ignoreSelf);
     }
   }
 
-  broadcastToZone(message, ignoreSelf?) {
+  broadcastToZone(message: any, ignoreSelf?: boolean) {
     if (this.broadcastzone_callback) {
       this.broadcastzone_callback(message, ignoreSelf === undefined ? true : ignoreSelf);
     }
   }
 
-  onExit(callback) {
+  onExit(callback: () => void) {
     this.exit_callback = callback;
   }
 
-  onMove(callback) {
+  onMove(callback: (x: number, y: number) => void) {
     this.move_callback = callback;
   }
 
-  onLootMove(callback) {
+  onLootMove(callback: (x: number, y: number) => void) {
     this.lootmove_callback = callback;
   }
 
-  onZone(callback) {
+  onZone(callback: (zoneId: number) => void) {
     this.zone_callback = callback;
   }
 
-  onOrient(callback) {
+  onOrient(callback: (orientation: number) => void) {
     this.orient_callback = callback;
   }
 
-  onMessage(callback) {
+  onMessage(callback: (message: any[]) => void) {
     this.message_callback = callback;
   }
 
-  onBroadcast(callback) {
+  onBroadcast(callback: (message: any, ignoreSelf: boolean) => void) {
     this.broadcast_callback = callback;
   }
 
-  onBroadcastToZone(callback) {
+  onBroadcastToZone(callback: (message: any, ignoreSelf: boolean) => void) {
     this.broadcastzone_callback = callback;
   }
 
-  equip(item) {
+  equip(item: number) {
     return new Messages.EquipItem(this, item);
   }
 
-  addHater(mob) {
+  addHater(mob: any) {
     if (mob) {
       if (!(mob.id in this.haters)) {
         this.haters[mob.id] = mob;
@@ -219,27 +221,27 @@ export class Player extends Character {
     }
   }
 
-  removeHater(mob) {
+  removeHater(mob: any) {
     if (mob && mob.id in this.haters) {
       delete this.haters[mob.id];
     }
   }
 
-  forEachHater(callback) {
+  forEachHater(callback: (mob: any) => void) {
     _.each(this.haters, function (mob) {
       callback(mob);
     });
   }
 
-  equipArmor(kind) {
+  equipArmor(kind: number) {
     this.equipment.equipToSlot('armor', kind);
   }
 
-  equipWeapon(kind) {
+  equipWeapon(kind: number) {
     this.equipment.equipToSlot('weapon', kind);
   }
 
-  equipItem(item) {
+  equipItem(item: any) {
     if (item) {
       console.debug(this.name + ' equips ' + Types.getKindAsString(item.kind));
 
@@ -270,7 +272,7 @@ export class Player extends Character {
    * Check if player entered a new zone and send notification
    */
   checkZoneChange(x: number, y: number) {
-    const result = this.world.zoneManager.updatePlayerZone(this.id, x, y, this.level);
+    const result = this.world.zoneManager.updatePlayerZone(String(this.id), x, y, this.level);
     if (result.changed && result.zone) {
       // Send zone enter notification
       this.send(this.world.zoneManager.createZoneEnterMessage(result.zone, result.warning));
@@ -389,12 +391,14 @@ export class Player extends Character {
     this.send(new Messages.DailyReward(result.gold, result.xp, result.streak, result.isNewDay).serialize());
   }
 
-  onRequestPosition(callback) {
+  onRequestPosition(callback: () => { x: number; y: number }) {
     this.requestpos_callback = callback;
   }
 
   resetTimeout() {
-    clearTimeout(this.disconnectTimeout);
+    if (this.disconnectTimeout) {
+      clearTimeout(this.disconnectTimeout);
+    }
     this.disconnectTimeout = setTimeout(this.timeout.bind(this), 1000 * 60 * 15); // 15 min.
   }
 
@@ -1491,7 +1495,7 @@ export class Player extends Character {
     }
 
     const achievementService = getAchievementService();
-    const achievements = achievementService.getPlayerAchievements(this.id);
+    const achievements = achievementService.getPlayerAchievements(String(this.id));
 
     const state: PlayerSaveState = {
       character: {
@@ -1528,7 +1532,7 @@ export class Player extends Character {
     }
 
     const achievementService = getAchievementService();
-    const achievements = achievementService.getPlayerAchievements(this.id);
+    const achievements = achievementService.getPlayerAchievements(String(this.id));
 
     return {
       character: {

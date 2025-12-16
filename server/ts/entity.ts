@@ -2,66 +2,56 @@ import {Messages} from './message';
 import {Utils} from './utils';
 
 export abstract class Entity {
-  id;
-  type;
-  kind;
-  x;
-  y;
+  id: number;
+  type: string;
+  kind: number;
+  x: number;
+  y: number;
 
-  /**
-   *
-   * @param id
-   * @param type
-   * @param kind
-   * @param x
-   * @param y
-   */
-  constructor(id, type, kind, x, y) {
-    this.id = parseInt(id);
+  constructor(id: string | number, type: string, kind: number, x: number, y: number) {
+    this.id = typeof id === 'string' ? parseInt(id) : id;
     this.type = type;
     this.kind = kind;
     this.x = x;
     this.y = y;
   }
 
-  abstract destroy();
+  abstract destroy(): void;
 
-  _getBaseState() {
+  _getBaseState(): any[] {
     return [
-      parseInt(this.id),
+      this.id,
       this.kind,
       this.x,
       this.y
     ];
   }
 
-  getState() {
+  getState(): any[] {
     return this._getBaseState();
   }
 
-  spawn() {
+  spawn(): any {
     return new Messages.Spawn(this);
   }
 
-  despawn() {
+  despawn(): any {
     return new Messages.Despawn(this.id);
   }
 
-  setPosition(x, y) {
+  setPosition(x: number, y: number): void {
     this.x = x;
     this.y = y;
   }
 
-  getPositionNextTo(entity) {
-    var pos = null;
+  getPositionNextTo(entity: Entity): { x: number; y: number } | null {
+    var pos: { x: number; y: number } | null = null;
     if (entity) {
-      pos = {};
+      pos = { x: entity.x, y: entity.y };
       // This is a quick & dirty way to give mobs a random position
       // close to another entity.
       var r = Utils.random(4);
 
-      pos.x = entity.x;
-      pos.y = entity.y;
       if (r === 0)
         pos.y -= 1;
       if (r === 1)

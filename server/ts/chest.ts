@@ -4,16 +4,17 @@ import {Utils} from './utils';
 import * as _ from 'lodash';
 
 export class Chest extends Item {
-  items;
-  constructor(id, x, y) {
+  items: any[] = [];
+
+  constructor(id: string | number, x: number, y: number) {
     super(id, Types.Entities.CHEST, x, y);
   }
 
-  setItems(items) {
+  setItems(items: any[]): void {
     this.items = items;
   }
 
-  getRandomItem() {
+  getRandomItem(): any {
     var nbItems = _.size(this.items),
       item = null;
 

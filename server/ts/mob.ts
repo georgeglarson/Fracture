@@ -6,33 +6,37 @@ import {ChestArea} from './chestarea';
 import {MobArea} from './mobarea';
 import {Utils} from './utils';
 
-export class Mob extends Character {
-  area;
-  spawningX;
-  spawningY;
-  armorLevel;
-  weaponLevel;
-  aggroRange;
-  hatelist = [];
-  respawnTimeout = null;
-  returnTimeout = null;
-  isDead = false;
-  respawn_callback;
-  move_callback;
+interface HateEntry {
+  id: number;
+  hate: number;
+}
 
-  constructor(id, kind, x, y) {
+export class Mob extends Character {
+  area: any;
+  spawningX: number;
+  spawningY: number;
+  armorLevel: number;
+  weaponLevel: number;
+  aggroRange: number;
+  hatelist: HateEntry[] = [];
+  respawnTimeout: ReturnType<typeof setTimeout> | null = null;
+  returnTimeout: ReturnType<typeof setTimeout> | null = null;
+  isDead: boolean = false;
+  respawn_callback: (() => void) | null = null;
+  move_callback: ((mob: Mob) => void) | null = null;
+
+  constructor(id: string | number, kind: number, x: number, y: number) {
     super(id, 'mob', kind, x, y);
 
-    this.updateHitPoints();
     this.spawningX = x;
     this.spawningY = y;
     this.armorLevel = Properties.getArmorLevel(this.kind);
     this.weaponLevel = Properties.getWeaponLevel(this.kind);
     this.aggroRange = Properties.getAggroRange(this.kind);
-
+    this.updateHitPoints();
   }
 
-  destroy() {
+  destroy(): void {
     this.isDead = true;
     this.hatelist = [];
     this.clearTarget();
@@ -42,31 +46,28 @@ export class Mob extends Character {
     this.handleRespawn();
   }
 
-  receiveDamage(points, playerId) {
+  receiveDamage(points: number, playerId: number): void {
     this.hitPoints -= points;
   }
 
-  hates(playerId) {
-    return _.any(this.hatelist, function (obj) {
+  hates(playerId: number): boolean {
+    return _.some(this.hatelist, function (obj: HateEntry) {
       return obj.id === playerId;
     });
   }
 
-  increaseHateFor(playerId, points) {
+  increaseHateFor(playerId: number, points: number): void {
     if (this.hates(playerId)) {
-      _.detect(this.hatelist, function (obj) {
+      const found = _.find(this.hatelist, function (obj: HateEntry) {
         return obj.id === playerId;
-      }).hate += points;
+      });
+      if (found) {
+        found.hate += points;
+      }
     }
     else {
       this.hatelist.push({id: playerId, hate: points});
     }
-
-    /*
-    log.debug("Hatelist : "+this.id);
-    _.each(this.hatelist, function(obj) {
-        log.debug(obj.id + " -> " + obj.hate);
-    });*/
 
     if (this.returnTimeout) {
       // Prevent the mob from returning to its spawning position
@@ -76,9 +77,9 @@ export class Mob extends Character {
     }
   }
 
-  getHatedPlayerId(hateRank) {
-    var i, playerId,
-      sorted = _.sortBy(this.hatelist, function (obj) {
+  getHatedPlayerId(hateRank?: number): number | undefined {
+    var i: number, playerId: number | undefined,
+      sorted = _.sortBy(this.hatelist, function (obj: HateEntry) {
         return obj.hate;
       }),
       size = _.size(this.hatelist);
@@ -96,8 +97,8 @@ export class Mob extends Character {
     return playerId;
   }
 
-  forgetPlayer(playerId, duration) {
-    this.hatelist = _.reject(this.hatelist, function (obj) {
+  forgetPlayer(playerId: number, duration?: number): void {
+    this.hatelist = _.reject(this.hatelist, function (obj: HateEntry) {
       return obj.id === playerId;
     });
 
@@ -106,18 +107,18 @@ export class Mob extends Character {
     }
   }
 
-  forgetEveryone() {
+  forgetEveryone(): void {
     this.hatelist = [];
     this.returnToSpawningPosition(1);
   }
 
-  drop(item) {
+  drop(item: any): any {
     if (item) {
       return new Messages.Drop(this, item);
     }
   }
 
-  handleRespawn() {
+  handleRespawn(): void {
     var delay = 30000,
       self = this;
 
@@ -138,15 +139,15 @@ export class Mob extends Character {
     }
   }
 
-  onRespawn(callback) {
+  onRespawn(callback: () => void): void {
     this.respawn_callback = callback;
   }
 
-  resetPosition() {
+  resetPosition(): void {
     this.setPosition(this.spawningX, this.spawningY);
   }
 
-  returnToSpawningPosition(waitDuration) {
+  returnToSpawningPosition(waitDuration?: number): void {
     var self = this,
       delay = waitDuration || 4000;
 
@@ -158,22 +159,22 @@ export class Mob extends Character {
     }, delay);
   }
 
-  onMove(callback) {
+  onMove(callback: (mob: Mob) => void): void {
     this.move_callback = callback;
   }
 
-  move(x, y) {
+  move(x: number, y: number): void {
     this.setPosition(x, y);
     if (this.move_callback) {
       this.move_callback(this);
     }
   }
 
-  updateHitPoints() {
+  updateHitPoints(): void {
     this.resetHitPoints(Properties.getHitPoints(this.kind));
   }
 
-  distanceToSpawningPoint(x, y) {
+  distanceToSpawningPoint(x: number, y: number): number {
     return Utils.distanceTo(x, y, this.spawningX, this.spawningY);
   }
 }

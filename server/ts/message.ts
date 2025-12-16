@@ -3,26 +3,26 @@ import * as _ from 'lodash';
 import { serializeProperties } from '../../shared/ts/items/index.js';
 export const Messages = {
   Spawn: class {
-    constructor(private entity) {
+    constructor(private entity: any) {
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.SPAWN].concat(this.entity.getState());
     }
   },
   Despawn: class {
-    constructor(private entityId) {
+    constructor(private entityId: number) {
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.DESPAWN, this.entityId];
     }
   },
   Move: class {
-    constructor(private entity) {
+    constructor(private entity: any) {
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.MOVE,
         this.entity.id,
         this.entity.x,
@@ -30,31 +30,31 @@ export const Messages = {
     }
   },
   LootMove: class {
-    constructor(private entity, private item) {
+    constructor(private entity: any, private item: any) {
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.LOOTMOVE,
         this.entity.id,
         this.item.id];
     }
   },
   Attack: class {
-    constructor(private attackerId, private targetId) {
+    constructor(private attackerId: number, private targetId: number | null) {
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.ATTACK,
         this.attackerId,
         this.targetId];
     }
   },
   Health: class {
-    constructor(private points, private isRegen = false) {
+    constructor(private points: number, private isRegen: boolean = false) {
     }
 
-    serialize() {
-      var health = [Types.Messages.HEALTH,
+    serialize(): any[] {
+      var health: any[] = [Types.Messages.HEALTH,
         this.points];
 
       if (this.isRegen) {
@@ -64,63 +64,63 @@ export const Messages = {
     }
   },
   HitPoints: class {
-    constructor(private maxHitPoints) {
+    constructor(private maxHitPoints: number) {
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.HP, this.maxHitPoints];
     }
   },
   EquipItem: class {
-    playerId;
-    constructor(private player, private itemKind) {
+    playerId: number;
+    constructor(private player: any, private itemKind: number) {
       this.playerId = player.id;
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.EQUIP,
         this.playerId,
         this.itemKind];
     }
   },
   Drop: class {
-    constructor(private mob, private item) {
+    constructor(private mob: any, private item: any) {
     }
 
-    serialize() {
+    serialize(): any[] {
       // Include item properties if available
       const properties = this.item.properties
         ? serializeProperties(this.item.properties)
         : null;
 
-      var drop = [Types.Messages.DROP,
+      var drop: any[] = [Types.Messages.DROP,
         this.mob.id,
         this.item.id,
         this.item.kind,
         properties,
-        _.pluck(this.mob.hatelist, 'id')];
+        _.map(this.mob.hatelist, 'id')];
 
       return drop;
     }
   },
   Chat: class {
-    playerId;
+    playerId: number;
 
-    constructor(player, private message) {
+    constructor(player: any, private message: string) {
       this.playerId = player.id;
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.CHAT,
         this.playerId,
         this.message];
     }
   },
   Teleport: class {
-    constructor(private entity) {
+    constructor(private entity: any) {
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.TELEPORT,
         this.entity.id,
         this.entity.x,
@@ -129,10 +129,10 @@ export const Messages = {
   },
 
   Damage: class {
-    constructor(private entity, private points) {
+    constructor(private entity: any, private points: number) {
     }
 
-    serialize() {
+    serialize(): any[] {
       // Include mob HP for health bar display
       return [Types.Messages.DAMAGE,
         this.entity.id,
@@ -143,10 +143,10 @@ export const Messages = {
   },
 
   Population: class {
-    constructor(private world, private total?) {
+    constructor(private world: number, private total?: number) {
     }
 
-    serialize() {
+    serialize(): any[] {
       // Hacked this
       // Made total prop optional
       // Added condition to fallbac to world count
@@ -157,20 +157,20 @@ export const Messages = {
   },
 
   Kill: class {
-    constructor(private mob) {
+    constructor(private mob: any) {
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.KILL,
         this.mob.kind];
     }
   },
 
   List: class {
-    constructor(private ids) {
+    constructor(private ids: any[]) {
     }
 
-    serialize() {
+    serialize(): any[] {
       var list = this.ids;
 
       list.unshift(Types.Messages.LIST);
@@ -179,20 +179,20 @@ export const Messages = {
   },
 
   Destroy: class {
-    constructor(private entity) {
+    constructor(private entity: any) {
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.DESTROY,
         this.entity.id];
     }
   },
 
   Blink: class {
-    constructor(private item) {
+    constructor(private item: any) {
     }
 
-    serialize() {
+    serialize(): any[] {
       return [Types.Messages.BLINK,
         this.item.id];
     }

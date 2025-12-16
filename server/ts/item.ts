@@ -28,17 +28,17 @@ export class Item extends Entity {
   /**
    *
    */
-  blinkTimeout;
+  blinkTimeout: ReturnType<typeof setTimeout> | null = null;
 
   /**
    *
    */
-  despawnTimeout;
+  despawnTimeout: ReturnType<typeof setTimeout> | null = null;
 
   /**
    *
    */
-  respawn_callback;
+  respawn_callback: (() => void) | null = null;
 
   /**
    *
@@ -48,7 +48,7 @@ export class Item extends Entity {
    * @param y
    * @param generatedItem Optional generated item with properties
    */
-  constructor(id, kind, x, y, generatedItem?: GeneratedItem) {
+  constructor(id: string | number, kind: number, x: number, y: number, generatedItem?: GeneratedItem) {
     super(id, 'item', kind, x, y);
     if (generatedItem) {
       this.properties = generatedItem.properties;
@@ -70,7 +70,7 @@ export class Item extends Entity {
    *
    * @param params
    */
-  handleDespawn(params) {
+  handleDespawn(params: { blinkCallback: () => void; despawnCallback: () => void; blinkingDuration: number; beforeBlinkDelay: number }) {
     const self = this;
 
     this.blinkTimeout = setTimeout(function () {
@@ -98,7 +98,7 @@ export class Item extends Entity {
    *
    * @param delay
    */
-  scheduleRespawn(delay) {
+  scheduleRespawn(delay: number) {
     const self = this;
     setTimeout(function () {
       if (self.respawn_callback) {
@@ -111,7 +111,7 @@ export class Item extends Entity {
    *
    * @param callback
    */
-  onRespawn(callback) {
+  onRespawn(callback: () => void) {
     this.respawn_callback = callback;
   }
 }

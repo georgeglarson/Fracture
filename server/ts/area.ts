@@ -3,27 +3,18 @@ import {Utils} from './utils';
 
 export class Area {
 
-  id;
-  x;
-  y;
-  width;
-  height;
-  world;
-  entities = [];
+  id: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  world: any;
+  entities: any[] = [];
   hasCompletelyRespawned = true;
-  nbEntities;
-  empty_callback;
+  nbEntities: number = 0;
+  empty_callback: (() => void) | null = null;
 
-  /**
-   *
-   * @param id
-   * @param x
-   * @param y
-   * @param width
-   * @param height
-   * @param world
-   */
-  constructor(id, x, y, width, height, world) {
+  constructor(id: number, x: number, y: number, width: number, height: number, world: any) {
     this.id = id;
     this.x = x;
     this.y = y;
@@ -33,8 +24,8 @@ export class Area {
 
   }
 
-  _getRandomPositionInsideArea() {
-    var pos: any = {},
+  _getRandomPositionInsideArea(): { x: number; y: number } {
+    var pos: { x: number; y: number } = { x: 0, y: 0 },
       valid = false;
 
     while (!valid) {
@@ -45,8 +36,8 @@ export class Area {
     return pos;
   }
 
-  removeFromArea(entity) {
-    var i = _.indexOf(_.pluck(this.entities, 'id'), entity.id);
+  removeFromArea(entity: any): void {
+    var i = _.indexOf(_.map(this.entities, 'id'), entity.id);
     this.entities.splice(i, 1);
 
     if (this.isEmpty() && this.hasCompletelyRespawned && this.empty_callback) {
@@ -55,7 +46,7 @@ export class Area {
     }
   }
 
-  addToArea(entity) {
+  addToArea(entity: any): void {
     if (entity) {
       this.entities.push(entity);
       entity.area = this;
@@ -66,21 +57,21 @@ export class Area {
     }
   }
 
-  setNumberOfEntities(nb) {
+  setNumberOfEntities(nb: number): void {
     this.nbEntities = nb;
   }
 
-  isEmpty() {
-    return !_.any(this.entities, function (entity) {
+  isEmpty(): boolean {
+    return !_.some(this.entities, function (entity: any) {
       return !entity.isDead
     });
   }
 
-  isFull() {
+  isFull(): boolean {
     return !this.isEmpty() && (this.nbEntities === _.size(this.entities));
   }
 
-  onEmpty(callback) {
+  onEmpty(callback: () => void): void {
     this.empty_callback = callback;
   }
 }

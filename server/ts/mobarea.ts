@@ -5,11 +5,11 @@ import * as _ from 'lodash';
 import {Utils} from './utils';
 
 export class MobArea extends Area {
-  nb;
-  kind;
-  respawns = [];
+  nb: number;
+  kind: string;
+  respawns: any[] = [];
 
-  constructor(id, nb, kind, x, y, width, height, world) {
+  constructor(id: number, nb: number, kind: string, x: number, y: number, width: number, height: number, world: any) {
     super(id, x, y, width, height, world);
     this.nb = nb;
     this.kind = kind;
@@ -34,7 +34,7 @@ export class MobArea extends Area {
     return mob;
   }
 
-  respawnMob(mob, delay) {
+  respawnMob(mob: Mob, delay: number) {
     var self = this;
 
     this.removeFromArea(mob);
@@ -50,7 +50,7 @@ export class MobArea extends Area {
     }, delay);
   }
 
-  addToArea(entity) {
+  addToArea(entity: any) {
     super.addToArea(entity);
     if (entity instanceof Mob) {
       this.world.addMob(entity);
@@ -61,7 +61,7 @@ export class MobArea extends Area {
     var self = this;
 
     setInterval(function () {
-      _.each(self.entities, function (mob) {
+      _.each(self.entities, function (mob: any) {
         var canRoam = (Utils.random(20) === 1),
           pos;
 
