@@ -35,7 +35,6 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 
 **What's missing for a "real game":**
 - Client-side storage integration (server-side done, client still uses localStorage)
-- Voice-acted NPCs (Fish Audio TTS integration)
 - More content (areas, mobs, bosses)
 
 ---
@@ -43,15 +42,15 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 ## ACTIVE PRIORITIES (December 2024)
 
 ### P0: Code Quality Refactor (020) 🔵
-**Status:** Planning Complete - Implementation Starting
+**Status:** In Progress - TypeScript Strict Mode Complete
 **Impact:** Enables sustainable development, prevents regression, improves maintainability
 **Spec:** `specs/020-code-quality-refactor/`
 
 **Key Deliverables:**
-- [ ] Testing infrastructure (Vitest)
-- [ ] Structured logging (Pino)
-- [ ] Rate limiting (security)
-- [ ] TypeScript strict mode
+- [x] Testing infrastructure (Vitest)
+- [x] Structured logging (Pino)
+- [x] Rate limiting (security)
+- [x] TypeScript strict mode
 - [ ] Player class decomposition (1,552 → <400 lines)
 - [ ] Game class decomposition (2,627 → <600 lines)
 - [ ] Error handling coverage (10% → 90%)
@@ -88,13 +87,16 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - [ ] Client-side integration (Phase 2)
 - [ ] Enable cross-device play (Phase 2)
 
-### P3: Voice Acting (Fish Audio) 🔵
-**Status:** Planning
-**Goal:** AI-generated voices for all NPCs
-- [ ] Fish Audio API integration
-- [ ] Voice personality per NPC type
-- [ ] Caching strategy for generated audio
-- [ ] Audio playback in client
+### P3: Voice Acting (Fish Audio) ✅
+**Status:** Complete
+**Goal:** AI-generated voices for key characters
+- [x] Fish Audio API integration (FishAudioService)
+- [x] Voice personality per NPC type (narrator_dark, narrator_epic, king, boss, friendly_npc)
+- [x] Caching strategy (memory + disk cache with MD5 keys)
+- [x] Audio playback in client (AudioManager.playNpcVoice)
+- [x] Intro sequence TTS narration
+- [x] NPC dialogue TTS (King and key NPCs)
+- [x] Narrator event TTS
 
 ### P4: Weekly/Monthly Challenges 🔵
 **Status:** Not started
