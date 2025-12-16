@@ -82,6 +82,18 @@ EntityFactory.builders[Types.Entities.BOSS] = function (id) {
   return new Mobs.Boss(id);
 };
 
+EntityFactory.builders[Types.Entities.ZOMBIE] = function (id) {
+  return new Mobs.Zombie(id);
+};
+
+EntityFactory.builders[Types.Entities.ZOMBIEGIRL] = function (id) {
+  return new Mobs.Zombiegirl(id);
+};
+
+EntityFactory.builders[Types.Entities.ZOMAGENT] = function (id) {
+  return new Mobs.Zomagent(id);
+};
+
 //===== items ======
 
 EntityFactory.builders[Types.Entities.SWORD2] = function (id) {

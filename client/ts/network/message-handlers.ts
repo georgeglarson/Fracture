@@ -300,6 +300,10 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
         const shakeIntensity = Math.min(6, 3 + Math.floor(-diff / 10));
         game.renderer.camera.shake(shakeIntensity, 120);
         game.renderer.particles.spawnHitParticles(player.x, player.y - 8, 6, '#ff2222');
+        // Trigger fracture damage effects
+        if (game.fractureAtmosphere) {
+          game.fractureAtmosphere.onPlayerDamage();
+        }
         if (game.playerhurt_callback) {
           game.playerhurt_callback();
         }

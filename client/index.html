@@ -18,6 +18,7 @@
   <script src="js/lib/css3-mediaqueries.js" type="text/javascript"></script>
   <![endif]-->
   <title>Fracture</title>
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="ba2bacb4-34ee-4c9c-811d-fb9faa5fedd5"></script>
 </head>
 <!--[if lt IE 9]>
 <body class="intro upscaled">
@@ -201,6 +202,7 @@
         <li><span class="icon"></span>WASD or Arrow Keys to move</li>
         <li><span class="icon"></span>Enter - Chat</li>
         <li><span class="icon"></span>I - Inventory</li>
+        <li><span class="icon"></span>Q - Use health item</li>
         <li><span class="icon"></span>J - Achievements</li>
         <li><span class="icon"></span>M - Minimap</li>
         <li><span class="icon"></span>N - Newspaper</li>
@@ -278,10 +280,11 @@
     <div id="statusbar">
       <div class="statusbar-left">
         <div class="bar-group">
-          <div id="healthbar">
+          <div id="healthbar" role="progressbar" aria-label="Health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
             <div id="hitpoints"></div>
+            <span class="sr-only" id="health-text">Health: 100%</span>
           </div>
-          <div id="xpbar">
+          <div id="xpbar" role="progressbar" aria-label="Experience" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <div id="xpfill"></div>
             <span id="level-display">Lv.1</span>
           </div>
@@ -291,17 +294,14 @@
         <span id="gold-display">0g</span>
       </div>
       <div class="statusbar-right">
-        <div id="inventorybutton" class="barbutton clickable" title="Inventory (I)"></div>
-        <div id="minimapbutton" class="barbutton clickable" title="Minimap (M)"></div>
-        <div id="newspaperbutton" class="barbutton clickable" title="News (N)"></div>
-        <div id="chatbutton" class="barbutton clickable" title="Chat (Enter)"></div>
-        <div id="achievementsbutton" class="barbutton clickable" title="Achievements (J)"></div>
-        <div id="helpbutton" class="barbutton clickable" title="Help (?)"></div>
-        <div id="mutebutton" class="barbutton clickable" title="Sound"></div>
+        <button id="inventorybutton" class="barbutton clickable" title="Inventory (I)" aria-label="Open Inventory"></button>
+        <button id="minimapbutton" class="barbutton clickable" title="Minimap (M)" aria-label="Open Minimap"></button>
+        <button id="newspaperbutton" class="barbutton clickable" title="News (N)" aria-label="Read News"></button>
+        <button id="chatbutton" class="barbutton clickable" title="Chat (Enter)" aria-label="Open Chat"></button>
+        <button id="achievementsbutton" class="barbutton clickable" title="Achievements (J)" aria-label="View Achievements"></button>
+        <button id="helpbutton" class="barbutton clickable" title="Help (?)" aria-label="Show Help"></button>
+        <button id="mutebutton" class="barbutton clickable" title="Sound" aria-label="Toggle Sound"></button>
       </div>
-    </div>
-    <!-- Old bar-container hidden -->
-    <div id="bar-container" style="display:none !important;">
     </div>
     <div id="chatbox">
       <form action="none" method="get" accept-charset="utf-8">

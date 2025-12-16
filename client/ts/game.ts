@@ -38,10 +38,13 @@ import {MinimapUI} from './ui/minimap-ui';
 import {AchievementUI} from './ui/achievement-ui';
 import {InventoryManager} from './inventory/inventory-manager';
 import {deserializeInventory, InventorySlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
+import {showError, showWarning, showSuccess, showInfo} from './ui/toast';
+import {getNetworkStatus} from './ui/network-status';
 import {setupNetworkHandlers} from './network/message-handlers';
 import {ZoningManager} from './world/zoning-manager';
 import {SpriteLoader} from './assets/sprite-loader';
 import {getAchievementById} from '../../shared/ts/achievements/achievement-data';
+import {FractureAtmosphere} from './ui/fracture-atmosphere';
 
 export class Game {
 
@@ -76,6 +79,7 @@ export class Game {
   achievementUI: AchievementUI | null = null;
   zoningManager: ZoningManager | null = null;
   spriteLoader: SpriteLoader | null = null;
+  fractureAtmosphere: FractureAtmosphere | null = null;
 
   // Entity accessors (delegate to entityManager)
   get entities() { return this.entityManager?.entities ?? {}; }
@@ -447,6 +451,7 @@ export class Game {
 
   loadAudio() {
     this.audioManager = new AudioManager(this);
+    this.fractureAtmosphere = new FractureAtmosphere();
   }
 
   initMusicAreas() {
@@ -642,10 +647,33 @@ export class Game {
     this.client.on(ClientEvents.CONNECTED, function () {
       console.info('Starting client/server handshake');
 
+      // Hide any network status overlay
+      getNetworkStatus().hide();
+
       self.player.name = self.username;
       self.started = true;
 
       self.sendHello(self.player);
+    });
+
+    // Handle network reconnection events
+    this.client.on(ClientEvents.RECONNECTING, function (attemptNumber: number) {
+      console.info('Reconnection attempt ' + attemptNumber);
+      getNetworkStatus().showReconnecting(attemptNumber, 5);
+    });
+
+    this.client.on(ClientEvents.RECONNECTED, function () {
+      console.info('Successfully reconnected');
+      getNetworkStatus().hide();
+      showSuccess('Connection restored', 'Reconnected');
+    });
+
+    this.client.on(ClientEvents.DISCONNECTED, function (message: string) {
+      console.error('Disconnected:', message);
+      getNetworkStatus().showDisconnected();
+      getNetworkStatus().setRetryCallback(() => {
+        window.location.reload();
+      });
     });
 
     // Handle authentication failure
@@ -653,16 +681,23 @@ export class Game {
       console.error('[Auth] Authentication failed:', reason);
       self.started = false;
 
-      let message = 'Authentication failed.';
+      let title = 'Authentication Failed';
+      let message = 'Please try again.';
       if (reason === 'wrong_password') {
-        message = 'Wrong password. Please try again.';
+        message = 'The password you entered is incorrect.';
       } else if (reason === 'password_required') {
-        message = 'Password required (3+ characters). This name is already registered.';
+        title = 'Password Required';
+        message = 'This name is already registered. Please enter a password (3+ characters).';
       }
 
-      // Show error and return to login screen
-      alert(message);
-      window.location.reload();
+      // Show error toast with reload action
+      showError(message, title, {
+        duration: 0, // Persistent until dismissed
+        action: {
+          label: 'Try Again',
+          callback: () => window.location.reload()
+        }
+      });
     });
 
     this.client.on(ClientEvents.LIST, function (list: number[]) {
@@ -964,6 +999,11 @@ export class Game {
 
         self.audioManager.fadeOutCurrentMusic();
         self.audioManager.playSound('death');
+
+        // Trigger fracture death effects
+        if (self.fractureAtmosphere) {
+          self.fractureAtmosphere.onPlayerDeath();
+        }
       });
 
       self.player.onHasMoved(function (player) {
@@ -2366,6 +2406,18 @@ export class Game {
 
     // Only use consumables via hotkey
     if (this.inventoryManager.isSlotConsumable(slotIndex)) {
+      this.client.sendInventoryUse(slotIndex);
+    }
+  }
+
+  /**
+   * Use the first consumable item in inventory (for Q hotkey)
+   */
+  useFirstConsumable() {
+    if (!this.inventoryManager) return;
+
+    const slotIndex = this.inventoryManager.findFirstConsumable();
+    if (slotIndex >= 0) {
       this.client.sendInventoryUse(slotIndex);
     }
   }

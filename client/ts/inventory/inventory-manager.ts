@@ -147,4 +147,17 @@ export class InventoryManager {
   isFull(): boolean {
     return this.slots.every(slot => slot !== null);
   }
+
+  /**
+   * Find the first consumable slot index
+   * Returns -1 if no consumable found
+   */
+  findFirstConsumable(): number {
+    for (let i = 0; i < INVENTORY_SIZE; i++) {
+      if (this.isSlotConsumable(i)) {
+        return i;
+      }
+    }
+    return -1;
+  }
 }

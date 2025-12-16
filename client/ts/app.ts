@@ -99,13 +99,27 @@ export class App {
       try {
         const introData = await this.introSequence.fetchIntro(username);
         if (introData) {
+          // Track if game has started loading
+          let gameStarted = false;
+
           // Set up callbacks
           this.introSequence.setCallbacks({
             onComplete: () => {
-              self.proceedToGame(username, password);
+              // Shatter effect finished, game should be visible now
+              // Nothing to do here - game already started in onReadyForGame
             },
             onSkip: () => {
-              self.proceedToGame(username, password);
+              if (!gameStarted) {
+                self.proceedToGame(username, password);
+              }
+            },
+            onReadyForGame: () => {
+              // Intro narration done - start loading the game in background
+              // The shatter effect will wait for signalGameReady()
+              if (!gameStarted) {
+                gameStarted = true;
+                self.startGameInBackground(username, password);
+              }
             }
           });
 
@@ -123,6 +137,48 @@ export class App {
 
     // No intro or intro failed - proceed directly
     this.proceedToGame(username, password);
+  }
+
+  /**
+   * Start the game connection in the background while intro is still showing
+   * Signals the intro sequence when game is ready to be revealed
+   */
+  private startGameInBackground(username: string, password: string): void {
+    var self = this;
+
+    // Switch to game body class (hides intro parchment, shows canvas)
+    $('body').removeClass('intro').addClass('game');
+
+    if (!this.isDesktop) {
+      // On mobile and tablet we load the map after the player has clicked
+      this.game.loadMap();
+    }
+
+    var firstTimePlaying = !this.storage.hasAlreadyPlayed();
+
+    if (username && !this.game.started) {
+      var config = this.config;
+
+      // Use current hostname for production (HTTPS) to support multiple domains
+      var host = window.location.protocol === 'https:'
+        ? window.location.hostname
+        : config.host;
+
+      this.game.setServerOptions(host, config.port, username, password);
+
+      this.center();
+
+      // Run game with callback that signals intro when ready
+      this.game.run(function () {
+        // Game is now running and ready to be displayed
+        console.log('[App] Game ready, signaling intro sequence');
+        self.introSequence.signalGameReady();
+
+        if (firstTimePlaying) {
+          self.toggleInstructions();
+        }
+      });
+    }
   }
 
   /**

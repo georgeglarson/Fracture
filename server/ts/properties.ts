@@ -124,6 +124,53 @@ export const Properties = {
   },
 
   // ============================================
+  // TIER 3.5 - Zombie Zone (Haunted graveyard)
+  // ============================================
+  zombie: {
+    drops: {
+      flask: 40,
+      burger: 15,       // Brains... er, burgers
+      morningstar: 12,
+      mailarmor: 15,
+      firepotion: 5
+    },
+    hp: 130,
+    armor: 2,
+    weapon: 2,
+    aggro: 5            // Zombies shamble toward the living
+  },
+
+  zombiegirl: {
+    drops: {
+      flask: 35,
+      burger: 12,
+      morningstar: 15,
+      mailarmor: 18,
+      platearmor: 8,    // Slightly better drops
+      firepotion: 6
+    },
+    hp: 150,
+    armor: 2,
+    weapon: 2,
+    aggro: 5            // Just as relentless
+  },
+
+  zomagent: {
+    drops: {
+      flask: 30,
+      burger: 10,
+      morningstar: 10,
+      platearmor: 15,   // Leader drops plate
+      bluesword: 12,    // Rare bluesword
+      firepotion: 8
+    },
+    hp: 180,
+    armor: 3,
+    weapon: 3,
+    aggro: 6            // The leader - more dangerous
+  },
+
+  // ============================================
   // TIER 4 - Late Areas (Deep caves, Lava edge)
   // ============================================
   ogre: {

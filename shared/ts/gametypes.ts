@@ -132,6 +132,9 @@ export const Types: any = {
     SKELETON2: 12,
     BOSS: 13,
     DEATHKNIGHT: 14,
+    ZOMBIE: 15,
+    ZOMBIEGIRL: 16,
+    ZOMAGENT: 17,
 
     // Armors
     FIREFOX: 20,
@@ -201,6 +204,9 @@ var kinds = {
   eye: [Types.Entities.EYE, 'mob'],
   skeleton2: [Types.Entities.SKELETON2, 'mob'],
   boss: [Types.Entities.BOSS, 'mob'],
+  zombie: [Types.Entities.ZOMBIE, 'mob'],
+  zombiegirl: [Types.Entities.ZOMBIEGIRL, 'mob'],
+  zomagent: [Types.Entities.ZOMAGENT, 'mob'],
 
   sword1: [Types.Entities.SWORD1, 'weapon'],
   sword2: [Types.Entities.SWORD2, 'weapon'],

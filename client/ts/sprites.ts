@@ -69,6 +69,9 @@ const target = require('../sprites/target.json');
 const villagegirl = require('../sprites/villagegirl.json');
 const villager = require('../sprites/villager.json');
 const wizard = require('../sprites/wizard.json');
+const zombie = require('../sprites/zombie.json');
+const zombiegirl = require('../sprites/zombiegirl.json');
+const zomagent = require('../sprites/zomagent.json');
 
 export const sprites = {
   agent,
@@ -125,6 +128,9 @@ export const sprites = {
   villagegirl,
   villager,
   wizard,
+  zombie,
+  zombiegirl,
+  zomagent,
   'item-axe': itemAxe,
   'item-bluesword': itemBluesword,
   'item-burger': itemBuger,

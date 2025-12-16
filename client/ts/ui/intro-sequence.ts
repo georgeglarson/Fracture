@@ -14,6 +14,7 @@ export interface IntroData {
 export interface IntroCallbacks {
   onComplete: () => void;
   onSkip: () => void;
+  onReadyForGame?: () => void; // Called when intro is done narrating (before shatter)
 }
 
 export class IntroSequence {
@@ -25,8 +26,53 @@ export class IntroSequence {
   private lines: string[] = [];
   private lineElements: HTMLElement[] = [];
   private skipButton: HTMLButtonElement | null = null;
+  private gameReady = false;
+  private gameReadyResolver: (() => void) | null = null;
+  private glitchIntroAudio: HTMLAudioElement | null = null;
 
-  constructor() {}
+  constructor() {
+    // Preload glitch intro sound
+    this.glitchIntroAudio = new Audio('audio/sounds/glitch-intro.mp3');
+    this.glitchIntroAudio.volume = 0.4;
+  }
+
+  /**
+   * Play glass shatter sound effect from audio file
+   */
+  private playShatterSound(): void {
+    try {
+      const audio = new Audio('audio/sounds/shatter.mp3');
+      audio.volume = 0.6;
+      audio.play().catch(e => {
+        console.warn('[IntroSequence] Could not play shatter sound:', e);
+      });
+    } catch (e) {
+      console.warn('[IntroSequence] Could not play shatter sound:', e);
+    }
+  }
+
+  /**
+   * Signal that the game is ready (connected and loaded)
+   */
+  signalGameReady(): void {
+    this.gameReady = true;
+    if (this.gameReadyResolver) {
+      this.gameReadyResolver();
+      this.gameReadyResolver = null;
+    }
+  }
+
+  /**
+   * Wait for game to be ready
+   */
+  private waitForGameReady(): Promise<void> {
+    if (this.gameReady) {
+      return Promise.resolve();
+    }
+    return new Promise(resolve => {
+      this.gameReadyResolver = resolve;
+    });
+  }
 
   /**
    * Set callback handlers
@@ -67,6 +113,12 @@ export class IntroSequence {
     this.lines = data.lines;
     this.currentLineIndex = 0;
     this.audioFinished = null;
+
+    // Play glitch intro sound at start
+    if (this.glitchIntroAudio) {
+      this.glitchIntroAudio.currentTime = 0;
+      this.glitchIntroAudio.play().catch(() => {});
+    }
 
     // Create the overlay
     this.createOverlay(data);
@@ -451,6 +503,11 @@ export class IntroSequence {
       this.audio.pause();
       this.audio = null;
     }
+    // Clear any pending game ready wait
+    if (this.gameReadyResolver) {
+      this.gameReadyResolver();
+      this.gameReadyResolver = null;
+    }
     this.cleanup();
     if (this.callbacks?.onSkip) {
       this.callbacks.onSkip();
@@ -460,7 +517,7 @@ export class IntroSequence {
   /**
    * Complete the intro with fracture effect
    */
-  private complete(): void {
+  private async complete(): Promise<void> {
     if (!this.isPlaying) return;
     this.isPlaying = false;
 
@@ -469,14 +526,35 @@ export class IntroSequence {
       this.audio = null;
     }
 
+    // Fade out and stop glitch intro audio
+    if (this.glitchIntroAudio) {
+      const fadeOut = setInterval(() => {
+        if (this.glitchIntroAudio && this.glitchIntroAudio.volume > 0.05) {
+          this.glitchIntroAudio.volume -= 0.05;
+        } else {
+          clearInterval(fadeOut);
+          if (this.glitchIntroAudio) {
+            this.glitchIntroAudio.pause();
+            this.glitchIntroAudio.currentTime = 0;
+          }
+        }
+      }, 50);
+    }
+
+    // Signal that we're ready for the game to start loading
+    if (this.callbacks?.onReadyForGame) {
+      this.callbacks.onReadyForGame();
+    }
+
     // Try to use fracture effect with anime.js, fall back to simple fade
     const animeAvailable = typeof (window as any).anime !== 'undefined' &&
                            typeof (window as any).anime.animate === 'function';
 
     if (this.overlay && animeAvailable) {
-      this.fractureComplete();
+      await this.fractureComplete();
     } else if (this.overlay) {
-      // Simple fade fallback
+      // Simple fade fallback - still wait for game ready
+      await this.waitForGameReady();
       this.overlay.style.transition = 'opacity 0.8s ease';
       this.overlay.style.opacity = '0';
       setTimeout(() => {
@@ -495,11 +573,44 @@ export class IntroSequence {
 
   /**
    * Create dramatic fracture/shatter effect for outro
+   * Waits for game to be ready before revealing, with slower dramatic animation
    */
-  private fractureComplete(): void {
+  private async fractureComplete(): Promise<void> {
     if (!this.overlay) return;
 
     const animeLib = (window as any).anime;
+
+    // Hide original content but keep background for fragments
+    const title = this.overlay.querySelector('.intro-title') as HTMLElement;
+    const lines = this.overlay.querySelectorAll('.intro-line');
+    const narrator = this.overlay.querySelector('.intro-narrator') as HTMLElement;
+    const skipBtn = this.skipButton;
+    const continueHint = this.overlay.querySelector('.intro-continue') as HTMLElement;
+
+    // Fade out text and UI elements first
+    [title, ...Array.from(lines), narrator, skipBtn, continueHint].forEach(el => {
+      if (el) (el as HTMLElement).style.opacity = '0';
+    });
+
+    // Show a "preparing world" message while waiting
+    const loadingMsg = document.createElement('div');
+    loadingMsg.style.cssText = `
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 2px;
+    `;
+    loadingMsg.textContent = 'Preparing world...';
+    this.overlay.appendChild(loadingMsg);
+
+    // Wait for game to be ready before starting the shatter
+    await this.waitForGameReady();
+
+    // Remove loading message
+    loadingMsg.remove();
 
     // Create fragment container
     const fragmentContainer = document.createElement('div');
@@ -511,23 +622,13 @@ export class IntroSequence {
       height: 100%;
       z-index: 100001;
       pointer-events: none;
-      perspective: 1000px;
+      perspective: 1500px;
     `;
     document.body.appendChild(fragmentContainer);
 
-    // Hide original content but keep background for fragments
-    const title = this.overlay.querySelector('.intro-title') as HTMLElement;
-    const lines = this.overlay.querySelectorAll('.intro-line');
-    const narrator = this.overlay.querySelector('.intro-narrator') as HTMLElement;
-
-    // Fade out text first
-    [title, ...Array.from(lines), narrator].forEach(el => {
-      if (el) (el as HTMLElement).style.opacity = '0';
-    });
-
-    // Create shattered glass fragments
-    const cols = 8;
-    const rows = 6;
+    // Create shattered glass fragments - more fragments for smoother effect
+    const cols = 10;
+    const rows = 8;
     const fragmentWidth = window.innerWidth / cols;
     const fragmentHeight = window.innerHeight / rows;
 
@@ -540,8 +641,8 @@ export class IntroSequence {
         const y = row * fragmentHeight;
 
         // Add slight randomness to fragment size for more natural look
-        const widthVariance = (Math.random() - 0.5) * 20;
-        const heightVariance = (Math.random() - 0.5) * 20;
+        const widthVariance = (Math.random() - 0.5) * 15;
+        const heightVariance = (Math.random() - 0.5) * 15;
 
         fragment.style.cssText = `
           position: absolute;
@@ -550,20 +651,20 @@ export class IntroSequence {
           width: ${fragmentWidth + widthVariance}px;
           height: ${fragmentHeight + heightVariance}px;
           background: linear-gradient(180deg, #0a0a12 0%, #1a1a2e 50%, #0a0a12 100%);
-          box-shadow: 0 0 20px rgba(97, 195, 255, 0.3), inset 0 0 30px rgba(0,0,0,0.5);
-          border: 1px solid rgba(97, 195, 255, 0.2);
+          box-shadow: 0 0 30px rgba(97, 195, 255, 0.4), inset 0 0 40px rgba(0,0,0,0.6);
+          border: 1px solid rgba(97, 195, 255, 0.3);
           transform-origin: center center;
           backface-visibility: hidden;
         `;
 
         // Add crack line effect on some fragments
-        if (Math.random() > 0.6) {
+        if (Math.random() > 0.5) {
           const crackAngle = Math.random() * 180;
           fragment.innerHTML = `<div style="
             position: absolute;
             width: 100%;
             height: 2px;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent);
             top: 50%;
             transform: rotate(${crackAngle}deg);
           "></div>`;
@@ -574,7 +675,7 @@ export class IntroSequence {
       }
     }
 
-    // Flash effect
+    // Flash effect - longer and more dramatic
     const flash = document.createElement('div');
     flash.style.cssText = `
       position: fixed;
@@ -582,7 +683,7 @@ export class IntroSequence {
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(255, 255, 255, 0.8);
+      background: rgba(255, 255, 255, 0.9);
       z-index: 100002;
       opacity: 0;
       pointer-events: none;
@@ -592,15 +693,18 @@ export class IntroSequence {
     // Hide original overlay
     this.overlay.style.opacity = '0';
 
-    // Animate flash
+    // Play synthesized shatter sound effect
+    this.playShatterSound();
+
+    // Animate flash - slower, more dramatic
     animeLib.animate(flash, {
-      opacity: [0, 0.8, 0],
-      duration: 400,
+      opacity: [0, 1, 0.3, 0],
+      duration: 800,
       ease: 'outQuad',
       complete: () => flash.remove()
     });
 
-    // Animate each fragment shattering outward
+    // Animate each fragment shattering outward - MUCH SLOWER
     fragments.forEach((fragment, i) => {
       const row = Math.floor(i / cols);
       const col = i % cols;
@@ -611,40 +715,44 @@ export class IntroSequence {
       const dirX = (col - centerX) / centerX;
       const dirY = (row - centerY) / centerY;
 
-      // Random variations
-      const randomX = (Math.random() - 0.5) * 400;
-      const randomY = (Math.random() - 0.5) * 400;
-      const randomRotateX = (Math.random() - 0.5) * 180;
-      const randomRotateY = (Math.random() - 0.5) * 180;
-      const randomRotateZ = (Math.random() - 0.5) * 90;
+      // Random variations - larger movements
+      const randomX = (Math.random() - 0.5) * 600;
+      const randomY = (Math.random() - 0.5) * 500;
+      const randomRotateX = (Math.random() - 0.5) * 360;
+      const randomRotateY = (Math.random() - 0.5) * 360;
+      const randomRotateZ = (Math.random() - 0.5) * 180;
 
       // Delay based on distance from center (center breaks first)
+      // Longer delays for more dramatic cascading effect
       const distance = Math.sqrt(dirX * dirX + dirY * dirY);
-      const delay = distance * 100;
+      const delay = distance * 300; // 3x longer delay spread
 
       animeLib.animate(fragment, {
-        translateX: dirX * 600 + randomX,
-        translateY: dirY * 400 + randomY + 200, // Slight downward bias
-        translateZ: -200 - Math.random() * 300,
+        translateX: dirX * 800 + randomX,
+        translateY: dirY * 600 + randomY + 300, // Gravity bias
+        translateZ: -400 - Math.random() * 500,
         rotateX: randomRotateX,
         rotateY: randomRotateY,
         rotateZ: randomRotateZ,
-        opacity: [1, 0],
-        scale: [1, 0.5 + Math.random() * 0.5],
-        duration: 1200 + Math.random() * 400,
+        opacity: [1, 1, 0.8, 0], // Hold opacity longer
+        scale: [1, 1.1, 0.3], // Slight pop before shrinking
+        duration: 2500 + Math.random() * 1000, // 2.5-3.5 seconds per fragment
         delay: delay,
-        ease: 'outExpo'
+        ease: 'outQuart' // Smoother easing
       });
     });
 
-    // Cleanup after animation
-    setTimeout(() => {
-      fragmentContainer.remove();
-      this.cleanup();
-      if (this.callbacks?.onComplete) {
-        this.callbacks.onComplete();
-      }
-    }, 1800);
+    // Cleanup after animation - 4.5 seconds total
+    return new Promise(resolve => {
+      setTimeout(() => {
+        fragmentContainer.remove();
+        this.cleanup();
+        if (this.callbacks?.onComplete) {
+          this.callbacks.onComplete();
+        }
+        resolve();
+      }, 4500);
+    });
   }
 
   /**

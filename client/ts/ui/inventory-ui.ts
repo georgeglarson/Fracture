@@ -157,21 +157,6 @@ export class InventoryUI {
         ">
       `;
 
-      // Hotkey indicator for first 5 slots
-      if (i < 5) {
-        html += `
-          <span style="
-            position: absolute;
-            top: 2px;
-            left: 4px;
-            font-size: 9px;
-            font-weight: bold;
-            color: #888;
-            text-shadow: 1px 1px 1px #000;
-          ">${i + 1}</span>
-        `;
-      }
-
       if (slot) {
         const spriteName = Types.getKindAsString(slot.kind);
         html += `
@@ -215,7 +200,7 @@ export class InventoryUI {
         color: #888;
         text-align: center;
       ">
-        Left-click: Use/Equip | Right-click: Options | Keys 1-5: Quick use | Press 'I' to close
+        Left-click: Use/Equip | Right-click: Options | Q: Quick heal | Press 'I' to close
       </div>
     `;
 

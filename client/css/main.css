@@ -42,6 +42,29 @@ q:before, q:after {
 	outline: 0;
 }
 
+/* Accessibility utilities */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Button reset for icon buttons */
+button.barbutton {
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	font: inherit;
+	color: inherit;
+}
+
 /* remember to highlight inserts somehow! */
 ins {
 	text-decoration: none;

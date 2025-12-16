@@ -461,10 +461,9 @@ var initGame = function () {
         }
         return false;
       }
-      // 1-5 keys - Quick use inventory slots (for consumables)
-      if (key >= 49 && key <= 53 && game.ready && game.started) { // Keys 1-5
-        const slotIndex = key - 49; // Convert to 0-4
-        game.useInventorySlot(slotIndex);
+      // Q key - Use first consumable (flask/food)
+      if (key === 81 && game.ready && game.started) { // Q
+        game.useFirstConsumable();
         return false;
       }
       if (key === 73) { // I - Toggle inventory

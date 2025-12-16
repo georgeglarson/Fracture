@@ -154,5 +154,43 @@ export const Mobs = {
         super.idle(orientation);
       }
     }
+  },
+
+  // Zombie mobs - slow but relentless
+  Zombie: class Zombie extends Mob {
+    constructor(id) {
+      super(id, Types.Entities.ZOMBIE);
+      this.moveSpeed = 450;  // Slow shambling
+      this.atkSpeed = 150;
+      this.idleSpeed = 800;
+      this.walkSpeed = 450;
+      this.shadowOffsetY = -2;
+      this.setAttackRate(1500);
+    }
+  },
+
+  Zombiegirl: class Zombiegirl extends Mob {
+    constructor(id) {
+      super(id, Types.Entities.ZOMBIEGIRL);
+      this.moveSpeed = 400;  // Slightly faster
+      this.atkSpeed = 120;
+      this.idleSpeed = 700;
+      this.walkSpeed = 400;
+      this.shadowOffsetY = -2;
+      this.setAttackRate(1200);
+    }
+  },
+
+  Zomagent: class Zomagent extends Mob {
+    constructor(id) {
+      super(id, Types.Entities.ZOMAGENT);
+      this.moveSpeed = 350;  // Fastest zombie - the leader
+      this.atkSpeed = 100;
+      this.idleSpeed = 600;
+      this.walkSpeed = 350;
+      this.shadowOffsetY = -2;
+      this.setAttackRate(1000);
+      this.aggroRange = 2;
+    }
   }
 };
