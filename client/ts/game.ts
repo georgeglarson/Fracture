@@ -49,6 +49,7 @@ import * as PartyHandler from './handlers/party.handler';
 import * as InventoryHandler from './handlers/inventory.handler';
 import * as GameEventHandler from './handlers/game-event.handler';
 import * as NetworkConnectionHandler from './handlers/network-connection.handler';
+import { PlayerController } from './player/player-controller';
 
 export class Game {
 
@@ -84,6 +85,7 @@ export class Game {
   zoningManager: ZoningManager | null = null;
   spriteLoader: SpriteLoader | null = null;
   fractureAtmosphere: FractureAtmosphere | null = null;
+  playerController: PlayerController | null = null;
 
   // Entity accessors (delegate to entityManager)
   get entities() { return this.entityManager?.entities ?? {}; }
@@ -576,6 +578,64 @@ export class Game {
           forEachVisibleEntityByDepth: (cb) => self.forEachVisibleEntityByDepth(cb)
         });
 
+        // Initialize player controller with dependencies
+        self.playerController = new PlayerController({
+          // Core systems (use closures for late binding)
+          client: { sendMove: (...args) => self.client?.sendMove(...args),
+                    sendAggro: (...args) => self.client?.sendAggro(...args),
+                    sendTeleport: (...args) => self.client?.sendTeleport(...args),
+                    sendOpen: (...args) => self.client?.sendOpen(...args),
+                    disable: () => self.client?.disable() },
+          renderer: self.renderer,
+          camera: self.camera,
+          map: self.map,
+          audioManager: self.audioManager,
+          storage: self.storage,
+
+          // Game state accessors
+          getSprites: () => self.sprites,
+          getPlayerId: () => self.playerId,
+
+          // Entity operations
+          forEachMob: (cb) => self.forEachMob(cb),
+          getEntityAt: (x, y) => self.getEntityAt(x, y),
+          isItemAt: (x, y) => self.isItemAt(x, y),
+          getItemAt: (x, y) => self.getItemAt(x, y),
+          isZoningTile: (x, y) => self.isZoningTile(x, y),
+          findPath: (e, x, y, ignored) => self.findPath(e, x, y, ignored),
+
+          // Grid operations
+          registerEntityPosition: (e) => self.registerEntityPosition(e),
+          unregisterEntityPosition: (e) => self.unregisterEntityPosition(e),
+          registerEntityDualPosition: (e) => self.registerEntityDualPosition(e),
+          removeFromRenderingGrid: (e, x, y) => self.removeFromRenderingGrid(e, x, y),
+          removeEntity: (e) => self.removeEntity(e),
+          checkOtherDirtyRects: (r, e, x, y) => self.checkOtherDirtyRects(r, e, x, y),
+
+          // Zone operations
+          enqueueZoningFrom: (x, y) => self.enqueueZoningFrom(x, y),
+          resetZone: () => self.resetZone(),
+          updatePlateauMode: () => self.updatePlateauMode(),
+          updatePlayerCheckpoint: () => self.updatePlayerCheckpoint(),
+          checkUndergroundAchievement: () => self.checkUndergroundAchievement(),
+
+          // UI operations
+          assignBubbleTo: (e) => self.assignBubbleTo(e),
+          makeNpcTalk: (npc) => self.makeNpcTalk(npc),
+          pickupItemToInventory: (item) => self.pickupItemToInventory(item),
+
+          // Achievement operations
+          tryUnlockingAchievement: (id) => self.tryUnlockingAchievement(id),
+
+          // Callbacks
+          onPlayerDeath: () => self.playerdeath_callback?.(),
+          onEquipmentChange: () => self.equipment_callback?.(),
+          onInvincible: () => self.invincible_callback?.(),
+
+          // Atmosphere effects
+          fractureAtmosphere: self.fractureAtmosphere
+        });
+
         self.setPathfinder(new Pathfinder(self.map.width, self.map.height));
 
         // Set camera map bounds to prevent rendering outside the map
@@ -728,259 +788,8 @@ export class Game {
       var dailyData = self.storage.getDailyData();
       self.client.sendDailyCheck(dailyData.lastLoginDate || '', dailyData.currentStreak);
 
-      self.player.onStartPathing(function (path) {
-        var i = path.length - 1,
-          x = path[i][0],
-          y = path[i][1];
-
-        if (self.player.isMovingToLoot()) {
-          self.player.isLootMoving = false;
-        }
-        else if (!self.player.isAttacking()) {
-          self.client.sendMove(x, y);
-        }
-
-        // Target cursor position
-        self.selectedX = x;
-        self.selectedY = y;
-        self.selectedCellVisible = true;
-
-        if (self.renderer.mobile || self.renderer.tablet) {
-          self.drawTarget = true;
-          self.clearTarget = true;
-          self.renderer.targetRect = self.renderer.getTargetBoundingRect();
-          self.checkOtherDirtyRects(self.renderer.targetRect, null, self.selectedX, self.selectedY);
-        }
-      });
-
-      self.player.onCheckAggro(function () {
-        self.forEachMob(function (mob) {
-          if (mob.isAggressive && !mob.isAttacking() && self.player.isNear(mob, mob.aggroRange)) {
-            self.player.aggro(mob);
-          }
-        });
-      });
-
-      self.player.onAggro(function (mob) {
-        if (!mob.isWaitingToAttack(self.player) && !self.player.isAttackedBy(mob)) {
-          self.player.log_info('Aggroed by ' + mob.id + ' at (' + self.player.gridX + ', ' + self.player.gridY + ')');
-          self.client.sendAggro(mob);
-          mob.waitToAttack(self.player);
-        }
-      });
-
-      self.player.onBeforeStep(function () {
-        var blockingEntity = self.getEntityAt(self.player.nextGridX, self.player.nextGridY);
-        if (blockingEntity && blockingEntity.id !== self.playerId) {
-          console.debug('Blocked by ' + blockingEntity.id);
-        }
-        self.unregisterEntityPosition(self.player);
-      });
-
-      self.player.onStep(function () {
-        if (self.player.hasNextStep()) {
-          self.registerEntityDualPosition(self.player);
-        }
-
-        if (self.isZoningTile(self.player.gridX, self.player.gridY)) {
-          self.enqueueZoningFrom(self.player.gridX, self.player.gridY);
-        }
-
-        self.player.forEachAttacker(function (attacker) {
-          if (attacker.isAdjacent(attacker.target)) {
-            attacker.lookAtTarget();
-          } else {
-            attacker.follow(self.player);
-          }
-        });
-
-        if ((self.player.gridX <= 85 && self.player.gridY <= 179 && self.player.gridY > 178) || (self.player.gridX <= 85 && self.player.gridY <= 266 && self.player.gridY > 265)) {
-          self.tryUnlockingAchievement('INTO_THE_WILD');
-        }
-
-        if (self.player.gridX <= 85 && self.player.gridY <= 293 && self.player.gridY > 292) {
-          self.tryUnlockingAchievement('AT_WORLDS_END');
-        }
-
-        if (self.player.gridX <= 85 && self.player.gridY <= 100 && self.player.gridY > 99) {
-          self.tryUnlockingAchievement('NO_MANS_LAND');
-        }
-
-        if (self.player.gridX <= 85 && self.player.gridY <= 51 && self.player.gridY > 50) {
-          self.tryUnlockingAchievement('HOT_SPOT');
-        }
-
-        if (self.player.gridX <= 27 && self.player.gridY <= 123 && self.player.gridY > 112) {
-          self.tryUnlockingAchievement('TOMB_RAIDER');
-        }
-
-        self.updatePlayerCheckpoint();
-
-        if (!self.player.isDead) {
-          self.audioManager.updateMusic();
-        }
-      });
-
-      self.player.onStopPathing(function (x, y) {
-        if (self.player.hasTarget()) {
-          self.player.lookAtTarget();
-        }
-
-        self.selectedCellVisible = false;
-
-        if (self.isItemAt(x, y)) {
-          var item = self.getItemAt(x, y);
-
-          // Send pickup request to server - item goes to inventory
-          self.pickupItemToInventory(item);
-          self.audioManager.playSound('loot');
-        }
-
-        if (!self.player.hasTarget() && self.map.isDoor(x, y)) {
-          var dest = self.map.getDoorDestination(x, y);
-
-          self.player.setGridPosition(dest.x, dest.y);
-          self.player.nextGridX = dest.x;
-          self.player.nextGridY = dest.y;
-          self.player.turnTo(dest.orientation);
-          self.client.sendTeleport(dest.x, dest.y);
-
-          // Determine if entering or exiting a building interior
-          // Doors with cameraX/cameraY are entry points to interiors
-          var enteringInterior = dest.cameraX !== undefined && dest.cameraY !== undefined;
-          var modeChanged = self.camera.indoorMode !== enteringInterior;
-          self.camera.setIndoorMode(enteringInterior);
-
-          // Clear all canvases when switching between indoor/outdoor mode
-          if (modeChanged) {
-            self.renderer.clearScreen(self.renderer.context);
-            self.renderer.clearScreen(self.renderer.background);
-            self.renderer.clearScreen(self.renderer.foreground);
-          }
-
-          if (enteringInterior) {
-            // Use explicit camera position from door definition
-            self.camera.setGridPosition(dest.cameraX, dest.cameraY);
-          } else {
-            if (dest.portal) {
-              self.assignBubbleTo(self.player);
-            } else {
-              // Center camera on player
-              self.camera.lookAt(self.player);
-            }
-          }
-
-          // Always reset zone after door transition to redraw static canvases
-          self.resetZone();
-
-          if (_.size(self.player.attackers) > 0) {
-            setTimeout(function () {
-              self.tryUnlockingAchievement('COWARD');
-            }, 500);
-          }
-          self.player.forEachAttacker(function (attacker) {
-            attacker.disengage();
-            attacker.idle();
-          });
-
-          self.updatePlateauMode();
-
-          self.checkUndergroundAchievement();
-
-          if (self.renderer.mobile || self.renderer.tablet) {
-            // When rendering with dirty rects, clear the whole screen when entering a door.
-            self.renderer.clearScreen(self.renderer.context);
-          }
-
-          if (dest.portal) {
-            self.audioManager.playSound('teleport');
-          }
-
-          if (!self.player.isDead) {
-            self.audioManager.updateMusic();
-          }
-        }
-
-        if (self.player.target instanceof Npc) {
-          self.makeNpcTalk(self.player.target);
-        } else if (self.player.target instanceof Chest) {
-          self.client.sendOpen(self.player.target);
-          self.audioManager.playSound('chest');
-        }
-
-        self.player.forEachAttacker(function (attacker) {
-          if (!attacker.isAdjacentNonDiagonal(self.player)) {
-            attacker.follow(self.player);
-          }
-        });
-
-        self.unregisterEntityPosition(self.player);
-        self.registerEntityPosition(self.player);
-      });
-
-      self.player.onRequestPath(function (x, y) {
-        var ignored = [self.player]; // Always ignore self
-
-        if (self.player.hasTarget()) {
-          ignored.push(self.player.target);
-        }
-        return self.findPath(self.player, x, y, ignored);
-      });
-
-      self.player.onDeath(function () {
-        console.info(self.playerId + ' is dead');
-
-        self.player.stopBlinking();
-        self.player.setSprite(self.sprites['death']);
-        self.player.animate('death', 120, 1, function () {
-          console.info(self.playerId + ' was removed');
-
-          self.removeEntity(self.player);
-          self.removeFromRenderingGrid(self.player, self.player.gridX, self.player.gridY);
-
-          self.player = null;
-          self.client.disable();
-
-          setTimeout(function () {
-            self.playerdeath_callback();
-          }, 1000);
-        });
-
-        self.player.forEachAttacker(function (attacker) {
-          attacker.disengage();
-          attacker.idle();
-        });
-
-        self.audioManager.fadeOutCurrentMusic();
-        self.audioManager.playSound('death');
-
-        // Trigger fracture death effects
-        if (self.fractureAtmosphere) {
-          self.fractureAtmosphere.onPlayerDeath();
-        }
-      });
-
-      self.player.onHasMoved(function (player) {
-        self.assignBubbleTo(player);
-      });
-
-      self.player.onArmorLoot(function (armorName) {
-        self.player.switchArmor(self.sprites[armorName]);
-      });
-
-      self.player.onSwitchItem(function () {
-        self.storage.savePlayer(self.renderer.getPlayerImage(),
-          self.player.getArmorName(),
-          self.player.getWeaponName());
-        if (self.equipment_callback) {
-          self.equipment_callback();
-        }
-      });
-
-      self.player.onInvincible(function () {
-        self.invincible_callback();
-        self.player.switchArmor(self.sprites['firefox']);
-      });
+      // Setup player behavior callbacks via PlayerController
+      self.playerController.setupCallbacks(self.player);
 
       // Setup all network message handlers (extracted to network/message-handlers.ts)
       setupNetworkHandlers(self, self.client);
