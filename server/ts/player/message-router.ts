@@ -320,12 +320,13 @@ export function createMessageHandlers(
     }
   });
 
-  // HIT - Deal damage
+  // HIT - Deal damage to mob
   handlers.set(Types.Messages.HIT, {
     rateLimit: 'combat', // 20 hits per second
     handler: (ctx, msg) => {
       const mob = ctx.world.getEntityById(msg[1]);
-      if (mob) {
+      // Check mob exists and is not already dead (prevents hitting during death animation)
+      if (mob && !mob.isDead) {
         const dmg = Formulas.dmg(ctx.weaponLevel, mob.armorLevel);
         if (dmg > 0) {
           mob.receiveDamage(dmg, ctx.id);
@@ -336,12 +337,13 @@ export function createMessageHandlers(
     }
   });
 
-  // HURT - Receive damage
+  // HURT - Receive damage from mob
   handlers.set(Types.Messages.HURT, {
     handler: (ctx, msg) => {
       const mob = ctx.world.getEntityById(msg[1]);
-      // Check mob exists, is not dead, and player is alive
-      if (mob && !mob.isDead && ctx.hitPoints > 0) {
+      // Check mob exists, is alive (isDead flag + hitPoints > 0), and player is alive
+      // Double-check (hitPoints > 0) prevents damage from mobs in death animation
+      if (mob && !mob.isDead && mob.hitPoints > 0 && ctx.hitPoints > 0) {
         (ctx as any).hitPoints -= Formulas.dmg(mob.weaponLevel, ctx.armorLevel);
         ctx.world.handleHurtEntity(ctx);
 

@@ -192,6 +192,10 @@ export class CombatSystem {
    * Handle mob death - drops, kill tracking, etc.
    */
   private handleMobDeath(mob: Entity, attacker?: Entity): void {
+    // CRITICAL: Set isDead flag IMMEDIATELY to prevent further damage processing
+    // This must happen before any messages are sent to prevent race conditions
+    (mob as any).isDead = true;
+
     const item = this.world.getDroppedItem(mob);
 
     if (attacker) {

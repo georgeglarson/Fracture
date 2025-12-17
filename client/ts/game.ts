@@ -1317,7 +1317,10 @@ export class Game {
             }
           }
 
-          if (character.hasTarget() && character.target.id === this.playerId && this.player && !this.player.invincible) {
+          // Only send HURT if the attacking mob is still alive (not dying/dead)
+          if (character.hasTarget() && character.target.id === this.playerId &&
+              this.player && !this.player.invincible &&
+              !character.isDying && !character.isDead) {
             this.client.sendHurt(character);
           }
         }
