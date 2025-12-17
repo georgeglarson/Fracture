@@ -153,13 +153,8 @@ export class VolumeUI {
   private toggleMute(muted: boolean): void {
     if (this.callbacks) {
       const audio = this.callbacks.getAudioManager();
-      if (muted) {
-        audio.enabled = false;
-        audio.fadeOutCurrentMusic();
-      } else {
-        audio.enabled = true;
-        audio.updateMusic();
-      }
+      // Use centralized setEnabled for all state transitions
+      audio.setEnabled(!muted);
       this.saveSettings();
 
       // Update mute button visual
@@ -255,14 +250,8 @@ export class VolumeUI {
     const audio = this.callbacks.getAudioManager();
     if (!audio) return;
 
-    // Toggle the actual audio state
-    if (audio.enabled) {
-      audio.enabled = false;
-      audio.fadeOutCurrentMusic();
-    } else {
-      audio.enabled = true;
-      audio.updateMusic();
-    }
+    // Toggle using the centralized setEnabled method
+    audio.toggle();
 
     // Update button visual to match new state
     this.updateMuteButton();

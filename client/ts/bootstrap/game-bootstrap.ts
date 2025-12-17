@@ -11,6 +11,8 @@ import { InputManager } from '../input/input-manager';
 import { UIManager } from '../ui/ui-manager';
 import { ItemTooltip } from '../ui/item-tooltip';
 import { ZoningManager } from '../world/zoning-manager';
+import { InteriorManager } from '../world/interior-manager';
+import { UnifiedZoneManager } from '../world/unified-zone-manager';
 import { PlayerController } from '../player/player-controller';
 import { InteractionController } from '../player/interaction-controller';
 import { QuestController } from '../quest/quest-controller';
@@ -106,6 +108,8 @@ export interface BootstrapResult {
   uiManager: UIManager;
   itemTooltip: ItemTooltip;
   zoningManager: ZoningManager;
+  interiorManager: InteriorManager;
+  unifiedZoneManager: UnifiedZoneManager;
   playerController: PlayerController;
   interactionController: InteractionController;
   questController: QuestController;
@@ -180,6 +184,21 @@ export function initializeManagers(ctx: BootstrapContext): BootstrapResult {
     forEachVisibleEntityByDepth: ctx.forEachVisibleEntityByDepth
   });
 
+  // Initialize unified zone manager (handles both outdoor zones and interiors)
+  const unifiedZoneManager = new UnifiedZoneManager();
+  unifiedZoneManager.setContext({
+    camera: ctx.camera,
+    renderer: ctx.renderer
+  });
+
+  // Initialize interior manager (deprecated - forwards to unified zone manager)
+  const interiorManager = new InteriorManager();
+  interiorManager.setUnifiedManager(unifiedZoneManager);
+  interiorManager.setContext({
+    camera: ctx.camera,
+    renderer: ctx.renderer
+  });
+
   // Initialize player controller with dependencies
   const playerController = new PlayerController({
     client: {
@@ -194,6 +213,8 @@ export function initializeManagers(ctx: BootstrapContext): BootstrapResult {
     map: ctx.map,
     audioManager: ctx.audioManager,
     storage: ctx.storage,
+    interiorManager: interiorManager,
+    unifiedZoneManager: unifiedZoneManager,
 
     getSprites: () => ctx.sprites,
     getPlayerId: () => ctx.playerId,
@@ -275,6 +296,8 @@ export function initializeManagers(ctx: BootstrapContext): BootstrapResult {
     uiManager,
     itemTooltip,
     zoningManager,
+    interiorManager,
+    unifiedZoneManager,
     playerController,
     interactionController,
     questController,

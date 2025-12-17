@@ -8,6 +8,8 @@
 import { Player } from '../entity/character/player/player';
 import { Npc } from '../entity/character/npc/npc';
 import { Chest } from '../entity/objects/chest';
+import { InteriorManager } from '../world/interior-manager';
+import { UnifiedZoneManager } from '../world/unified-zone-manager';
 import _ from 'lodash';
 
 /**
@@ -21,6 +23,8 @@ export interface PlayerControllerDeps {
   map: any;
   audioManager: any;
   storage: any;
+  interiorManager: InteriorManager;
+  unifiedZoneManager: UnifiedZoneManager;
 
   // Game state accessors
   getSprites: () => Record<string, any>;
@@ -275,37 +279,44 @@ export class PlayerController {
 
   /**
    * Handle door transition logic
+   * Uses UnifiedZoneManager for zone-based interior/outdoor transitions
    */
   private handleDoorTransition(x: number, y: number): void {
     if (!this.player) return;
 
     const dest = this.deps.map.getDoorDestination(x, y);
 
+    // Move player to destination
     this.player.setGridPosition(dest.x, dest.y);
     this.player.nextGridX = dest.x;
     this.player.nextGridY = dest.y;
     this.player.turnTo(dest.orientation);
     this.deps.client.sendTeleport(dest.x, dest.y);
 
-    // Indoor/outdoor mode handling
-    const enteringInterior = dest.cameraX !== undefined && dest.cameraY !== undefined;
-    const modeChanged = this.deps.camera.indoorMode !== enteringInterior;
-    this.deps.camera.setIndoorMode(enteringInterior);
+    // Zone-based interior/outdoor handling
+    const transition = this.deps.unifiedZoneManager.handleDoorTransition(
+      x, y, {
+        x: dest.x,
+        y: dest.y,
+        orientation: dest.orientation,
+        cameraX: dest.cameraX,
+        cameraY: dest.cameraY
+      }
+    );
 
-    // Clear canvases on mode change
-    if (modeChanged) {
-      this.deps.renderer.clearScreen(this.deps.renderer.context);
-      this.deps.renderer.clearScreen(this.deps.renderer.background);
-      this.deps.renderer.clearScreen(this.deps.renderer.foreground);
-    }
-
-    // Camera positioning
-    if (enteringInterior) {
-      this.deps.camera.setGridPosition(dest.cameraX, dest.cameraY);
+    if (transition) {
+      // Zone transition occurred - UnifiedZoneManager handles camera/viewport
+      // For outdoor exits, position camera on player
+      if (!this.deps.unifiedZoneManager.isIndoors()) {
+        if (dest.portal) {
+          this.deps.assignBubbleTo(this.player);
+        } else {
+          this.deps.camera.lookAt(this.player);
+        }
+      }
     } else {
-      if (dest.portal) {
-        this.deps.assignBubbleTo(this.player);
-      } else {
+      // No zone transition - just a simple door, position camera
+      if (!this.deps.unifiedZoneManager.isIndoors()) {
         this.deps.camera.lookAt(this.player);
       }
     }

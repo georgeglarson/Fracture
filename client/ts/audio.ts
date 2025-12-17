@@ -3,11 +3,18 @@ import {Detect} from './utils/detect';
 
 import * as _ from 'lodash';
 
+/**
+ * AudioManager - Centralized audio control with single point of state management
+ *
+ * Pattern: All audio state changes flow through setEnabled().
+ * Individual play methods check enabled as a guard, but state transitions
+ * are handled in one place to prevent audio leaks.
+ */
 export class AudioManager {
 
   game;
   extension;
-  enabled = true;
+  private _enabled = true;
   sounds = {};
   currentMusic = null;
   areas = [];
@@ -18,7 +25,7 @@ export class AudioManager {
   inCombat = false;
   combatTimeout: ReturnType<typeof setTimeout> | null = null;
   savedZoneMusic = null;
-  combatMusicName = 'boss'; // Use boss music for combat
+  combatMusicName = 'boss';
 
   // Volume controls
   masterVolume = 1.0;
@@ -42,7 +49,7 @@ export class AudioManager {
         self.loadSound(name, function () {
           counter -= 1;
           if (counter === 0) {
-            if (!Detect.isSafari()) { // Disable music on Safari - See bug 738008
+            if (!Detect.isSafari()) {
               loadMusicFiles();
             }
           }
@@ -51,11 +58,9 @@ export class AudioManager {
     };
 
     var loadMusicFiles = function () {
-      if (!self.game.renderer.mobile) { // disable music on mobile devices
+      if (!self.game.renderer.mobile) {
         console.info('Loading music files...');
-        // Load the village music first, as players always start here
         self.loadMusic(self.musicNames.shift(), function () {
-          // Then, load all the other music files
           _.each(self.musicNames, function (name) {
             self.loadMusic(name);
           });
@@ -66,46 +71,159 @@ export class AudioManager {
     if (!(Detect.isSafari() && Detect.isWindows())) {
       loadSoundFiles();
     } else {
-      this.enabled = false; // Disable audio on Safari Windows
+      this._enabled = false;
     }
   }
 
-  toggle() {
-    if (this.enabled) {
-      this.enabled = false;
+  // ============================================================================
+  // AUDIO GATE - Single point of control for enabled state
+  // ============================================================================
 
-      if (this.currentMusic) {
-        this.resetMusic(this.currentMusic);
-      }
+  /**
+   * Check if audio is enabled (read-only access)
+   */
+  get enabled(): boolean {
+    return this._enabled;
+  }
+
+  /**
+   * Central method for enabling/disabling all audio.
+   * ALL state transitions flow through here to prevent audio leaks.
+   */
+  setEnabled(enabled: boolean): void {
+    if (this._enabled === enabled) return;
+
+    this._enabled = enabled;
+
+    if (!enabled) {
+      // DISABLE: Stop everything immediately
+      this.stopAll();
     } else {
-      this.enabled = true;
-
-      if (this.currentMusic) {
-        this.currentMusic = null;
-      }
+      // ENABLE: Resume music based on current location
+      this.currentMusic = null;
       this.updateMusic();
     }
+
+    console.debug('[Audio] Enabled:', enabled);
   }
 
-  load(basePath, name, loaded_callback, channels) {
+  /**
+   * Toggle audio on/off
+   */
+  toggle(): void {
+    this.setEnabled(!this._enabled);
+  }
+
+  /**
+   * Stop ALL audio - music, sfx, voice, fades
+   * Called when disabling audio to ensure nothing leaks through
+   */
+  private stopAll(): void {
+    // Stop current music
+    if (this.currentMusic) {
+      this.clearFadeIn(this.currentMusic);
+      this.clearFadeOut(this.currentMusic);
+      this.resetMusic(this.currentMusic);
+    }
+
+    // Stop NPC voice
+    if (this.npcVoiceAudio) {
+      this.npcVoiceAudio.pause();
+      this.npcVoiceAudio.currentTime = 0;
+      this.npcVoiceAudio = null;
+    }
+
+    // Stop all sound channels
+    for (const name in this.sounds) {
+      const channels = this.sounds[name];
+      if (channels) {
+        for (const sound of channels) {
+          if (sound && !sound.paused) {
+            sound.pause();
+            sound.currentTime = 0;
+          }
+        }
+      }
+    }
+
+    // Clear combat state
+    if (this.combatTimeout) {
+      clearTimeout(this.combatTimeout);
+      this.combatTimeout = null;
+    }
+    this.inCombat = false;
+  }
+
+  // ============================================================================
+  // VOLUME CONTROL
+  // ============================================================================
+
+  setMasterVolume(volume: number): void {
+    this.masterVolume = Math.max(0, Math.min(1, volume));
+    this.applyVolumes();
+  }
+
+  setMusicVolume(volume: number): void {
+    this.musicVolume = Math.max(0, Math.min(1, volume));
+    this.applyVolumes();
+  }
+
+  setSfxVolume(volume: number): void {
+    this.sfxVolume = Math.max(0, Math.min(1, volume));
+  }
+
+  getMusicVolume(): number {
+    return this.masterVolume * this.musicVolume;
+  }
+
+  getSfxVolume(): number {
+    return this.masterVolume * this.sfxVolume;
+  }
+
+  applyVolumes(): void {
+    if (this.currentMusic?.sound && !this.currentMusic.sound.fadingIn && !this.currentMusic.sound.fadingOut) {
+      this.currentMusic.sound.volume = this.getMusicVolume();
+    }
+  }
+
+  /**
+   * Initialize volume settings from storage
+   */
+  initVolumeSettings(masterVolume: number, musicVolume: number, sfxVolume: number, muted: boolean): void {
+    this.masterVolume = masterVolume;
+    this.musicVolume = musicVolume;
+    this.sfxVolume = sfxVolume;
+
+    // Use setEnabled for mute state - centralizes the logic
+    if (muted && this._enabled) {
+      this.setEnabled(false);
+    }
+
+    this.applyVolumes();
+  }
+
+  // ============================================================================
+  // SOUND LOADING
+  // ============================================================================
+
+  load(basePath, name, loaded_callback, channels): void {
     var path = basePath + name + '.' + this.extension,
       sound = document.createElement('audio'),
       self = this;
 
     sound.addEventListener('canplaythrough', function (e) {
-      // this.removeEventListener('canplaythrough', arguments.callee, false);
       console.debug(path + ' is ready to play.');
       if (loaded_callback) {
         loaded_callback();
       }
     }, false);
+
     sound.addEventListener('error', function (e) {
       console.error('Error: ' + path + ' could not be loaded.');
       self.sounds[name] = null;
     }, false);
 
     sound.preload = 'auto';
-    // sound.autobuffer = true;
     sound.src = path;
     sound.load();
 
@@ -115,16 +233,21 @@ export class AudioManager {
     });
   }
 
-  loadSound(name, handleLoaded) {
+  loadSound(name, handleLoaded): void {
     this.load('audio/sounds/', name, handleLoaded, 4);
   }
 
-  loadMusic(name, handleLoaded?) {
+  loadMusic(name, handleLoaded?): void {
+    var self = this;
     this.load('audio/music/', name, handleLoaded, 1);
     var music = this.sounds[name][0];
     music.loop = true;
+
+    // Loop handler checks enabled state through the gate
     music.addEventListener('ended', function () {
-      music.play()
+      if (self._enabled) {
+        music.play();
+      }
     }, false);
   }
 
@@ -143,8 +266,14 @@ export class AudioManager {
     return sound;
   }
 
-  playSound(name) {
-    var sound = this.enabled && this.getSound(name);
+  // ============================================================================
+  // SOUND PLAYBACK - All methods check enabled as guard
+  // ============================================================================
+
+  playSound(name): void {
+    if (!this._enabled) return;
+
+    var sound = this.getSound(name);
     if (sound) {
       sound.volume = this.getSfxVolume();
       sound.play();
@@ -153,10 +282,9 @@ export class AudioManager {
 
   /**
    * Play NPC voice from TTS audio URL
-   * Stops any currently playing NPC voice first
    */
-  playNpcVoice(audioUrl: string) {
-    if (!this.enabled) return;
+  playNpcVoice(audioUrl: string): void {
+    if (!this._enabled) return;
 
     // Stop any currently playing NPC voice
     if (this.npcVoiceAudio) {
@@ -164,12 +292,12 @@ export class AudioManager {
       this.npcVoiceAudio.currentTime = 0;
     }
 
-    // Create new audio element for this voice
     this.npcVoiceAudio = new Audio(audioUrl);
     this.npcVoiceAudio.volume = this.getSfxVolume();
 
     this.npcVoiceAudio.addEventListener('canplaythrough', () => {
-      if (this.npcVoiceAudio) {
+      // Double-check enabled state when audio is ready (async)
+      if (this._enabled && this.npcVoiceAudio) {
         this.npcVoiceAudio.play().catch(err => {
           console.warn('[Audio] Failed to play NPC voice:', err);
         });
@@ -180,15 +308,14 @@ export class AudioManager {
       console.error('[Audio] NPC voice failed to load:', audioUrl, e);
     }, { once: true });
 
-    // Start loading
     this.npcVoiceAudio.load();
     console.log('[Audio] Playing NPC voice:', audioUrl);
   }
 
   /**
-   * Stop any currently playing NPC voice
+   * Stop NPC voice (public for external callers like dialogue close)
    */
-  stopNpcVoice() {
+  stopNpcVoice(): void {
     if (this.npcVoiceAudio) {
       this.npcVoiceAudio.pause();
       this.npcVoiceAudio.currentTime = 0;
@@ -196,13 +323,19 @@ export class AudioManager {
     }
   }
 
-  addArea(x, y, width, height, musicName) {
+  // ============================================================================
+  // MUSIC AREAS
+  // ============================================================================
+
+  addArea(x, y, width, height, musicName): void {
     var area: any = new Area(x, y, width, height);
     area.musicName = musicName;
     this.areas.push(area);
   }
 
   getSurroundingMusic(entity) {
+    if (!entity) return null;
+
     var music = null,
       area: any = _.detect(this.areas, function (area) {
         return area.contains(entity);
@@ -214,47 +347,51 @@ export class AudioManager {
     return music;
   }
 
-  updateMusic() {
-    if (this.enabled) {
-      var music = this.getSurroundingMusic(this.game.player);
+  // ============================================================================
+  // MUSIC PLAYBACK
+  // ============================================================================
 
-      if (music) {
-        if (!this.isCurrentMusic(music)) {
-          if (this.currentMusic) {
-            this.fadeOutCurrentMusic();
-          }
-          this.playMusic(music);
+  updateMusic(): void {
+    if (!this._enabled) return;
+
+    var music = this.getSurroundingMusic(this.game.player);
+
+    if (music) {
+      if (!this.isCurrentMusic(music)) {
+        if (this.currentMusic) {
+          this.fadeOutCurrentMusic();
         }
-      } else {
-        this.fadeOutCurrentMusic();
+        this.playMusic(music);
       }
+    } else {
+      this.fadeOutCurrentMusic();
     }
   }
 
-  isCurrentMusic(music) {
+  isCurrentMusic(music): boolean {
     return this.currentMusic && (music.name === this.currentMusic.name);
   }
 
-  playMusic(music) {
-    if (this.enabled && music && music.sound) {
-      if (music.sound.fadingOut) {
-        this.fadeInMusic(music);
-      } else {
-        music.sound.volume = this.getMusicVolume();
-        music.sound.play();
-      }
-      this.currentMusic = music;
+  playMusic(music): void {
+    if (!this._enabled || !music?.sound) return;
+
+    if (music.sound.fadingOut) {
+      this.fadeInMusic(music);
+    } else {
+      music.sound.volume = this.getMusicVolume();
+      music.sound.play();
     }
+    this.currentMusic = music;
   }
 
-  resetMusic(music) {
-    if (music && music.sound && music.sound.readyState > 0) {
+  resetMusic(music): void {
+    if (music?.sound?.readyState > 0) {
       music.sound.pause();
       music.sound.currentTime = 0;
     }
   }
 
-  fadeOutMusic(music, ended_callback) {
+  fadeOutMusic(music, ended_callback): void {
     var self = this;
     if (music && !music.sound.fadingOut) {
       this.clearFadeIn(music);
@@ -262,7 +399,7 @@ export class AudioManager {
         var step = 0.02,
         volume = music.sound.volume - step;
 
-        if (self.enabled && volume >= step) {
+        if (self._enabled && volume >= step) {
           music.sound.volume = volume;
         } else {
           music.sound.volume = 0;
@@ -273,7 +410,7 @@ export class AudioManager {
     }
   }
 
-  fadeInMusic(music) {
+  fadeInMusic(music): void {
     var self = this;
     if (music && !music.sound.fadingIn) {
       this.clearFadeOut(music);
@@ -281,7 +418,7 @@ export class AudioManager {
         var step = 0.01,
         volume = music.sound.volume + step;
 
-        if (self.enabled && volume < 1 - step) {
+        if (self._enabled && volume < 1 - step) {
           music.sound.volume = volume;
         } else {
           music.sound.volume = 1;
@@ -291,21 +428,21 @@ export class AudioManager {
     }
   }
 
-  clearFadeOut(music) {
-    if (music.sound.fadingOut) {
+  clearFadeOut(music): void {
+    if (music?.sound?.fadingOut) {
       clearInterval(music.sound.fadingOut);
       music.sound.fadingOut = null;
     }
   }
 
-  clearFadeIn(music) {
-    if (music.sound.fadingIn) {
+  clearFadeIn(music): void {
+    if (music?.sound?.fadingIn) {
       clearInterval(music.sound.fadingIn);
       music.sound.fadingIn = null;
     }
   }
 
-  fadeOutCurrentMusic() {
+  fadeOutCurrentMusic(): void {
     var self = this;
     if (this.currentMusic) {
       this.fadeOutMusic(this.currentMusic, function (music) {
@@ -315,12 +452,12 @@ export class AudioManager {
     }
   }
 
-  /**
-   * Called when player enters combat (attacks or is attacked)
-   */
-  enterCombat() {
-    console.log('[Audio] enterCombat called - enabled:', this.enabled, 'inCombat:', this.inCombat);
-    if (!this.enabled) return;
+  // ============================================================================
+  // COMBAT MUSIC
+  // ============================================================================
+
+  enterCombat(): void {
+    if (!this._enabled) return;
 
     // Clear any pending combat exit
     if (this.combatTimeout) {
@@ -328,7 +465,6 @@ export class AudioManager {
       this.combatTimeout = null;
     }
 
-    // If already in combat, just reset the timer
     if (this.inCombat) return;
 
     this.inCombat = true;
@@ -348,20 +484,13 @@ export class AudioManager {
         });
       }
       this.playMusic(combatMusic);
-      console.log('[Audio] Combat music STARTED - boss track playing');
-    } else {
-      console.warn('[Audio] Combat music failed - boss sound not found!');
+      console.debug('[Audio] Combat music started');
     }
   }
 
-  /**
-   * Called when combat ends (5s after last combat action)
-   */
-  exitCombat() {
-    console.log('[Audio] exitCombat called - enabled:', this.enabled, 'inCombat:', this.inCombat);
-    if (!this.enabled || !this.inCombat) return;
+  exitCombat(): void {
+    if (!this._enabled || !this.inCombat) return;
 
-    // Clear any pending timeout
     if (this.combatTimeout) {
       clearTimeout(this.combatTimeout);
     }
@@ -371,93 +500,24 @@ export class AudioManager {
       this.inCombat = false;
       this.combatTimeout = null;
 
-      // Fade back to zone music
-      if (this.currentMusic && this.currentMusic.name === this.combatMusicName) {
+      if (this.currentMusic?.name === this.combatMusicName) {
         this.fadeOutMusic(this.currentMusic, () => {
           this.resetMusic(this.currentMusic);
           this.currentMusic = null;
-          // Restore zone music
           this.updateMusic();
         });
       }
       console.debug('[Audio] Combat music ended');
-    }, 5000); // 5 second delay after last combat action
+    }, 5000);
   }
 
-  /**
-   * Reset combat timeout when combat continues
-   */
-  refreshCombat() {
+  refreshCombat(): void {
     if (this.inCombat) {
-      // Clear existing timeout and set new one
       if (this.combatTimeout) {
         clearTimeout(this.combatTimeout);
         this.combatTimeout = null;
       }
-      this.exitCombat(); // This sets a new 5s timeout
+      this.exitCombat();
     }
-  }
-
-  /**
-   * Set master volume (0-1)
-   */
-  setMasterVolume(volume: number) {
-    this.masterVolume = Math.max(0, Math.min(1, volume));
-    this.applyVolumes();
-  }
-
-  /**
-   * Set music volume (0-1)
-   */
-  setMusicVolume(volume: number) {
-    this.musicVolume = Math.max(0, Math.min(1, volume));
-    this.applyVolumes();
-  }
-
-  /**
-   * Set SFX volume (0-1)
-   */
-  setSfxVolume(volume: number) {
-    this.sfxVolume = Math.max(0, Math.min(1, volume));
-  }
-
-  /**
-   * Apply volume settings to currently playing music
-   */
-  applyVolumes() {
-    if (this.currentMusic && this.currentMusic.sound) {
-      const effectiveVolume = this.masterVolume * this.musicVolume;
-      // Don't override volume if fading
-      if (!this.currentMusic.sound.fadingIn && !this.currentMusic.sound.fadingOut) {
-        this.currentMusic.sound.volume = effectiveVolume;
-      }
-    }
-  }
-
-  /**
-   * Get effective music volume
-   */
-  getMusicVolume(): number {
-    return this.masterVolume * this.musicVolume;
-  }
-
-  /**
-   * Get effective SFX volume
-   */
-  getSfxVolume(): number {
-    return this.masterVolume * this.sfxVolume;
-  }
-
-  /**
-   * Initialize volume settings from storage
-   */
-  initVolumeSettings(masterVolume: number, musicVolume: number, sfxVolume: number, muted: boolean) {
-    this.masterVolume = masterVolume;
-    this.musicVolume = musicVolume;
-    this.sfxVolume = sfxVolume;
-    if (muted) {
-      this.enabled = false;
-    }
-    this.applyVolumes();
   }
 }

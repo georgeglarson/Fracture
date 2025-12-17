@@ -3,6 +3,8 @@
  *
  * Map is 172 x 314 tiles. Zones are contiguous horizontal bands
  * progressing from safe (south) to dangerous (north).
+ *
+ * Interior zones are building interiors with fixed camera viewports.
  */
 
 export interface ZoneBounds {
@@ -10,6 +12,21 @@ export interface ZoneBounds {
   y: number;
   w: number;
   h: number;
+}
+
+/**
+ * Zone type: outdoor (normal scrolling) or interior (fixed viewport)
+ */
+export type ZoneType = 'outdoor' | 'interior';
+
+/**
+ * Viewport configuration for interior zones
+ */
+export interface ZoneViewport {
+  width: number;    // Grid viewport width (tiles)
+  height: number;   // Grid viewport height (tiles)
+  cameraX: number;  // Fixed camera grid X position
+  cameraY: number;  // Fixed camera grid Y position
 }
 
 export interface ZoneDefinition {
@@ -27,6 +44,13 @@ export interface ZoneDefinition {
   weaponDropBonus: number;  // Bonus to weapon drop chance
   // Zone areas (can have multiple areas per zone type)
   areas: ZoneBounds[];
+
+  // Zone type (default: 'outdoor')
+  type?: ZoneType;
+  // Interior-specific: viewport configuration
+  viewport?: ZoneViewport;
+  // Interior-specific: parent outdoor zone (inherits bonuses if not specified)
+  parentZone?: string;
 }
 
 // Full map: 172 x 314

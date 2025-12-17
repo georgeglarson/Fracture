@@ -40,6 +40,7 @@ import {InventoryManager} from './inventory/inventory-manager';
 import {deserializeInventory, InventorySlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
 import {setupNetworkHandlers} from './network/message-handlers';
 import {ZoningManager} from './world/zoning-manager';
+import {InteriorManager} from './world/interior-manager';
 import {SpriteLoader} from './assets/sprite-loader';
 import {getAchievementById} from '../../shared/ts/achievements/achievement-data';
 import {FractureAtmosphere} from './ui/fracture-atmosphere';
@@ -88,6 +89,7 @@ export class Game {
   minimapUI: MinimapUI | null = null;
   achievementUI: AchievementUI | null = null;
   zoningManager: ZoningManager | null = null;
+  interiorManager: InteriorManager | null = null;
   spriteLoader: SpriteLoader | null = null;
   fractureAtmosphere: FractureAtmosphere | null = null;
   playerController: PlayerController | null = null;
@@ -614,6 +616,7 @@ export class Game {
         self.uiManager = bootstrapResult.uiManager;
         self.itemTooltip = bootstrapResult.itemTooltip;
         self.zoningManager = bootstrapResult.zoningManager;
+        self.interiorManager = bootstrapResult.interiorManager;
         self.playerController = bootstrapResult.playerController;
         self.interactionController = bootstrapResult.interactionController;
         self.questController = bootstrapResult.questController;
@@ -1409,8 +1412,8 @@ export class Game {
   restart() {
     console.debug('Beginning restart');
 
-    // Reset camera to outdoor mode (fixes viewport stuck small after dying in building)
-    this.camera.setIndoorMode(false);
+    // Reset interior state (fixes viewport stuck small after dying in building)
+    this.interiorManager?.reset();
     this.camera.rescale();
 
     // Clear all bubbles

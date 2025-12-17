@@ -15,9 +15,12 @@ export class Camera {
   fullGridW: number = 0;
   fullGridH: number = 0;
 
-  // Indoor mode - use smaller fixed viewport
-  // Sized to fit single building rooms (most are ~9x7 tiles)
-  indoorMode: boolean = false;
+  // Zone-based viewport system
+  // When viewportFixed = true, camera stays fixed (for interiors)
+  // When viewportFixed = false, camera follows player (outdoor)
+  private viewportFixed: boolean = false;
+
+  // Legacy constants for backward compatibility
   static readonly INDOOR_GRID_W = 11;
   static readonly INDOOR_GRID_H = 9;
 
@@ -95,39 +98,67 @@ export class Camera {
     this.fullGridW = Math.max(this.fullGridW, 15);
     this.fullGridH = Math.max(this.fullGridH, 7);
 
-    // Apply indoor mode limits if active
-    if (this.indoorMode) {
-      this.gridW = Math.min(this.fullGridW, Camera.INDOOR_GRID_W);
-      this.gridH = Math.min(this.fullGridH, Camera.INDOOR_GRID_H);
-    } else {
+    // Apply fixed viewport limits if active (e.g., in interior zone)
+    // Note: gridW/gridH are set by setZoneViewport when entering interiors
+    if (!this.viewportFixed) {
       this.gridW = this.fullGridW;
       this.gridH = this.fullGridH;
     }
+    // If viewportFixed, keep current gridW/gridH (set by setZoneViewport)
 
     console.debug('---------');
     console.debug('Scale:' + scale + ' Tilesize:' + tilesize);
     console.debug('Viewport:' + window.innerWidth + 'x' + window.innerHeight);
-    console.debug('Grid W:' + this.gridW + ' H:' + this.gridH + (this.indoorMode ? ' (indoor)' : ''));
+    console.debug('Grid W:' + this.gridW + ' H:' + this.gridH + (this.viewportFixed ? ' (fixed)' : ''));
   }
 
   /**
-   * Enter indoor mode - use smaller viewport for building interiors
+   * Set viewport based on zone configuration
+   * @param width Grid viewport width (tiles)
+   * @param height Grid viewport height (tiles)
+   * @param isFixed If true, camera stays fixed (interior). If false, follows player (outdoor)
    */
-  setIndoorMode(indoor: boolean) {
-    if (this.indoorMode === indoor) return;
+  setZoneViewport(width: number, height: number, isFixed: boolean): void {
+    this.viewportFixed = isFixed;
 
-    this.indoorMode = indoor;
-
-    // Apply the new grid size
-    if (indoor) {
-      this.gridW = Math.min(this.fullGridW, Camera.INDOOR_GRID_W);
-      this.gridH = Math.min(this.fullGridH, Camera.INDOOR_GRID_H);
+    if (isFixed) {
+      // Use zone-defined dimensions (capped by window size)
+      this.gridW = Math.min(this.fullGridW, width);
+      this.gridH = Math.min(this.fullGridH, height);
     } else {
+      // Outdoor mode - use full window
       this.gridW = this.fullGridW;
       this.gridH = this.fullGridH;
     }
 
-    console.debug('Camera indoor mode:', indoor, 'Grid:', this.gridW, 'x', this.gridH);
+    console.debug('Camera viewport:', this.gridW, 'x', this.gridH, isFixed ? '(fixed)' : '(dynamic)');
+  }
+
+  /**
+   * Check if viewport is fixed (interior/zone mode)
+   */
+  isViewportFixed(): boolean {
+    return this.viewportFixed;
+  }
+
+  /**
+   * Legacy: Enter indoor mode with default 11x9 viewport
+   * @deprecated Use setZoneViewport() instead
+   */
+  setIndoorMode(indoor: boolean): void {
+    if (indoor) {
+      this.setZoneViewport(Camera.INDOOR_GRID_W, Camera.INDOOR_GRID_H, true);
+    } else {
+      this.setZoneViewport(this.fullGridW, this.fullGridH, false);
+    }
+  }
+
+  /**
+   * Legacy getter for backward compatibility
+   * @deprecated Use isViewportFixed() instead
+   */
+  get indoorMode(): boolean {
+    return this.viewportFixed;
   }
 
   setPosition(x, y) {
@@ -171,6 +202,11 @@ export class Camera {
   }
 
   lookAt(entity) {
+    // In fixed viewport mode (interiors), don't follow entities - camera stays fixed
+    if (this.viewportFixed) {
+      return;
+    }
+
     var r = this.renderer,
       x = Math.round(entity.x - (Math.floor(this.gridW / 2) * r.tilesize)),
       y = Math.round(entity.y - (Math.floor(this.gridH / 2) * r.tilesize));
@@ -201,6 +237,11 @@ export class Camera {
   }
 
   focusEntity(entity) {
+    // In fixed viewport mode (interiors), don't refocus camera - stays fixed
+    if (this.viewportFixed) {
+      return;
+    }
+
     var w = this.gridW - 2,
       h = this.gridH - 2,
       x = Math.floor((entity.gridX - 1) / w) * w,

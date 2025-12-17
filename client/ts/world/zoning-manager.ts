@@ -42,10 +42,17 @@ export class ZoningManager {
 
   /**
    * Check if a tile is at the edge of the camera (triggers zone change)
+   * IMPORTANT: Never trigger zone transitions in indoor mode - camera stays fixed
    */
   isZoningTile(x: number, y: number): boolean {
     if (!this.context) return false;
     const c = this.context.camera;
+
+    // Never trigger zone transitions in indoor mode
+    // Indoor camera should stay fixed at the set position
+    if (c.indoorMode) {
+      return false;
+    }
 
     const relX = x - c.gridX;
     const relY = y - c.gridY;
