@@ -5,6 +5,8 @@
  * Extracted from Game.ts to reduce its size.
  */
 
+import { FractureAtmosphere } from '../ui/fracture-atmosphere.js';
+
 /**
  * Game context for game event operations
  */
@@ -15,6 +17,9 @@ export interface GameEventContext {
   // Methods
   showNotification: (message: string) => void;
   showNarratorText: (text: string, style: string) => void;
+
+  // Atmosphere (optional)
+  fractureAtmosphere?: FractureAtmosphere | null;
 }
 
 /**
@@ -39,6 +44,13 @@ export function handleZoneEnter(
   warning: string | null
 ): ZoneData {
   const zone = { id: zoneId, name: zoneName, minLevel, maxLevel };
+
+  // Trigger dimension theme change BEFORE showing narrator text
+  // This way the theme transition happens alongside the zone notification
+  if (ctx.fractureAtmosphere) {
+    // Don't show dimension name since we show zone name via narrator
+    ctx.fractureAtmosphere.setDimensionTheme(zoneId, false);
+  }
 
   // Show zone enter notification using narrator style for epic feel
   const levelRange = `Level ${minLevel}-${maxLevel}`;

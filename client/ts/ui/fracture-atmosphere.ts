@@ -1,22 +1,156 @@
 /**
  * FractureAtmosphere - Creates an unsettling, glitchy atmosphere
  * Combines audio glitches, visual effects, and floating particles
+ *
+ * Now with dimension-specific themes for each zone!
  */
+
+/**
+ * Dimension theme configuration
+ */
+export interface DimensionTheme {
+  id: string;
+  name: string;
+  // Colors
+  particleColor: string;
+  particleGlow: string;
+  vignetteColor: string;
+  scanlineColor: string;
+  // Symbols for particles
+  symbols: string[];
+  // Intensity settings
+  baseIntensity: number;
+  particleRate: number; // 0-1, how often particles spawn
+  glitchRate: number;   // 0-1, how often glitches occur
+  // Audio settings
+  glitchTypes: Array<'static' | 'distort' | 'lowfreq'>;
+  // CSS filter for game canvas
+  canvasFilter: string;
+}
+
+/**
+ * Pre-defined dimension themes
+ */
+export const DIMENSION_THEMES: Record<string, DimensionTheme> = {
+  village: {
+    id: 'village',
+    name: 'The Refuge',
+    particleColor: 'rgba(100, 180, 100, 0.5)',
+    particleGlow: 'rgba(120, 200, 120, 0.6)',
+    vignetteColor: 'rgba(0, 30, 0, 0.2)',
+    scanlineColor: 'rgba(0, 50, 0, 0.02)',
+    symbols: ['✦', '❋', '✿', '◇', '○', '△'],
+    baseIntensity: 0.15,
+    particleRate: 0.3,
+    glitchRate: 0.05,
+    glitchTypes: ['static'],
+    canvasFilter: 'none',
+  },
+  beach: {
+    id: 'beach',
+    name: 'Shattered Coast',
+    particleColor: 'rgba(80, 180, 220, 0.6)',
+    particleGlow: 'rgba(100, 200, 255, 0.7)',
+    vignetteColor: 'rgba(0, 20, 40, 0.25)',
+    scanlineColor: 'rgba(0, 100, 150, 0.03)',
+    symbols: ['≋', '∿', '◌', '◦', '⌇', '≈', '~'],
+    baseIntensity: 0.25,
+    particleRate: 0.5,
+    glitchRate: 0.1,
+    glitchTypes: ['static', 'distort'],
+    canvasFilter: 'saturate(1.1) hue-rotate(-5deg)',
+  },
+  forest: {
+    id: 'forest',
+    name: 'Glitch Woods',
+    particleColor: 'rgba(0, 255, 100, 0.7)',
+    particleGlow: 'rgba(0, 255, 150, 0.9)',
+    vignetteColor: 'rgba(0, 40, 0, 0.35)',
+    scanlineColor: 'rgba(0, 255, 0, 0.04)',
+    symbols: ['█', '▓', '▒', '░', '⌐', '¬', '│', '┤', '╡', '╢'],
+    baseIntensity: 0.4,
+    particleRate: 0.7,
+    glitchRate: 0.25,
+    glitchTypes: ['static', 'distort'],
+    canvasFilter: 'saturate(0.9) brightness(0.95) contrast(1.1)',
+  },
+  cave: {
+    id: 'cave',
+    name: 'The Underdepths',
+    particleColor: 'rgba(150, 80, 200, 0.7)',
+    particleGlow: 'rgba(180, 100, 255, 0.8)',
+    vignetteColor: 'rgba(20, 0, 40, 0.5)',
+    scanlineColor: 'rgba(100, 0, 150, 0.04)',
+    symbols: ['◈', '◇', '⬡', '⬢', '✧', '★', '☆', '∴', '∵'],
+    baseIntensity: 0.5,
+    particleRate: 0.6,
+    glitchRate: 0.2,
+    glitchTypes: ['lowfreq', 'distort'],
+    canvasFilter: 'saturate(0.8) brightness(0.85) hue-rotate(20deg)',
+  },
+  desert: {
+    id: 'desert',
+    name: 'The Null Zone',
+    particleColor: 'rgba(255, 0, 255, 0.6)',
+    particleGlow: 'rgba(255, 100, 255, 0.8)',
+    vignetteColor: 'rgba(40, 0, 40, 0.4)',
+    scanlineColor: 'rgba(255, 0, 255, 0.03)',
+    symbols: ['◯', '◎', '◉', '●', '○', '∅', '⊘', '⊙', '⊚'],
+    baseIntensity: 0.55,
+    particleRate: 0.65,
+    glitchRate: 0.3,
+    glitchTypes: ['static', 'lowfreq', 'distort'],
+    canvasFilter: 'saturate(1.2) contrast(1.15) hue-rotate(-10deg)',
+  },
+  lavaland: {
+    id: 'lavaland',
+    name: 'The Core Breach',
+    particleColor: 'rgba(255, 100, 0, 0.8)',
+    particleGlow: 'rgba(255, 150, 50, 1)',
+    vignetteColor: 'rgba(60, 0, 0, 0.5)',
+    scanlineColor: 'rgba(255, 50, 0, 0.05)',
+    symbols: ['▲', '△', '◢', '◣', '◤', '◥', '⚠', '☢', '⚡'],
+    baseIntensity: 0.7,
+    particleRate: 0.8,
+    glitchRate: 0.4,
+    glitchTypes: ['static', 'lowfreq', 'distort'],
+    canvasFilter: 'saturate(1.3) brightness(1.05) sepia(0.15)',
+  },
+  boss: {
+    id: 'boss',
+    name: "Reality's Edge",
+    particleColor: 'rgba(255, 255, 255, 0.9)',
+    particleGlow: 'rgba(255, 255, 255, 1)',
+    vignetteColor: 'rgba(0, 0, 0, 0.6)',
+    scanlineColor: 'rgba(255, 255, 255, 0.06)',
+    symbols: ['✕', '✖', '✗', '✘', '╳', '⨯', '☠', '⚔', '†', '‡'],
+    baseIntensity: 0.85,
+    particleRate: 0.9,
+    glitchRate: 0.5,
+    glitchTypes: ['static', 'lowfreq', 'distort'],
+    canvasFilter: 'saturate(0.7) contrast(1.3) brightness(0.9)',
+  },
+};
 
 export class FractureAtmosphere {
   private audioCtx: AudioContext | null = null;
   private container: HTMLElement | null = null;
   private particleContainer: HTMLElement | null = null;
   private scanlineOverlay: HTMLElement | null = null;
+  private vignetteOverlay: HTMLElement | null = null;
   private enabled = true;
   private intensity = 0.3; // 0-1, how intense effects are
+
+  // Current dimension theme
+  private currentTheme: DimensionTheme = DIMENSION_THEMES.village;
+  private currentZone: string = 'village';
 
   // Timers
   private glitchTimer: ReturnType<typeof setInterval> | null = null;
   private particleTimer: ReturnType<typeof setInterval> | null = null;
 
-  // Fracture symbols for particles
-  private readonly symbols = ['░', '▓', '█', '◢', '◣', '✕', '⚡', '◈', '⬡', '▲', '●', '◆', '╳', '⌁', '⏣'];
+  // Fracture symbols for particles (default, overridden by theme)
+  private readonly defaultSymbols = ['░', '▓', '█', '◢', '◣', '✕', '⚡', '◈', '⬡', '▲', '●', '◆', '╳', '⌁', '⏣'];
   private readonly corruptSymbols = ['̷', '̸', '̶', '̵', '̴']; // Zalgo-lite
 
   // Preloaded glitch sounds
@@ -124,6 +258,11 @@ export class FractureAtmosphere {
           height: 100%;
           pointer-events: none;
           z-index: 9999;
+          /* CSS variables for dimension theming */
+          --particle-color: rgba(180, 60, 60, 0.6);
+          --particle-glow: rgba(180, 60, 60, 0.8);
+          --vignette-color: rgba(0, 0, 0, 0.3);
+          --scanline-color: rgba(0, 0, 0, 0.03);
         }
 
         .fracture-scanlines {
@@ -136,10 +275,11 @@ export class FractureAtmosphere {
             0deg,
             transparent,
             transparent 2px,
-            rgba(0, 0, 0, 0.03) 2px,
-            rgba(0, 0, 0, 0.03) 4px
+            var(--scanline-color) 2px,
+            var(--scanline-color) 4px
           );
           opacity: 0.5;
+          transition: background 1s ease;
         }
 
         .fracture-vignette {
@@ -151,8 +291,9 @@ export class FractureAtmosphere {
           background: radial-gradient(
             ellipse at center,
             transparent 50%,
-            rgba(0, 0, 0, 0.3) 100%
+            var(--vignette-color) 100%
           );
+          transition: background 1.5s ease;
         }
 
         .fracture-particles {
@@ -166,16 +307,16 @@ export class FractureAtmosphere {
 
         .fracture-particle {
           position: absolute;
-          color: rgba(180, 60, 60, 0.6);
+          color: var(--particle-color);
           font-size: 14px;
-          text-shadow: 0 0 5px rgba(180, 60, 60, 0.8);
+          text-shadow: 0 0 5px var(--particle-glow);
           animation: fracture-float 8s ease-in-out infinite;
           user-select: none;
         }
 
         .fracture-particle.bright {
-          color: rgba(220, 100, 100, 0.8);
-          text-shadow: 0 0 10px rgba(255, 100, 100, 0.9);
+          filter: brightness(1.3);
+          text-shadow: 0 0 10px var(--particle-glow), 0 0 20px var(--particle-glow);
         }
 
         @keyframes fracture-float {
@@ -230,27 +371,70 @@ export class FractureAtmosphere {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.7; }
         }
+
+        /* Zone transition effect */
+        .fracture-zone-transition {
+          animation: zone-shift 0.8s ease-out;
+        }
+
+        @keyframes zone-shift {
+          0% { filter: brightness(1.5) saturate(0); }
+          50% { filter: brightness(0.5) saturate(2); }
+          100% { filter: none; }
+        }
+
+        /* Dimension name display */
+        .dimension-name {
+          position: absolute;
+          top: 80px;
+          left: 50%;
+          transform: translateX(-50%);
+          font-family: 'Press Start 2P', monospace;
+          font-size: 16px;
+          color: white;
+          text-shadow: 0 0 10px var(--particle-glow), 2px 2px 0 rgba(0,0,0,0.8);
+          opacity: 0;
+          transition: opacity 0.5s ease;
+          pointer-events: none;
+        }
+
+        .dimension-name.visible {
+          animation: dimension-reveal 3s ease-out forwards;
+        }
+
+        @keyframes dimension-reveal {
+          0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+          15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          85% { opacity: 1; }
+          100% { opacity: 0; }
+        }
       </style>
       <div class="fracture-scanlines"></div>
       <div class="fracture-vignette"></div>
       <div class="fracture-particles"></div>
+      <div class="dimension-name"></div>
     `;
 
     document.body.appendChild(this.container);
     this.particleContainer = this.container.querySelector('.fracture-particles');
     this.scanlineOverlay = this.container.querySelector('.fracture-scanlines');
+    this.vignetteOverlay = this.container.querySelector('.fracture-vignette');
   }
 
   private startAmbientEffects(): void {
-    // Random visual glitches
+    // Random visual glitches - rate based on theme
     this.glitchTimer = setInterval(() => {
-      if (!this.enabled || Math.random() > this.intensity * 0.3) return;
+      if (!this.enabled) return;
+      // Use theme's glitch rate
+      if (Math.random() > this.currentTheme.glitchRate) return;
       this.triggerVisualGlitch();
     }, 5000 + Math.random() * 10000);
 
-    // Spawn floating particles
+    // Spawn floating particles - rate based on theme
     this.particleTimer = setInterval(() => {
-      if (!this.enabled || Math.random() > this.intensity) return;
+      if (!this.enabled) return;
+      // Use theme's particle rate
+      if (Math.random() > this.currentTheme.particleRate) return;
       this.spawnParticle();
     }, 2000 + Math.random() * 3000);
 
@@ -261,14 +445,22 @@ export class FractureAtmosphere {
   }
 
   /**
-   * Spawn a floating fracture symbol
+   * Spawn a floating fracture symbol using current theme
    */
   private spawnParticle(): void {
     if (!this.particleContainer) return;
 
+    const symbols = this.currentTheme.symbols.length > 0
+      ? this.currentTheme.symbols
+      : this.defaultSymbols;
+
     const particle = document.createElement('div');
     particle.className = 'fracture-particle' + (Math.random() > 0.7 ? ' bright' : '');
-    particle.textContent = this.symbols[Math.floor(Math.random() * this.symbols.length)];
+    particle.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+
+    // Apply theme colors directly to particle (for instant color change)
+    particle.style.color = this.currentTheme.particleColor;
+    particle.style.textShadow = `0 0 5px ${this.currentTheme.particleGlow}`;
 
     // Random position
     particle.style.left = `${Math.random() * 100}%`;
@@ -281,6 +473,105 @@ export class FractureAtmosphere {
 
     // Remove after animation
     setTimeout(() => particle.remove(), 15000);
+  }
+
+  /**
+   * Set the dimension theme based on zone ID
+   * Triggers visual transition and updates all theme-dependent elements
+   */
+  setDimensionTheme(zoneId: string, showName = true): void {
+    const theme = DIMENSION_THEMES[zoneId] || DIMENSION_THEMES.village;
+
+    // Skip if same zone
+    if (this.currentZone === zoneId && this.currentTheme === theme) return;
+
+    const previousZone = this.currentZone;
+    this.currentZone = zoneId;
+    this.currentTheme = theme;
+
+    console.log(`[Fracture] Entering dimension: ${theme.name}`);
+
+    // Update CSS variables
+    if (this.container) {
+      this.container.style.setProperty('--particle-color', theme.particleColor);
+      this.container.style.setProperty('--particle-glow', theme.particleGlow);
+      this.container.style.setProperty('--vignette-color', theme.vignetteColor);
+      this.container.style.setProperty('--scanline-color', theme.scanlineColor);
+    }
+
+    // Update intensity to match zone
+    this.setIntensity(theme.baseIntensity);
+
+    // Apply canvas filter
+    const gameCanvas = document.getElementById('canvas');
+    if (gameCanvas) {
+      gameCanvas.style.filter = theme.canvasFilter;
+      gameCanvas.style.transition = 'filter 1s ease';
+    }
+
+    // Show dimension name on transition
+    if (showName && previousZone !== zoneId) {
+      this.showDimensionName(theme.name);
+    }
+
+    // Trigger transition effects
+    if (previousZone !== zoneId) {
+      this.triggerZoneTransition();
+    }
+
+    // Clear existing particles and spawn new themed ones
+    if (this.particleContainer) {
+      // Keep existing particles, new ones will use new theme
+      for (let i = 0; i < Math.ceil(theme.particleRate * 5); i++) {
+        setTimeout(() => this.spawnParticle(), i * 300);
+      }
+    }
+  }
+
+  /**
+   * Show the dimension name briefly
+   */
+  private showDimensionName(name: string): void {
+    const nameEl = this.container?.querySelector('.dimension-name') as HTMLElement;
+    if (nameEl) {
+      nameEl.textContent = name;
+      nameEl.classList.remove('visible');
+      // Force reflow to restart animation
+      void nameEl.offsetWidth;
+      nameEl.classList.add('visible');
+    }
+  }
+
+  /**
+   * Trigger zone transition visual effect
+   */
+  private triggerZoneTransition(): void {
+    const gameContainer = document.getElementById('container');
+    if (gameContainer) {
+      gameContainer.classList.add('fracture-zone-transition');
+      setTimeout(() => gameContainer.classList.remove('fracture-zone-transition'), 800);
+    }
+
+    // Play appropriate glitch sound
+    const glitchType = this.currentTheme.glitchTypes[
+      Math.floor(Math.random() * this.currentTheme.glitchTypes.length)
+    ];
+    this.playAudioGlitch(glitchType, 0.2);
+    this.playRandomGlitch(0.15);
+  }
+
+  /**
+   * Get the current dimension theme
+   */
+  getCurrentTheme(): DimensionTheme {
+    return this.currentTheme;
+  }
+
+  /**
+   * Get the current zone ID
+   */
+  getCurrentZone(): string {
+    return this.currentZone;
   }
 
   /**

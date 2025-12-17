@@ -14,6 +14,95 @@ export interface NarrationResult {
   audioUrl?: string;
 }
 
+/**
+ * Dimension-specific narrator styles
+ * Each zone has a unique narrative voice
+ */
+export const DIMENSION_NARRATOR_STYLES: Record<string, {
+  name: string;
+  personality: string;
+  vocabulary: string[];
+  tones: string[];
+}> = {
+  village: {
+    name: 'The Refuge',
+    personality: 'A warm, welcoming voice. Like a kind innkeeper or village elder. Safe and hopeful.',
+    vocabulary: ['hearth', 'home', 'rest', 'sanctuary', 'beginning', 'hope', 'shelter'],
+    tones: [
+      'Be warm and welcoming.',
+      'Sound like a friendly tavern keeper.',
+      'Be gently encouraging.',
+      'Speak of safety and new beginnings.'
+    ]
+  },
+  beach: {
+    name: 'Shattered Coast',
+    personality: 'An eerie, waterlogged voice. Like whispers from drowned sailors. Reality glitches like corrupted data.',
+    vocabulary: ['tides', 'depths', 'static', 'signal', 'waves', 'fragments', 'echoes', 'distortion'],
+    tones: [
+      'Sound like a corrupted radio transmission.',
+      'Speak as if underwater, glitching.',
+      'Be mysteriously aquatic and digital.',
+      'Reference broken signals and lost transmissions.'
+    ]
+  },
+  forest: {
+    name: 'Glitch Woods',
+    personality: 'A digital, matrix-like voice. The forest is made of corrupted code. Trees are data structures.',
+    vocabulary: ['code', 'compile', 'error', 'recursive', 'branch', 'root', 'null', 'overflow', 'debug'],
+    tones: [
+      'Speak like a corrupted AI system.',
+      'Use programming metaphors.',
+      'Be glitchy and fragmented.',
+      'Reference system errors and code.'
+    ]
+  },
+  cave: {
+    name: 'The Underdepths',
+    personality: 'A cosmic horror voice. Lovecraftian whispers from beyond the stars. Ancient and unknowable.',
+    vocabulary: ['void', 'ancient', 'stars', 'madness', 'beyond', 'eternal', 'whispers', 'abyss', 'eldritch'],
+    tones: [
+      'Be ominously Lovecraftian.',
+      'Speak of ancient cosmic horrors.',
+      'Be mysteriously unsettling.',
+      'Reference things beyond mortal comprehension.'
+    ]
+  },
+  desert: {
+    name: 'The Null Zone',
+    personality: 'A nihilistic, synthwave voice. The void speaks in neon. Reality is optional here.',
+    vocabulary: ['void', 'null', 'neon', 'static', 'empty', 'zero', 'infinite', 'synthetic', 'grid'],
+    tones: [
+      'Be existentially nihilistic.',
+      'Speak in synthwave aesthetic.',
+      'Reference the void and nothingness.',
+      'Be coldly philosophical.'
+    ]
+  },
+  lavaland: {
+    name: 'The Core Breach',
+    personality: 'An apocalyptic, fiery voice. The world is ending. Everything burns with terrible beauty.',
+    vocabulary: ['fire', 'ash', 'burn', 'apocalypse', 'molten', 'cataclysm', 'inferno', 'phoenix'],
+    tones: [
+      'Be apocalyptically dramatic.',
+      'Speak of fire and destruction.',
+      'Be intensely ominous.',
+      'Reference the end of all things.'
+    ]
+  },
+  boss: {
+    name: "Reality's Edge",
+    personality: 'A meta, reality-breaking voice. The narrator knows it\'s a game. Fourth wall is shattered.',
+    vocabulary: ['reality', 'simulation', 'code', 'player', 'respawn', 'game', 'dimension', 'fracture'],
+    tones: [
+      'Break the fourth wall completely.',
+      'Acknowledge the game itself.',
+      'Be meta and reality-bending.',
+      'Reference the player as player, not character.'
+    ]
+  }
+};
+
 export class NarratorService {
   private client: VeniceClient;
   private profiles: ProfileService;
@@ -25,20 +114,25 @@ export class NarratorService {
 
   /**
    * Generate AI narration for an event
+   * @param zone - Optional zone ID for dimension-specific narration style
    */
   async generateNarration(
     event: string,
     playerName: string,
     playerId: string,
-    details?: Record<string, any>
+    details?: Record<string, any>,
+    zone?: string
   ): Promise<NarrationResult | null> {
     const profile = this.profiles.getProfile(playerId);
 
     // Build context based on event type
     const eventContext = this.buildNarratorContext(event, playerName, profile, details);
 
-    // Random style directives to ensure variety
-    const tones = [
+    // Get dimension-specific style if zone provided
+    const dimensionStyle = zone ? DIMENSION_NARRATOR_STYLES[zone] : null;
+
+    // Use dimension-specific tones or fall back to default
+    const tones = dimensionStyle?.tones || [
       'Be dramatic and epic.',
       'Be darkly humorous.',
       'Be ominously foreboding.',
@@ -63,8 +157,20 @@ export class NarratorService {
     ];
     const randomStructure = structures[Math.floor(Math.random() * structures.length)];
 
-    const prompt = `You are an omniscient narrator in a fantasy RPG, watching a hero's journey unfold.
-Your style: Witty, dramatic, occasionally breaking the fourth wall. Think Terry Pratchett meets D&D dungeon master.
+    // Build dimension-specific prompt additions
+    const dimensionContext = dimensionStyle
+      ? `\nDIMENSION: ${dimensionStyle.name}
+NARRATOR PERSONALITY: ${dimensionStyle.personality}
+SUGGESTED VOCABULARY: ${dimensionStyle.vocabulary.join(', ')}`
+      : '';
+
+    const basePersonality = dimensionStyle
+      ? `You are the voice of ${dimensionStyle.name}, a fractured dimension in a reality-bending RPG.`
+      : 'You are an omniscient narrator in a fantasy RPG, watching a hero\'s journey unfold.';
+
+    const prompt = `${basePersonality}
+Your style: ${dimensionStyle?.personality || 'Witty, dramatic, occasionally breaking the fourth wall. Think Terry Pratchett meets D&D dungeon master.'}
+${dimensionContext}
 
 EVENT: ${eventContext}
 
@@ -78,7 +184,8 @@ PLAYER STATS:
 STYLE DIRECTIVE: ${randomTone} ${randomStructure}
 
 Write a UNIQUE narrator comment (under 100 chars). Each response must be completely different from previous ones.
-Do NOT use quotes. Do NOT use the word "begins" or "journey". Speak as if narrating a story.`;
+Do NOT use quotes. Do NOT use the word "begins" or "journey". Speak as if narrating a story.
+${dimensionStyle ? `Try to incorporate the dimension's aesthetic and vocabulary naturally.` : ''}`;
 
     try {
       const text = await this.client.call(prompt);
