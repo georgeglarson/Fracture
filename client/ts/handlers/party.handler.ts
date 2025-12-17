@@ -11,6 +11,7 @@ import { ContextMenu } from '../ui/context-menu';
 import { GameClient } from '../network/gameclient';
 import { Renderer } from '../renderer/renderer';
 import { Player } from '../entity/character/player/player';
+import { Npc } from '../entity/character/npc/npc';
 
 /**
  * Game context for party operations
@@ -31,6 +32,9 @@ export interface PartyGameContext {
   getEntityById: (id: number) => any;
   getMouseGridPosition: () => { x: number; y: number };
   getEntityAt: (x: number, y: number) => any;
+  makeNpcTalk?: (npc: any) => void;
+  hasActiveQuest?: () => boolean;
+  requestQuest?: (npcKind: number) => void;
 }
 
 /**
@@ -64,7 +68,20 @@ export function initPartyUI(ctx: PartyGameContext): { partyUI: PartyUI; playerIn
   // Set up context menu callbacks
   contextMenu.setCallbacks({
     onInspect: (entityId) => ctx.client?.sendPlayerInspect(entityId),
-    onInvite: (playerId) => ctx.client?.sendPartyInvite(playerId)
+    onInvite: (playerId) => ctx.client?.sendPartyInvite(playerId),
+    onNpcTalk: (npcKind) => {
+      // Find the NPC entity and trigger talk
+      const pos = ctx.getMouseGridPosition();
+      const entity = ctx.getEntityAt(pos.x, pos.y);
+      if (entity && ctx.makeNpcTalk) {
+        ctx.makeNpcTalk(entity);
+      }
+    },
+    onNpcQuest: (npcKind) => {
+      if (ctx.requestQuest) {
+        ctx.requestQuest(npcKind);
+      }
+    }
   });
   contextMenu.setPartyStatusChecker(() => partyUI?.isInParty() ?? false);
 
@@ -192,5 +209,22 @@ export function rightClick(ctx: PartyGameContext, screenX: number, screenY: numb
     return true;
   }
 
+  // Check if entity is an NPC
+  if (entity && entity instanceof Npc) {
+    showNpcContextMenu(ctx, entity, screenX, screenY);
+    return true;
+  }
+
   return false;
+}
+
+/**
+ * Show context menu for an NPC
+ */
+export function showNpcContextMenu(ctx: PartyGameContext, npc: Npc, screenX: number, screenY: number): void {
+  if (ctx.contextMenu) {
+    const hasQuest = ctx.hasActiveQuest ? ctx.hasActiveQuest() : false;
+    const npcName = npc.name || 'NPC';
+    ctx.contextMenu.showForNpc(npc.kind, npcName, screenX, screenY, hasQuest);
+  }
 }

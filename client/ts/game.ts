@@ -51,6 +51,9 @@ import * as GameEventHandler from './handlers/game-event.handler';
 import * as NetworkConnectionHandler from './handlers/network-connection.handler';
 import { PlayerController } from './player/player-controller';
 import { InteractionController } from './player/interaction-controller';
+import { QuestController } from './quest/quest-controller';
+import { setupQuestHandlers } from './handlers/quest.handler';
+import { QuestUI, initQuestUI } from './ui/quest-ui';
 
 export class Game {
 
@@ -88,6 +91,8 @@ export class Game {
   fractureAtmosphere: FractureAtmosphere | null = null;
   playerController: PlayerController | null = null;
   interactionController: InteractionController | null = null;
+  questController: QuestController | null = null;
+  questUI: QuestUI | null = null;
 
   // Entity accessors (delegate to entityManager)
   get entities() { return this.entityManager?.entities ?? {}; }
@@ -661,6 +666,17 @@ export class Game {
           getCurrentNpcTalk: () => self.currentNpcTalk
         });
 
+        // Initialize quest controller
+        self.questController = new QuestController({
+          sendRequestQuest: (npcKind: number) => self.client?.sendRequestQuest(npcKind),
+          showNotification: (message: string) => self.showNotification(message),
+          showNarratorText: (text: string, style: string) => self.uiManager?.showNarratorText(text, style as any),
+          playSound: (soundName: string) => self.audioManager?.playSound(soundName)
+        });
+
+        // Initialize quest UI
+        self.questUI = initQuestUI(self.questController);
+
         self.setPathfinder(new Pathfinder(self.map.width, self.map.height));
 
         // Set camera map bounds to prevent rendering outside the map
@@ -819,6 +835,10 @@ export class Game {
       // Setup all network message handlers (extracted to network/message-handlers.ts)
       setupNetworkHandlers(self, self.client);
 
+      // Setup quest handlers
+      if (self.questController) {
+        setupQuestHandlers(self.client, self.questController);
+      }
 
       self.gamestart_callback();
 
@@ -919,6 +939,20 @@ export class Game {
 
   makeNpcTalk(npc) {
     this.interactionController?.makeNpcTalk(npc);
+  }
+
+  /**
+   * Check if player has an active quest
+   */
+  hasActiveQuest(): boolean {
+    return this.questController?.hasActiveQuest() ?? false;
+  }
+
+  /**
+   * Request a quest from an NPC
+   */
+  requestQuest(npcKind: number): void {
+    this.questController?.requestQuest(npcKind);
   }
 
   // Current NPC being talked to (for Venice AI response handling)

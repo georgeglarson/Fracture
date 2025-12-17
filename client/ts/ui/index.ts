@@ -37,3 +37,9 @@ export {
   ShopItem,
   ShopCallbacks
 } from './shop-ui.js';
+
+export {
+  QuestUI,
+  initQuestUI,
+  getQuestUI
+} from './quest-ui.js';

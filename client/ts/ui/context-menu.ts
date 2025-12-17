@@ -12,6 +12,8 @@ export interface ContextMenuOption {
 export interface ContextMenuCallbacks {
   onInspect: (entityId: number) => void;
   onInvite: (playerId: number) => void;
+  onNpcTalk?: (npcKind: number) => void;
+  onNpcQuest?: (npcKind: number) => void;
 }
 
 export class ContextMenu {
@@ -72,6 +74,36 @@ export class ContextMenu {
     }
 
     this.render(options, x, y, playerName);
+  }
+
+  /**
+   * Show context menu for an NPC
+   */
+  showForNpc(npcKind: number, npcName: string, x: number, y: number, hasActiveQuest: boolean): void {
+    const options: ContextMenuOption[] = [
+      {
+        label: 'Talk',
+        action: () => {
+          if (this.callbacks?.onNpcTalk) {
+            this.callbacks.onNpcTalk(npcKind);
+          }
+        }
+      }
+    ];
+
+    // Only show "Get Quest" if player doesn't have an active quest
+    if (!hasActiveQuest) {
+      options.push({
+        label: 'Get Quest',
+        action: () => {
+          if (this.callbacks?.onNpcQuest) {
+            this.callbacks.onNpcQuest(npcKind);
+          }
+        }
+      });
+    }
+
+    this.render(options, x, y, npcName);
   }
 
   /**
