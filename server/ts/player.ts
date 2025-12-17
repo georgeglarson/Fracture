@@ -23,6 +23,7 @@ import {serializeProperties} from '../../shared/ts/items/item-types';
 import {MessageRouter} from './player/message-router';
 import {getDailyRewardService} from './player/daily-reward.service';
 import {getEconomyService} from './player/economy.service';
+import {ProgressionService, createProgressionService} from './player/progression.service';
 import {IStorageService, CharacterData, DailyData, PlayerSaveState} from './storage/storage.interface';
 
 export class Player extends Character {
@@ -51,6 +52,9 @@ export class Player extends Character {
   // Inventory management
   private inventory: Inventory = new Inventory();
 
+  // Progression service (handles XP, leveling, gold)
+  private progression!: ProgressionService;
+
   // Legacy accessors for backward compatibility
   get weapon(): number { return this.equipment.weapon; }
   get armor(): number { return this.equipment.armor; }
@@ -60,13 +64,14 @@ export class Player extends Character {
   // Client IP for rate limiting
   get clientIp(): string { return this.connection.clientIp; }
 
-  // Progression system
-  level: number = 1;
-  xp: number = 0;
-  xpToNext: number = 100;  // Formulas.xpToNextLevel(1)
-
-  // Economy system
-  gold: number = 0;
+  // Progression accessors (delegate to service)
+  get level(): number { return this.progression?.level ?? 1; }
+  set level(value: number) { if (this.progression) this.progression.level = value; }
+  get xp(): number { return this.progression?.xp ?? 0; }
+  set xp(value: number) { if (this.progression) this.progression.xp = value; }
+  get xpToNext(): number { return this.progression?.xpToNext ?? 100; }
+  get gold(): number { return this.progression?.gold ?? 0; }
+  set gold(value: number) { if (this.progression) this.progression.gold = value; }
 
   // Achievement system
   title: string | null = null;
@@ -89,8 +94,17 @@ export class Player extends Character {
 
     var self = this;
 
-
     this.formatChecker = new FormatChecker();
+
+    // Initialize progression service with callbacks
+    this.progression = createProgressionService({
+      send: (msg) => this.send(msg),
+      updateHitPoints: () => this.updateHitPoints(),
+      getMaxHitPoints: () => this.maxHitPoints,
+      checkLevelAchievements: (level) => this.checkLevelAchievements(level),
+      checkGoldAchievements: (amount) => this.checkGoldAchievements(amount),
+      getName: () => this.name
+    });
 
     this.connection.listen(async function (message: any[]) {
       var action = parseInt(message[0]);
@@ -283,88 +297,35 @@ export class Player extends Character {
   }
 
   // ============================================================================
-  // PROGRESSION SYSTEM
+  // PROGRESSION & ECONOMY (delegated to ProgressionService)
   // ============================================================================
 
   /**
    * Grant XP to the player, handling level ups
    */
-  grantXP(amount: number) {
-    if (this.level >= Formulas.MAX_LEVEL) {
-      return; // Already max level
-    }
-
-    this.xp += amount;
-    console.log(`[XP] ${this.name} gained ${amount} XP (${this.xp}/${this.xpToNext})`);
-
-    // Send XP gain message to player
-    this.send(new Messages.XpGain(amount, this.xp, this.xpToNext).serialize());
-
-    // Check for level up
-    while (this.xp >= this.xpToNext && this.level < Formulas.MAX_LEVEL) {
-      this.levelUp();
-    }
-  }
-
-  /**
-   * Level up the player
-   */
-  private levelUp() {
-    this.xp -= this.xpToNext;
-    this.level++;
-    this.xpToNext = Formulas.xpToNextLevel(this.level);
-
-    const bonusHP = Formulas.levelBonusHP(this.level);
-    const bonusDamage = Formulas.levelBonusDamage(this.level);
-
-    console.log(`[LevelUp] ${this.name} reached level ${this.level}! (+${bonusHP} HP, +${bonusDamage} dmg)`);
-
-    // Update HP with new level bonus
-    this.updateHitPoints();
-
-    // Send level up message
-    this.send(new Messages.LevelUp(this.level, bonusHP, bonusDamage).serialize());
-    this.send(new Messages.HitPoints(this.maxHitPoints).serialize());
-
-    // Check level achievements
-    this.checkLevelAchievements(this.level);
+  grantXP(amount: number): void {
+    this.progression.grantXP(amount);
   }
 
   /**
    * Set player level directly (for restoring from save)
    */
-  setLevel(level: number, xp: number = 0) {
-    this.level = Math.min(Math.max(1, level), Formulas.MAX_LEVEL);
-    this.xp = xp;
-    this.xpToNext = Formulas.xpToNextLevel(this.level);
-    this.updateHitPoints();
+  setLevel(level: number, xp: number = 0): void {
+    this.progression.setLevel(level, xp);
   }
-
-  // ============================================================================
-  // ECONOMY SYSTEM
-  // ============================================================================
 
   /**
    * Grant gold to the player
    */
-  grantGold(amount: number) {
-    this.gold += amount;
-    console.log(`[Gold] ${this.name} gained ${amount} gold (total: ${this.gold})`);
-
-    // Send gold gain message to player
-    this.send(new Messages.GoldGain(amount, this.gold).serialize());
-
-    // Check wealth achievements
-    if (amount > 0) {
-      this.checkGoldAchievements(amount);
-    }
+  grantGold(amount: number): void {
+    this.progression.grantGold(amount);
   }
 
   /**
    * Set player gold directly (for restoring from save)
    */
-  setGold(gold: number) {
-    this.gold = Math.max(0, gold);
+  setGold(gold: number): void {
+    this.progression.setGold(gold);
   }
 
   // ============================================================================
@@ -1456,13 +1417,12 @@ export class Player extends Character {
     // Set character ID
     this.characterId = state.character.id;
 
-    // Restore progression
-    this.level = state.character.level;
-    this.xp = state.character.xp;
-    this.xpToNext = Formulas.xpToNextLevel(this.level);
-
-    // Restore economy
-    this.gold = state.character.gold;
+    // Restore progression (use service's loadState for consistency)
+    this.progression.loadState({
+      level: state.character.level,
+      xp: state.character.xp,
+      gold: state.character.gold
+    });
 
     // Restore equipment (if any)
     if (state.character.armorKind) {
