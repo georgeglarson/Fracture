@@ -38,8 +38,6 @@ import {MinimapUI} from './ui/minimap-ui';
 import {AchievementUI} from './ui/achievement-ui';
 import {InventoryManager} from './inventory/inventory-manager';
 import {deserializeInventory, InventorySlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
-import {showError, showWarning, showSuccess, showInfo} from './ui/toast';
-import {getNetworkStatus} from './ui/network-status';
 import {setupNetworkHandlers} from './network/message-handlers';
 import {ZoningManager} from './world/zoning-manager';
 import {SpriteLoader} from './assets/sprite-loader';
@@ -50,6 +48,7 @@ import * as ShopHandler from './handlers/shop.handler';
 import * as PartyHandler from './handlers/party.handler';
 import * as InventoryHandler from './handlers/inventory.handler';
 import * as GameEventHandler from './handlers/game-event.handler';
+import * as NetworkConnectionHandler from './handlers/network-connection.handler';
 
 export class Game {
 
@@ -648,62 +647,8 @@ export class Game {
     }
     //>>includeEnd("prodHost");
 
-    // EventEmitter pattern: handle connection
-    this.client.on(ClientEvents.CONNECTED, function () {
-      console.info('Starting client/server handshake');
-
-      // Hide any network status overlay
-      getNetworkStatus().hide();
-
-      self.player.name = self.username;
-      self.started = true;
-
-      self.sendHello(self.player);
-    });
-
-    // Handle network reconnection events
-    this.client.on(ClientEvents.RECONNECTING, function (attemptNumber: number) {
-      console.info('Reconnection attempt ' + attemptNumber);
-      getNetworkStatus().showReconnecting(attemptNumber, 5);
-    });
-
-    this.client.on(ClientEvents.RECONNECTED, function () {
-      console.info('Successfully reconnected');
-      getNetworkStatus().hide();
-      showSuccess('Connection restored', 'Reconnected');
-    });
-
-    this.client.on(ClientEvents.DISCONNECTED, function (message: string) {
-      console.error('Disconnected:', message);
-      getNetworkStatus().showDisconnected();
-      getNetworkStatus().setRetryCallback(() => {
-        window.location.reload();
-      });
-    });
-
-    // Handle authentication failure
-    this.client.on(ClientEvents.AUTH_FAIL, function (reason: string) {
-      console.error('[Auth] Authentication failed:', reason);
-      self.started = false;
-
-      let title = 'Authentication Failed';
-      let message = 'Please try again.';
-      if (reason === 'wrong_password') {
-        message = 'The password you entered is incorrect.';
-      } else if (reason === 'password_required') {
-        title = 'Password Required';
-        message = 'This name is already registered. Please enter a password (3+ characters).';
-      }
-
-      // Show error toast with reload action
-      showError(message, title, {
-        duration: 0, // Persistent until dismissed
-        action: {
-          label: 'Try Again',
-          callback: () => window.location.reload()
-        }
-      });
-    });
+    // Network connection handlers - delegated to NetworkConnectionHandler
+    NetworkConnectionHandler.setupConnectionHandlers(this, this.client);
 
     this.client.on(ClientEvents.LIST, function (list: number[]) {
       var entityIds = _.pluck(self.entities, 'id'),
