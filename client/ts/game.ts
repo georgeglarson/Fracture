@@ -45,6 +45,9 @@ import {ZoningManager} from './world/zoning-manager';
 import {SpriteLoader} from './assets/sprite-loader';
 import {getAchievementById} from '../../shared/ts/achievements/achievement-data';
 import {FractureAtmosphere} from './ui/fracture-atmosphere';
+import * as AchievementHandler from './handlers/achievement.handler';
+import * as ShopHandler from './handlers/shop.handler';
+import * as PartyHandler from './handlers/party.handler';
 
 export class Game {
 
@@ -1880,97 +1883,21 @@ export class Game {
     this.playertitleupdate_callback = callback;
   }
 
-  // Achievement handlers
+  // Achievement handlers - Delegated to AchievementHandler
   handleAchievementInit(unlockedIds: string[], progressMap: Record<string, { current: number; target: number }>, selectedTitle: string | null) {
-    this.unlockedAchievements = unlockedIds;
-    this.achievementProgress = progressMap;
-    this.selectedTitle = selectedTitle;
-
-    // Store own title
-    if (this.player && this.player.id) {
-      this.playerTitles[this.player.id] = selectedTitle;
-    }
-
-    // Save to storage
-    this.storage.saveAchievements(unlockedIds, selectedTitle);
-
-    // Update achievement panel UI
-    if (this.achievementUI) {
-      // Convert progressMap to simple current values for UI
-      const progressCurrent: Record<string, number> = {};
-      for (const [id, data] of Object.entries(progressMap)) {
-        progressCurrent[id] = data.current;
-      }
-      this.achievementUI.updateData(unlockedIds, progressCurrent, selectedTitle);
-    }
-
-    console.info('[Achievements] Initialized:', unlockedIds.length, 'unlocked, title:', selectedTitle);
+    AchievementHandler.handleAchievementInit(this, unlockedIds, progressMap, selectedTitle);
   }
 
   handleAchievementUnlock(achievementId: string) {
-    if (!this.unlockedAchievements.includes(achievementId)) {
-      this.unlockedAchievements.push(achievementId);
-    }
-
-    // Save to storage
-    this.storage.saveAchievements(this.unlockedAchievements, this.selectedTitle);
-
-    // Look up achievement data for name
-    const achievement = getAchievementById(achievementId);
-    const achievementName = achievement ? achievement.name : achievementId;
-
-    // Show achievement notification through app
-    if (this.app) {
-      this.app.showAchievementNotification(achievementId, achievementName);
-    }
-
-    // Trigger unlock callback for UI notification
-    if (this.achievementunlock_callback) {
-      this.achievementunlock_callback(achievementId);
-    }
-
-    // Update achievement panel UI
-    if (this.achievementUI) {
-      this.achievementUI.unlockAchievement(achievementId);
-    }
-
-    // Play achievement sound
-    if (this.audioManager) {
-      this.audioManager.playSound('achievement');
-    }
-
-    console.info('[Achievements] Unlocked:', achievementId, '(' + achievementName + ')');
+    AchievementHandler.handleAchievementUnlock(this, achievementId);
   }
 
   handleAchievementProgress(achievementId: string, current: number, target: number) {
-    this.achievementProgress[achievementId] = { current, target };
-
-    if (this.achievementprogress_callback) {
-      this.achievementprogress_callback(achievementId, current, target);
-    }
-
-    // Update achievement panel UI
-    if (this.achievementUI) {
-      this.achievementUI.updateProgress(achievementId, current);
-    }
-
-    console.debug('[Achievements] Progress:', achievementId, current + '/' + target);
+    AchievementHandler.handleAchievementProgress(this, achievementId, current, target);
   }
 
   handlePlayerTitleUpdate(playerId: number, title: string | null) {
-    this.playerTitles[playerId] = title;
-
-    // Update own selected title if it's for this player
-    if (this.player && playerId === this.player.id) {
-      this.selectedTitle = title;
-      this.storage.saveAchievements(this.unlockedAchievements, title);
-    }
-
-    if (this.playertitleupdate_callback) {
-      this.playertitleupdate_callback(playerId, title);
-    }
-
-    console.info('[Achievements] Player', playerId, 'title changed to:', title);
+    AchievementHandler.handlePlayerTitleUpdate(this, playerId, title);
   }
 
   selectTitle(achievementId: string) {
@@ -1980,7 +1907,7 @@ export class Game {
   }
 
   getPlayerTitle(playerId: number): string | null {
-    return this.playerTitles[playerId] || null;
+    return AchievementHandler.getPlayerTitle(this, playerId);
   }
 
   resize() {
@@ -2198,179 +2125,69 @@ export class Game {
     console.info('[Daily] Reward popup shown: +' + gold + 'g, +' + xp + ' XP, streak: ' + streak);
   }
 
-  // Shop system
+  // Shop system - Delegated to ShopHandler
   initShop() {
-    this.shopUI = new ShopUI();
-    this.shopUI.setCallbacks({
-      onBuy: (npcKind: number, itemKind: number) => {
-        this.client.sendShopBuy(npcKind, itemKind);
-      },
-      getPlayerGold: () => this.playerGold,
-      onGoldChange: (newGold: number) => {
-        this.playerGold = newGold;
-        if (this.playergold_callback) {
-          this.playergold_callback(newGold);
-        }
-      },
-      saveGold: (gold: number) => {
-        this.storage.saveGold(gold);
-      },
-      playSound: (sound: string) => {
-        if (this.audioManager) {
-          this.audioManager.playSound(sound);
-        }
-      },
-      onSell: (slotIndex: number) => {
-        // Selling is handled through inventory context menu, not shop UI directly
-        this.client.sendShopSell(slotIndex);
-      }
-    });
+    this.shopUI = ShopHandler.initShop(this);
   }
 
   showShop(npcKind: number, shopName: string, items: Array<{ itemKind: number; price: number; stock: number }>) {
-    this.shopUI?.show(npcKind, shopName, items);
+    ShopHandler.showShop(this, npcKind, shopName, items);
   }
 
   hideShop() {
-    this.shopUI?.hide();
+    ShopHandler.hideShop(this);
   }
 
   handleShopBuyResult(success: boolean, itemKind: number, newGold: number, message: string) {
-    this.shopUI?.handleBuyResult(success, itemKind, newGold, message);
+    ShopHandler.handleShopBuyResult(this, success, itemKind, newGold, message);
   }
 
   handleShopSellResult(success: boolean, goldGained: number, newGold: number, message: string) {
-    this.shopUI?.handleSellResult(success, goldGained, newGold, message);
+    ShopHandler.handleShopSellResult(this, success, goldGained, newGold, message);
   }
 
-  // Party System
+  // Party System - Delegated to PartyHandler
   initPartyUI() {
-    this.partyUI = new PartyUI();
-    this.playerInspect = new PlayerInspect();
-    this.contextMenu = new ContextMenu();
-
-    // Set player ID when available
-    if (this.player) {
-      this.partyUI.setPlayerId(this.player.id);
-    }
-
-    // Set up party callbacks
-    this.partyUI.setCallbacks({
-      onAcceptInvite: (inviterId) => this.client?.sendPartyAccept(inviterId),
-      onDeclineInvite: (inviterId) => this.client?.sendPartyDecline(inviterId),
-      onLeaveParty: () => this.client?.sendPartyLeave(),
-      onKickMember: (memberId) => this.client?.sendPartyKick(memberId),
-      onSendChat: (message) => this.client?.sendPartyChat(message)
-    });
-
-    // Set up inspect callbacks
-    this.playerInspect.setCallbacks({
-      onInviteToParty: (playerId) => this.client?.sendPartyInvite(playerId)
-    });
-    this.playerInspect.setPartyStatusChecker(() => this.partyUI?.isInParty() ?? false);
-
-    // Set up context menu callbacks
-    this.contextMenu.setCallbacks({
-      onInspect: (entityId) => this.client?.sendPlayerInspect(entityId),
-      onInvite: (playerId) => this.client?.sendPartyInvite(playerId)
-    });
-    this.contextMenu.setPartyStatusChecker(() => this.partyUI?.isInParty() ?? false);
+    const result = PartyHandler.initPartyUI(this);
+    this.partyUI = result.partyUI;
+    this.playerInspect = result.playerInspect;
+    this.contextMenu = result.contextMenu;
   }
 
   handlePartyInvite(inviterId: number, inviterName: string) {
-    if (this.partyUI) {
-      this.partyUI.showInvite(inviterId, inviterName);
-    }
-    console.info('[Party] Received invite from', inviterName);
+    PartyHandler.handlePartyInvite(this, inviterId, inviterName);
   }
 
   handlePartyJoin(partyId: string, members: PartyMember[], leaderId: number) {
-    if (this.partyUI) {
-      this.partyUI.joinParty(partyId, members, leaderId);
-      // Update renderer with party member IDs
-      this.renderer?.setPartyMembers(members.map(m => m.id));
-    }
-    this.showNotification('Joined party');
-    console.info('[Party] Joined party', partyId);
+    PartyHandler.handlePartyJoin(this, partyId, members, leaderId);
   }
 
   handlePartyLeave(playerId: number) {
-    if (this.partyUI) {
-      this.partyUI.memberLeft(playerId);
-      // Update renderer
-      this.renderer?.setPartyMembers(this.partyUI.getPartyMemberIds());
-    }
-    console.info('[Party] Player left:', playerId);
+    PartyHandler.handlePartyLeave(this, playerId);
   }
 
   handlePartyDisband() {
-    if (this.partyUI) {
-      this.partyUI.leaveParty();
-      this.renderer?.setPartyMembers([]);
-    }
-    this.showNotification('Party disbanded');
-    console.info('[Party] Party disbanded');
+    PartyHandler.handlePartyDisband(this);
   }
 
   handlePartyUpdate(members: PartyMember[]) {
-    if (this.partyUI) {
-      this.partyUI.updateMembers(members);
-      this.renderer?.setPartyMembers(members.map(m => m.id));
-    }
+    PartyHandler.handlePartyUpdate(this, members);
   }
 
   handlePartyChat(senderId: number, senderName: string, message: string) {
-    // Show party chat in regular chat with [Party] prefix
-    if (this.partyUI) {
-      this.partyUI.addChatMessage(senderName, message);
-    }
-    // Create chat bubble
-    const entity = this.getEntityById(senderId);
-    if (entity) {
-      this.showBubbleFor(entity, '[P] ' + message);
-    }
-    console.info('[Party Chat]', senderName + ':', message);
+    PartyHandler.handlePartyChat(this, senderId, senderName, message);
   }
 
   handlePlayerInspectResult(playerId: number, name: string, title: string | null, level: number, weapon: number, armor: number) {
-    if (this.playerInspect) {
-      this.playerInspect.show({
-        playerId,
-        name,
-        title,
-        level,
-        weapon,
-        armor
-      });
-    }
+    PartyHandler.handlePlayerInspectResult(this, playerId, name, title, level, weapon, armor);
   }
 
   showPlayerContextMenu(playerId: number, playerName: string, screenX: number, screenY: number) {
-    if (this.contextMenu && playerId !== this.playerId) {
-      this.contextMenu.showForPlayer(playerId, playerName, screenX, screenY);
-    }
+    PartyHandler.showPlayerContextMenu(this, playerId, playerName, screenX, screenY);
   }
 
-  /**
-   * Handle right-click on the game canvas.
-   * Checks if a player is at the clicked position and shows context menu.
-   * @param screenX - Screen X coordinate
-   * @param screenY - Screen Y coordinate
-   * @returns true if context menu was shown
-   */
   rightClick(screenX: number, screenY: number): boolean {
-    if (!this.started || !this.contextMenu) return false;
-
-    const pos = this.getMouseGridPosition();
-    const entity = this.getEntityAt(pos.x, pos.y);
-
-    // Check if entity is a player (not NPC, not mob, not self)
-    if (entity && entity instanceof Player && entity.id !== this.playerId) {
-      this.showPlayerContextMenu(entity.id, entity.name, screenX, screenY);
-      return true;
-    }
-
-    return false;
+    return PartyHandler.rightClick(this, screenX, screenY);
   }
 
   // Inventory System
