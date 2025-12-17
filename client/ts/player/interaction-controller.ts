@@ -16,8 +16,8 @@ import { Item } from '../entity/objects/item';
  * Dependencies injected into InteractionController
  */
 export interface InteractionControllerDeps {
-  // Core systems
-  client: any;
+  // Core systems - use getter for late binding (client created after bootstrap)
+  getClient: () => any;
   map: any;
   audioManager: any;
 
@@ -91,7 +91,7 @@ export class InteractionController {
         return;
       }
       else if (entity instanceof Chest) {
-        this.deps.client.sendOpen(entity);
+        this.deps.getClient()?.sendOpen(entity);
         this.deps.audioManager.playSound('chest');
         return;
       }
@@ -104,7 +104,7 @@ export class InteractionController {
         return;
       }
       else if (entity instanceof Player && entity.id !== this.deps.getPlayerId()) {
-        this.deps.client.sendPlayerInspect(entity.id);
+        this.deps.getClient()?.sendPlayerInspect(entity.id);
         return;
       }
       return; // Other entities block movement
@@ -135,7 +135,7 @@ export class InteractionController {
     if (item && player) {
       player.isLootMoving = true;
       this.makePlayerGoTo(item.gridX, item.gridY);
-      this.deps.client.sendLootMove(item, item.gridX, item.gridY);
+      this.deps.getClient()?.sendLootMove(item, item.gridX, item.gridY);
     }
   }
 
@@ -183,7 +183,7 @@ export class InteractionController {
       mob.addAttacker(player);
     }
 
-    this.deps.client.sendAttack(mob);
+    this.deps.getClient()?.sendAttack(mob);
   }
 
   /**
@@ -207,7 +207,7 @@ export class InteractionController {
     this.deps.showBubbleFor(npc, '...');
 
     // Request AI-generated dialogue from server
-    this.deps.client.sendNpcTalk(npc.kind);
+    this.deps.getClient()?.sendNpcTalk(npc.kind);
 
     // Fallback: if no response in 5 seconds, use static dialogue
     const currentNpc = npc;
@@ -266,7 +266,7 @@ export class InteractionController {
         this.makePlayerOpenChest(entity);
       } else {
         console.log('[Chest Debug] Sending OPEN to server for chest:', entity.id);
-        this.deps.client.sendOpen(entity);
+        this.deps.getClient()?.sendOpen(entity);
         this.deps.audioManager.playSound('chest');
       }
     }

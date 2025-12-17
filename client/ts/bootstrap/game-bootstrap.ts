@@ -233,7 +233,7 @@ export function initializeManagers(ctx: BootstrapContext): BootstrapResult {
 
   // Initialize interaction controller
   const interactionController = new InteractionController({
-    client: ctx.client,
+    getClient: () => ctx.client,
     map: ctx.map,
     audioManager: ctx.audioManager,
     getPlayer: () => ctx.player,

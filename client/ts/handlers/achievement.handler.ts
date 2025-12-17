@@ -37,11 +37,20 @@ export interface AchievementGameContext {
 export function handleAchievementInit(
   ctx: AchievementGameContext,
   unlockedIds: string[],
-  progressMap: Record<string, { current: number; target: number }>,
+  progressMap: Record<string, { current: number; target: number }> | string,
   selectedTitle: string | null
 ): void {
   ctx.unlockedAchievements = unlockedIds;
-  ctx.achievementProgress = progressMap;
+  // Defensive parsing - server may send string instead of object
+  if (typeof progressMap === 'string') {
+    try {
+      ctx.achievementProgress = JSON.parse(progressMap) || {};
+    } catch {
+      ctx.achievementProgress = {};
+    }
+  } else {
+    ctx.achievementProgress = progressMap || {};
+  }
   ctx.selectedTitle = selectedTitle;
 
   // Store own title
