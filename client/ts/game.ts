@@ -54,6 +54,7 @@ import { InteractionController } from './player/interaction-controller';
 import { QuestController } from './quest/quest-controller';
 import { setupQuestHandlers } from './handlers/quest.handler';
 import { QuestUI, initQuestUI } from './ui/quest-ui';
+import { initializeManagers, BootstrapContext } from './bootstrap/game-bootstrap';
 
 export class Game {
 
@@ -467,6 +468,90 @@ export class Game {
     this.fractureAtmosphere = new FractureAtmosphere();
   }
 
+  /**
+   * Creates the bootstrap context for manager initialization
+   */
+  createBootstrapContext(): BootstrapContext {
+    const self = this;
+    return {
+      // Core systems
+      map: self.map,
+      renderer: self.renderer,
+      camera: self.camera,
+      storage: self.storage,
+      audioManager: self.audioManager,
+      bubbleManager: self.bubbleManager,
+      sprites: self.sprites,
+      cursors: self.cursors,
+      get currentTime() { return self.currentTime; },
+
+      // State (use getters for late binding)
+      get player() { return self.player; },
+      get playerId() { return self.playerId; },
+      get started() { return self.started; },
+      get client() { return self.client; },
+      fractureAtmosphere: self.fractureAtmosphere,
+
+      // Callbacks
+      get notification_callback() { return self.notification_callback; },
+
+      // Methods
+      isMobAt: (x, y) => self.isMobAt(x, y),
+      isItemAt: (x, y) => self.isItemAt(x, y),
+      isNpcAt: (x, y) => self.isNpcAt(x, y),
+      isChestAt: (x, y) => self.isChestAt(x, y),
+      getEntityAt: (x, y) => self.getEntityAt(x, y),
+      forEachMob: (cb) => self.forEachMob(cb),
+      forEachEntity: (cb) => self.forEachEntity(cb),
+      forEachVisibleEntityByDepth: (cb) => self.forEachVisibleEntityByDepth(cb),
+      findPath: (e, x, y, ignored) => self.findPath(e, x, y, ignored),
+      getItemAt: (x, y) => self.getItemAt(x, y),
+      isZoningTile: (x, y) => self.isZoningTile(x, y),
+      isZoning: () => self.isZoning(),
+      getMouseGridPosition: () => self.getMouseGridPosition(),
+      makeCharacterGoTo: (c, x, y) => self.makeCharacterGoTo(c, x, y),
+
+      // Grid operations
+      registerEntityPosition: (e) => self.registerEntityPosition(e),
+      unregisterEntityPosition: (e) => self.unregisterEntityPosition(e),
+      registerEntityDualPosition: (e) => self.registerEntityDualPosition(e),
+      removeFromRenderingGrid: (e, x, y) => self.removeFromRenderingGrid(e, x, y),
+      removeEntity: (e) => self.removeEntity(e),
+      checkOtherDirtyRects: (r, e, x, y) => self.checkOtherDirtyRects(r, e, x, y),
+
+      // Zone operations
+      enqueueZoningFrom: (x, y) => self.enqueueZoningFrom(x, y),
+      resetZone: () => self.resetZone(),
+      updatePlateauMode: () => self.updatePlateauMode(),
+      updatePlayerCheckpoint: () => self.updatePlayerCheckpoint(),
+      checkUndergroundAchievement: () => self.checkUndergroundAchievement(),
+      initAnimatedTiles: () => self.initAnimatedTiles(),
+
+      // UI operations
+      assignBubbleTo: (e) => self.assignBubbleTo(e),
+      makeNpcTalk: (npc) => self.makeNpcTalk(npc),
+      pickupItemToInventory: (item) => self.pickupItemToInventory(item),
+      showNotification: (msg) => self.showNotification(msg),
+      showBubbleFor: (e, msg) => self.showBubbleFor(e, msg),
+
+      // Achievement operations
+      tryUnlockingAchievement: (id) => self.tryUnlockingAchievement(id),
+
+      // Callbacks
+      get playerdeath_callback() { return self.playerdeath_callback; },
+      get equipment_callback() { return self.equipment_callback; },
+      get invincible_callback() { return self.invincible_callback; },
+
+      // Player accessors
+      get hoveringCollidingTile() { return self.hoveringCollidingTile; },
+      get hoveringPlateauTile() { return self.hoveringPlateauTile; },
+      get previousClickPosition() { return self.previousClickPosition; },
+      set previousClickPosition(val) { self.previousClickPosition = val; },
+      get currentNpcTalk() { return self.currentNpcTalk; },
+      set currentNpcTalk(val) { self.currentNpcTalk = val; }
+    };
+  }
+
   initMusicAreas() {
     var self = this;
     _.each(this.map.musicAreas, function (area) {
@@ -510,53 +595,25 @@ export class Game {
           self.initSilhouettes();
         }
 
-        // Initialize grid manager
-        self.gridManager = new GridManager(self.map);
+        // Initialize all managers via bootstrap
+        const bootstrapResult = initializeManagers(self.createBootstrapContext());
+        self.gridManager = bootstrapResult.gridManager;
+        self.entityManager = bootstrapResult.entityManager;
+        self.inputManager = bootstrapResult.inputManager;
+        self.uiManager = bootstrapResult.uiManager;
+        self.itemTooltip = bootstrapResult.itemTooltip;
+        self.zoningManager = bootstrapResult.zoningManager;
+        self.playerController = bootstrapResult.playerController;
+        self.interactionController = bootstrapResult.interactionController;
+        self.questController = bootstrapResult.questController;
+        self.questUI = bootstrapResult.questUI;
+        self.setPathfinder(bootstrapResult.pathfinder);
+
+        // Initialize grids
         self.initEntityGrid();
         self.initItemGrid();
         self.initPathingGrid();
         self.initRenderingGrid();
-
-        // Initialize entity manager
-        self.entityManager = new EntityManager();
-        self.entityManager.setGridManager(self);
-        self.entityManager.setRenderer(self.renderer);
-        self.entityManager.setCamera(self.camera);
-        self.entityManager.setCurrentTimeProvider(() => self.currentTime);
-        self.entityManager.setDirtyRectCallback((rect, entity, x, y) => {
-          self.checkOtherDirtyRects(rect, entity, x, y);
-        });
-
-        // Initialize input manager
-        self.inputManager = new InputManager();
-        self.inputManager.setRenderer(self.renderer);
-        self.inputManager.setMap(self.map);
-        self.inputManager.setEntityQuery({
-          isMobAt: (x, y) => self.isMobAt(x, y),
-          isItemAt: (x, y) => self.isItemAt(x, y),
-          isNpcAt: (x, y) => self.isNpcAt(x, y),
-          isChestAt: (x, y) => self.isChestAt(x, y),
-          getEntityAt: (x, y) => self.getEntityAt(x, y)
-        });
-        self.inputManager.setPlayerProvider(() => self.player);
-        self.inputManager.setGameStartedProvider(() => self.started);
-        self.inputManager.setCursors(self.cursors);
-
-        // Initialize UI manager
-        self.uiManager = new UIManager();
-        self.uiManager.setNotificationCallback((msg) => {
-          if (self.notification_callback) {
-            self.notification_callback(msg);
-          }
-        });
-        self.uiManager.setNewsRequestCallback(() => {
-          if (self.client) {
-            self.client.sendNewsRequest();
-          }
-        });
-
-        // Initialize item tooltip
-        self.itemTooltip = new ItemTooltip();
 
         // Initialize party UI (context menu, party panel, inspect popup)
         self.initPartyUI();
@@ -572,112 +629,6 @@ export class Game {
 
         // Initialize achievements panel UI
         self.initAchievementsUI();
-
-        // Initialize zoning manager
-        self.zoningManager = new ZoningManager();
-        self.zoningManager.setContext({
-          camera: self.camera,
-          renderer: self.renderer,
-          bubbleManager: self.bubbleManager,
-          // Use closure - client is created later in connect()
-          client: { sendZone: () => self.client?.sendZone() },
-          initAnimatedTiles: () => self.initAnimatedTiles(),
-          forEachVisibleEntityByDepth: (cb) => self.forEachVisibleEntityByDepth(cb)
-        });
-
-        // Initialize player controller with dependencies
-        self.playerController = new PlayerController({
-          // Core systems (use closures for late binding)
-          client: { sendMove: (...args) => self.client?.sendMove(...args),
-                    sendAggro: (...args) => self.client?.sendAggro(...args),
-                    sendTeleport: (...args) => self.client?.sendTeleport(...args),
-                    sendOpen: (...args) => self.client?.sendOpen(...args),
-                    disable: () => self.client?.disable() },
-          renderer: self.renderer,
-          camera: self.camera,
-          map: self.map,
-          audioManager: self.audioManager,
-          storage: self.storage,
-
-          // Game state accessors
-          getSprites: () => self.sprites,
-          getPlayerId: () => self.playerId,
-
-          // Entity operations
-          forEachMob: (cb) => self.forEachMob(cb),
-          getEntityAt: (x, y) => self.getEntityAt(x, y),
-          isItemAt: (x, y) => self.isItemAt(x, y),
-          getItemAt: (x, y) => self.getItemAt(x, y),
-          isZoningTile: (x, y) => self.isZoningTile(x, y),
-          findPath: (e, x, y, ignored) => self.findPath(e, x, y, ignored),
-
-          // Grid operations
-          registerEntityPosition: (e) => self.registerEntityPosition(e),
-          unregisterEntityPosition: (e) => self.unregisterEntityPosition(e),
-          registerEntityDualPosition: (e) => self.registerEntityDualPosition(e),
-          removeFromRenderingGrid: (e, x, y) => self.removeFromRenderingGrid(e, x, y),
-          removeEntity: (e) => self.removeEntity(e),
-          checkOtherDirtyRects: (r, e, x, y) => self.checkOtherDirtyRects(r, e, x, y),
-
-          // Zone operations
-          enqueueZoningFrom: (x, y) => self.enqueueZoningFrom(x, y),
-          resetZone: () => self.resetZone(),
-          updatePlateauMode: () => self.updatePlateauMode(),
-          updatePlayerCheckpoint: () => self.updatePlayerCheckpoint(),
-          checkUndergroundAchievement: () => self.checkUndergroundAchievement(),
-
-          // UI operations
-          assignBubbleTo: (e) => self.assignBubbleTo(e),
-          makeNpcTalk: (npc) => self.makeNpcTalk(npc),
-          pickupItemToInventory: (item) => self.pickupItemToInventory(item),
-
-          // Achievement operations
-          tryUnlockingAchievement: (id) => self.tryUnlockingAchievement(id),
-
-          // Callbacks
-          onPlayerDeath: () => self.playerdeath_callback?.(),
-          onEquipmentChange: () => self.equipment_callback?.(),
-          onInvincible: () => self.invincible_callback?.(),
-
-          // Atmosphere effects
-          fractureAtmosphere: self.fractureAtmosphere
-        });
-
-        // Initialize interaction controller
-        self.interactionController = new InteractionController({
-          client: self.client,
-          map: self.map,
-          audioManager: self.audioManager,
-          getPlayer: () => self.player,
-          getPlayerId: () => self.playerId,
-          isStarted: () => self.started,
-          isZoning: () => self.isZoning(),
-          isZoningTile: (x, y) => self.isZoningTile(x, y),
-          getEntityAt: (x, y) => self.getEntityAt(x, y),
-          getMouseGridPosition: () => self.getMouseGridPosition(),
-          makeCharacterGoTo: (c, x, y) => self.makeCharacterGoTo(c, x, y),
-          hoveringCollidingTile: () => self.hoveringCollidingTile,
-          hoveringPlateauTile: () => self.hoveringPlateauTile,
-          showBubbleFor: (e, msg) => self.showBubbleFor(e, msg),
-          tryUnlockingAchievement: (id) => self.tryUnlockingAchievement(id),
-          getPreviousClickPosition: () => self.previousClickPosition,
-          setPreviousClickPosition: (pos) => { self.previousClickPosition = pos; },
-          setCurrentNpcTalk: (npc) => { self.currentNpcTalk = npc; },
-          getCurrentNpcTalk: () => self.currentNpcTalk
-        });
-
-        // Initialize quest controller
-        self.questController = new QuestController({
-          sendRequestQuest: (npcKind: number) => self.client?.sendRequestQuest(npcKind),
-          showNotification: (message: string) => self.showNotification(message),
-          showNarratorText: (text: string, style: string) => self.uiManager?.showNarratorText(text, style as any),
-          playSound: (soundName: string) => self.audioManager?.playSound(soundName)
-        });
-
-        // Initialize quest UI
-        self.questUI = initQuestUI(self.questController);
-
-        self.setPathfinder(new Pathfinder(self.map.width, self.map.height));
 
         // Set camera map bounds to prevent rendering outside the map
         self.camera.setMapSize(self.map.width, self.map.height);
