@@ -10,13 +10,10 @@ import {Messages} from './message';
 import {Formulas} from './formulas';
 import {Properties} from './properties';
 import {Chest} from './chest';
-import {getVeniceService, getFishAudioService} from './ai';
 import {EquipmentManager} from './equipment/equipment-manager';
-import {EquipmentSlot, getSlotForKind} from '../../shared/ts/equipment/equipment-types';
-import {shopService, isMerchant, getShopInventory} from './shop/shop.service';
+import {EquipmentSlot} from '../../shared/ts/equipment/equipment-types';
 import {getAchievementService} from './achievements/achievement.service';
 import {PlayerAchievements} from '../../shared/ts/achievements';
-import {PartyService} from './party';
 import {Inventory} from './inventory/inventory';
 import {serializeSlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
 import {serializeProperties} from '../../shared/ts/items/item-types';
@@ -25,6 +22,8 @@ import {getDailyRewardService} from './player/daily-reward.service';
 import {getEconomyService} from './player/economy.service';
 import {ProgressionService, createProgressionService} from './player/progression.service';
 import {IStorageService, CharacterData, DailyData, PlayerSaveState} from './storage/storage.interface';
+import * as VeniceHandler from './player/venice.handler';
+import * as PartyHandler from './player/party.handler';
 
 export class Player extends Character {
   // Shared message router instance (singleton pattern)
@@ -177,6 +176,10 @@ export class Player extends Character {
 
   send(message: any) {
     this.connection.send(message);
+  }
+
+  getWorld() {
+    return this.world;
   }
 
   broadcast(message: any, ignoreSelf?: boolean) {
@@ -369,203 +372,40 @@ export class Player extends Character {
   }
 
   // ============================================================================
-  // VENICE AI HANDLERS
+  // VENICE AI HANDLERS - Delegated to VeniceHandler
   // ============================================================================
 
   async handleNpcTalk(npcKind: number) {
-    console.log(`[Venice] handleNpcTalk called with npcKind: ${npcKind}`);
-    const venice = getVeniceService();
-    const fishAudio = getFishAudioService();
-    const npcType = Types.getKindAsString(npcKind);
-    console.log(`[Venice] npcType resolved to: ${npcType}, venice service: ${venice ? 'available' : 'null'}`);
-
-    // Check if this NPC is a merchant - if so, send shop data too
-    if (isMerchant(npcKind)) {
-      const shop = getShopInventory(npcKind);
-      if (shop) {
-        console.log(`[Shop] Opening shop: ${shop.name}`);
-        const items = shopService.getInventoryWithStock(npcKind);
-        this.send(new Messages.ShopOpen(npcKind, shop.name, items || []).serialize());
-      }
-    }
-
-    if (!npcType) {
-      console.log('[Venice] Unknown NPC type, sending fallback');
-      this.send(new Messages.NpcTalkResponse(npcKind, '...', null).serialize());
-      return;
-    }
-
-    // Helper function to generate TTS audio for dialogue
-    const generateTTS = async (text: string): Promise<string | null> => {
-      if (!fishAudio || !npcType) return null;
-      try {
-        const result = await fishAudio.textToSpeech(text, npcType);
-        if (result) {
-          console.log(`[FishAudio] Generated TTS for ${npcType}: ${result.audioUrl} (cached: ${result.cached})`);
-          return result.audioUrl;
-        }
-      } catch (error) {
-        console.error('[FishAudio] TTS error:', error);
-      }
-      return null;
-    };
-
-    // If Venice isn't available, use static NPC personality greetings
-    if (!venice) {
-      const { NPC_PERSONALITIES } = await import('./ai/npc-personalities.js');
-      const personality = NPC_PERSONALITIES[npcType.toLowerCase()];
-      const fallback = personality ? personality.greeting : '...';
-      console.log(`[Venice] No AI service, using static greeting: ${fallback}`);
-      const audioUrl = await generateTTS(fallback);
-      this.send(new Messages.NpcTalkResponse(npcKind, fallback, audioUrl).serialize());
-      return;
-    }
-
-    try {
-      console.log(`[Venice] Generating dialogue for ${npcType}...`);
-      const response = await venice.generateNpcDialogue(
-        npcType,
-        this.name,
-        this.id.toString()
-      );
-      console.log(`[Venice] Got response: ${response}`);
-
-      // Generate TTS for the dialogue (don't wait for it to complete before sending text)
-      const audioUrl = await generateTTS(response);
-      this.send(new Messages.NpcTalkResponse(npcKind, response, audioUrl).serialize());
-    } catch (error) {
-      console.error('Venice NPC talk error:', error);
-      const fallback = venice.getFallback(npcType);
-      const audioUrl = await generateTTS(fallback);
-      this.send(new Messages.NpcTalkResponse(npcKind, fallback, audioUrl).serialize());
-    }
+    await VeniceHandler.handleNpcTalk(this, npcKind);
   }
 
   async handleRequestQuest(npcKind: number) {
-    const venice = getVeniceService();
-    const npcType = Types.getKindAsString(npcKind);
-
-    if (!venice || !npcType) {
-      return;
-    }
-
-    try {
-      const quest = await venice.generateQuest(this.id.toString(), npcType);
-      this.send(new Messages.QuestOffer(quest).serialize());
-    } catch (error) {
-      console.error('Venice quest generation error:', error);
-    }
+    await VeniceHandler.handleRequestQuest(this, npcKind);
   }
 
-  // Called when player kills a mob - for quest tracking and narration
   handleKill(mobType: string) {
-    const venice = getVeniceService();
-    if (!venice) return;
-
-    const profile = venice.getProfile(this.id.toString());
-    const prevKills = profile.totalKills;
-
-    const result = venice.recordKill(this.id.toString(), mobType);
-    if (result && result.completed) {
-      this.send(new Messages.QuestComplete(result).serialize());
-    }
-
-    // AI Narrator: Trigger narration for special kills
-    const newKills = profile.totalKills;
-
-    // First kill ever
-    if (prevKills === 0 && newKills === 1) {
-      this.triggerNarration('firstKill', { mobType });
-    }
-    // Kill milestones (10, 25, 50, 100, etc.)
-    else if ([10, 25, 50, 100, 250, 500].includes(newKills)) {
-      this.triggerNarration('killMilestone', { mobType, count: newKills });
-    }
-    // Boss kill
-    else if (mobType.toLowerCase() === 'boss' || mobType.toLowerCase() === 'skeleton2') {
-      this.triggerNarration('bossKill', { bossType: mobType });
-    }
+    VeniceHandler.handleKill(this, mobType, (event, details) => this.triggerNarration(event, details));
   }
 
-  // Called when player enters a new area - for quest tracking, companion hints, and narration
   async handleAreaChange(area: string) {
-    const venice = getVeniceService();
-    if (!venice) return;
-
-    const profile = venice.getProfile(this.id.toString());
-    const isNewArea = !profile.areas.includes(area);
-
-    const result = venice.recordArea(this.id.toString(), area);
-    if (result && result.completed) {
-      this.send(new Messages.QuestComplete(result).serialize());
-    }
-
-    // AI Narrator: Announce new area discovery
-    if (isNewArea) {
-      this.triggerNarration('newArea', { area });
-    }
-
-    // Send companion hint for new area
-    const hint = await venice.getCompanionHint(this.id.toString(), 'newArea', { area });
-    if (hint) {
-      this.send(new Messages.CompanionHint(hint).serialize());
-    }
+    await VeniceHandler.handleAreaChange(this, area, (event, details) => this.triggerNarration(event, details));
   }
 
-  // Called when player picks up an item - for lore generation
   async handleItemPickup(itemKind: number) {
-    const venice = getVeniceService();
-    if (!venice) return;
-
-    const itemType = Types.getKindAsString(itemKind);
-    if (itemType) {
-      venice.recordItem(this.id.toString(), itemType);
-      const lore = await venice.generateItemLore(itemType);
-      this.send(new Messages.ItemLore(itemKind, lore).serialize());
-    }
+    await VeniceHandler.handleItemPickup(this, itemKind);
   }
 
-  // Called when player health is low - for companion hints
   async handleLowHealth(healthPercent: number) {
-    const venice = getVeniceService();
-    if (!venice) return;
-
-    const hint = await venice.getCompanionHint(
-      this.id.toString(),
-      'lowHealth',
-      { percent: Math.round(healthPercent * 100) }
-    );
-    if (hint) {
-      this.send(new Messages.CompanionHint(hint).serialize());
-    }
+    await VeniceHandler.handleLowHealth(this, healthPercent);
   }
 
-  // Called when player dies - for companion hints and narration
   async handleDeath(killerType: string) {
-    const venice = getVeniceService();
-    if (!venice) return;
-
-    venice.recordDeath(this.id.toString());
-
-    // AI Narrator: Dramatic death commentary
-    this.triggerNarration('death', { killer: killerType });
-
-    const hint = await venice.getCompanionHint(
-      this.id.toString(),
-      'death',
-      { killer: killerType }
-    );
-    if (hint) {
-      this.send(new Messages.CompanionHint(hint).serialize());
-    }
+    await VeniceHandler.handleDeath(this, killerType, (event, details) => this.triggerNarration(event, details));
   }
 
-  // Cleanup Venice data when player disconnects
   cleanupVenice() {
-    const venice = getVeniceService();
-    if (venice) {
-      venice.cleanupPlayer(this.id.toString());
-    }
+    VeniceHandler.cleanupVenice(this.id.toString());
+    VeniceHandler.cleanupNarration(this.id);
   }
 
   // ============================================================================
@@ -662,27 +502,9 @@ export class Player extends Character {
     this.send(new Messages.GoldGain(result.sellPrice, this.gold).serialize());
   }
 
-  // Town Crier: Handle newspaper request
+  // Town Crier: Handle newspaper request - delegated to VeniceHandler
   async handleNewsRequest() {
-    console.log('[TownCrier] handleNewsRequest called for player:', this.name);
-    const venice = getVeniceService();
-    if (!venice) {
-      console.log('[TownCrier] No Venice service, sending empty response');
-      this.send(new Messages.NewsResponse([]).serialize());
-      return;
-    }
-
-    try {
-      console.log('[TownCrier] Generating newspaper...');
-      const newspaper = await venice.generateNewspaper();
-      console.log('[TownCrier] Generated', newspaper.headlines.length, 'headlines');
-      const response = new Messages.NewsResponse(newspaper.headlines).serialize();
-      console.log('[TownCrier] Sending response:', JSON.stringify(response));
-      this.send(response);
-    } catch (error) {
-      console.error('[TownCrier] Venice newspaper error:', error);
-      this.send(new Messages.NewsResponse(['📰 No news today...']).serialize());
-    }
+    await VeniceHandler.handleNewsRequest(this);
   }
 
   // Handle dropping currently equipped item (unified for all slots)
@@ -720,51 +542,11 @@ export class Player extends Character {
   }
 
   // ============================================================================
-  // AI NARRATOR - Triggers dramatic commentary on player actions
+  // AI NARRATOR - Delegated to VeniceHandler
   // ============================================================================
 
-  private lastNarrationTime: number = 0;
-  private narrationCooldown: number = 5000; // 5 seconds between narrations
-
   async triggerNarration(event: string, details?: Record<string, any>) {
-    const venice = getVeniceService();
-    if (!venice) return;
-
-    // Cooldown to prevent spam (except for important events)
-    const importantEvents = ['join', 'death', 'bossKill'];
-    const now = Date.now();
-    if (!importantEvents.includes(event) && (now - this.lastNarrationTime) < this.narrationCooldown) {
-      return;
-    }
-
-    console.log(`[Narrator] Triggering narration for event: ${event}`);
-
-    try {
-      // Try AI narration first
-      const narration = await venice.generateNarration(
-        event,
-        this.name,
-        this.id.toString(),
-        details
-      );
-
-      if (narration) {
-        console.log(`[Narrator] AI response: "${narration.text}"${narration.audioUrl ? ' [with audio]' : ''}`);
-        this.send(new Messages.Narrator(narration.text, narration.style, narration.audioUrl).serialize());
-        this.lastNarrationTime = now;
-      } else {
-        // Fallback to static narration (no audio for fallbacks)
-        const fallback = venice.getStaticNarration(event, this.name, details);
-        console.log(`[Narrator] Using fallback: "${fallback.text}"`);
-        this.send(new Messages.Narrator(fallback.text, fallback.style).serialize());
-        this.lastNarrationTime = now;
-      }
-    } catch (error) {
-      console.error('[Narrator] Error:', error);
-      // Use static fallback on error (no audio for fallbacks)
-      const fallback = venice.getStaticNarration(event, this.name, details);
-      this.send(new Messages.Narrator(fallback.text, fallback.style).serialize());
-    }
+    await VeniceHandler.triggerNarration(this, event, details);
   }
 
   // ============================================================================
@@ -897,282 +679,56 @@ export class Player extends Character {
   }
 
   // ============================================================================
-  // PARTY SYSTEM
+  // PARTY SYSTEM - Delegated to PartyHandler
   // ============================================================================
 
-  /**
-   * Handle party invite request
-   */
   handlePartyInvite(targetId: number) {
-    const partyService = PartyService.getInstance();
-    const targetPlayer = this.world.getEntityById(targetId) as Player;
-
-    if (!targetPlayer || !(targetPlayer instanceof Player)) {
-      console.log(`[Party] ${this.name} tried to invite invalid player ${targetId}`);
-      return;
-    }
-
-    // Create player reference for PartyService (x/y are pixel coords, divide by 16 for grid)
-    const inviterRef = {
-      id: this.id,
-      name: this.name,
-      level: this.level,
-      hitPoints: this.hitPoints,
-      maxHitPoints: this.maxHitPoints,
-      gridX: Math.floor(this.x / 16),
-      gridY: Math.floor(this.y / 16),
-      send: (msg: any[]) => this.send(msg)
-    };
-
-    const targetRef = {
-      id: targetPlayer.id,
-      name: targetPlayer.name,
-      level: targetPlayer.level,
-      hitPoints: targetPlayer.hitPoints,
-      maxHitPoints: targetPlayer.maxHitPoints,
-      gridX: Math.floor(targetPlayer.x / 16),
-      gridY: Math.floor(targetPlayer.y / 16),
-      send: (msg: any[]) => targetPlayer.send(msg)
-    };
-
-    const error = partyService.sendInvite(inviterRef, targetId, targetRef);
-    if (error) {
-      console.log(`[Party] Invite failed: ${error}`);
-    }
+    PartyHandler.handlePartyInvite(this, targetId);
   }
 
-  /**
-   * Handle accepting a party invite
-   */
   handlePartyAccept(inviterId: number) {
-    const partyService = PartyService.getInstance();
-    const inviterPlayer = this.world.getEntityById(inviterId) as Player;
-
-    const accepterRef = {
-      id: this.id,
-      name: this.name,
-      level: this.level,
-      hitPoints: this.hitPoints,
-      maxHitPoints: this.maxHitPoints,
-      gridX: Math.floor(this.x / 16),
-      gridY: Math.floor(this.y / 16),
-      send: (msg: any[]) => this.send(msg)
-    };
-
-    const inviterRef = inviterPlayer ? {
-      id: inviterPlayer.id,
-      name: inviterPlayer.name,
-      level: inviterPlayer.level,
-      hitPoints: inviterPlayer.hitPoints,
-      maxHitPoints: inviterPlayer.maxHitPoints,
-      gridX: Math.floor(inviterPlayer.x / 16),
-      gridY: Math.floor(inviterPlayer.y / 16),
-      send: (msg: any[]) => inviterPlayer.send(msg)
-    } : undefined;
-
-    const result = partyService.acceptInvite(accepterRef, inviterId, inviterRef);
-
-    if (typeof result === 'string') {
-      console.log(`[Party] Accept failed: ${result}`);
-      return;
-    }
-
-    // Send PARTY_JOIN to all party members
-    const members = result.getMemberData();
-    for (const memberId of result.getMemberIds()) {
-      const memberPlayer = this.world.getEntityById(memberId) as Player;
-      if (memberPlayer) {
-        memberPlayer.send(new Messages.PartyJoin(result.id, members, result.leaderId).serialize());
-      }
-    }
+    PartyHandler.handlePartyAccept(this, inviterId);
   }
 
-  /**
-   * Handle declining a party invite
-   */
   handlePartyDecline(inviterId: number) {
-    const partyService = PartyService.getInstance();
-    partyService.declineInvite(this.id, inviterId);
+    PartyHandler.handlePartyDecline(this, inviterId);
   }
 
-  /**
-   * Handle leaving the party
-   */
   handlePartyLeave() {
-    const partyService = PartyService.getInstance();
-    const result = partyService.leaveParty(this.id);
-
-    if (!result) {
-      return;
-    }
-
-    // Notify remaining party members
-    const remainingMembers = result.party.getMemberIds();
-    const memberData = result.party.getMemberData();
-
-    if (result.disbanded) {
-      // Notify all remaining members that party disbanded
-      for (const memberId of remainingMembers) {
-        const memberPlayer = this.world.getEntityById(memberId) as Player;
-        if (memberPlayer) {
-          memberPlayer.send(new Messages.PartyDisband().serialize());
-        }
-      }
-    } else {
-      // Notify remaining members
-      for (const memberId of remainingMembers) {
-        const memberPlayer = this.world.getEntityById(memberId) as Player;
-        if (memberPlayer) {
-          memberPlayer.send(new Messages.PartyLeave(this.id).serialize());
-          if (result.newLeaderId) {
-            // Leadership changed, send full update
-            memberPlayer.send(new Messages.PartyUpdate(memberData).serialize());
-          }
-        }
-      }
-    }
+    PartyHandler.handlePartyLeave(this);
   }
 
-  /**
-   * Handle kicking a member from the party
-   */
   handlePartyKick(targetId: number) {
-    const partyService = PartyService.getInstance();
-    const result = partyService.kickMember(this.id, targetId);
-
-    if (!result || !result.success) {
-      console.log(`[Party] Kick failed: ${result?.message || 'Unknown error'}`);
-      return;
-    }
-
-    // Notify the kicked player
-    const kickedPlayer = this.world.getEntityById(targetId) as Player;
-    if (kickedPlayer) {
-      kickedPlayer.send(new Messages.PartyDisband().serialize());
-    }
-
-    // Notify remaining party members
-    const memberData = result.party.getMemberData();
-    for (const memberId of result.party.getMemberIds()) {
-      const memberPlayer = this.world.getEntityById(memberId) as Player;
-      if (memberPlayer) {
-        memberPlayer.send(new Messages.PartyLeave(targetId).serialize());
-        memberPlayer.send(new Messages.PartyUpdate(memberData).serialize());
-      }
-    }
+    PartyHandler.handlePartyKick(this, targetId);
   }
 
-  /**
-   * Handle party chat message
-   */
   handlePartyChat(message: string) {
-    const partyService = PartyService.getInstance();
-    const party = partyService.getPlayerParty(this.id);
-
-    if (!party) {
-      return;
-    }
-
-    // Send chat to all party members
-    for (const memberId of party.getMemberIds()) {
-      const memberPlayer = this.world.getEntityById(memberId) as Player;
-      if (memberPlayer) {
-        memberPlayer.send(new Messages.PartyChat(this.id, this.name, message).serialize());
-      }
-    }
+    PartyHandler.handlePartyChat(this, message);
   }
 
-  /**
-   * Handle player inspect request
-   */
   handlePlayerInspect(targetId: number) {
-    const targetPlayer = this.world.getEntityById(targetId) as Player;
-
-    if (!targetPlayer || !(targetPlayer instanceof Player)) {
-      console.log(`[Inspect] ${this.name} tried to inspect invalid player ${targetId}`);
-      return;
-    }
-
-    this.send(new Messages.PlayerInspectResult(
-      targetPlayer.id,
-      targetPlayer.name,
-      targetPlayer.title,
-      targetPlayer.level,
-      targetPlayer.weapon,
-      targetPlayer.armor
-    ).serialize());
+    PartyHandler.handlePlayerInspect(this, targetId);
   }
 
-  /**
-   * Handle leaderboard request - send boss kill leaderboard
-   */
   handleLeaderboardRequest() {
     if (!this.world.roamingBossManager) {
-      // Send empty leaderboard if boss system not initialized
       this.send(new Messages.LeaderboardResponse([]).serialize());
       return;
     }
-
     const leaderboard = this.world.roamingBossManager.getLeaderboard();
     this.send(new Messages.LeaderboardResponse(leaderboard).serialize());
   }
 
-  /**
-   * Cleanup party data on disconnect
-   */
   cleanupParty() {
-    const partyService = PartyService.getInstance();
-    const party = partyService.handlePlayerDisconnect(this.id);
-
-    if (party) {
-      // Notify remaining party members
-      const remainingMembers = party.getMemberIds();
-      const memberData = party.getMemberData();
-
-      if (remainingMembers.length === 0) {
-        return;
-      }
-
-      for (const memberId of remainingMembers) {
-        const memberPlayer = this.world.getEntityById(memberId) as Player;
-        if (memberPlayer) {
-          memberPlayer.send(new Messages.PartyLeave(this.id).serialize());
-          if (remainingMembers.length > 1) {
-            memberPlayer.send(new Messages.PartyUpdate(memberData).serialize());
-          } else {
-            // Last member, disband
-            memberPlayer.send(new Messages.PartyDisband().serialize());
-          }
-        }
-      }
-    }
+    PartyHandler.cleanupParty(this);
   }
 
-  /**
-   * Update party position (for shared XP proximity checks)
-   */
   updatePartyPosition() {
-    const partyService = PartyService.getInstance();
-    partyService.updateMemberPosition(this.id, Math.floor(this.x / 16), Math.floor(this.y / 16));
+    PartyHandler.updatePartyPosition(this);
   }
 
-  /**
-   * Update party HP (for party UI)
-   */
   updatePartyHp() {
-    const partyService = PartyService.getInstance();
-    const party = partyService.updateMemberHp(this.id, this.hitPoints, this.maxHitPoints);
-
-    if (party) {
-      // Broadcast HP update to all party members
-      const memberData = party.getMemberData();
-      for (const memberId of party.getMemberIds()) {
-        const memberPlayer = this.world.getEntityById(memberId) as Player;
-        if (memberPlayer && memberId !== this.id) {
-          memberPlayer.send(new Messages.PartyUpdate(memberData).serialize());
-        }
-      }
-    }
+    PartyHandler.updatePartyHp(this);
   }
 
   // ============================================================================
