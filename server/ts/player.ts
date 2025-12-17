@@ -11,7 +11,6 @@ import {Formulas} from './formulas';
 import {Properties} from './properties';
 import {Chest} from './chest';
 import {EquipmentManager} from './equipment/equipment-manager';
-import {EquipmentSlot} from '../../shared/ts/equipment/equipment-types';
 import {PlayerAchievements} from '../../shared/ts/achievements';
 import {Inventory} from './inventory/inventory';
 import {SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
@@ -25,6 +24,8 @@ import * as InventoryHandler from './player/inventory.handler';
 import * as AchievementHandler from './player/achievement.handler';
 import * as ShopHandler from './player/shop.handler';
 import * as PersistenceHandler from './player/persistence.handler';
+import * as EquipmentHandler from './player/equipment.handler';
+import * as ZoneHandler from './player/zone.handler';
 
 export class Player extends Character {
   // Shared message router instance (singleton pattern)
@@ -203,6 +204,10 @@ export class Player extends Character {
     return this.progression;
   }
 
+  getEquipment() {
+    return this.equipment;
+  }
+
   broadcast(message: any, ignoreSelf?: boolean) {
     if (this.broadcast_callback) {
       this.broadcast_callback(message, ignoreSelf === undefined ? true : ignoreSelf);
@@ -271,28 +276,24 @@ export class Player extends Character {
     });
   }
 
+  // ============================================================================
+  // EQUIPMENT - Delegated to EquipmentHandler
+  // ============================================================================
+
   equipArmor(kind: number) {
-    this.equipment.equipToSlot('armor', kind);
+    EquipmentHandler.equipArmor(this, kind);
   }
 
   equipWeapon(kind: number) {
-    this.equipment.equipToSlot('weapon', kind);
+    EquipmentHandler.equipWeapon(this, kind);
   }
 
   equipItem(item: any) {
-    if (item) {
-      console.debug(this.name + ' equips ' + Types.getKindAsString(item.kind));
-
-      const slot = this.equipment.equip(item.kind);
-      if (slot && slot === 'armor') {
-        this.updateHitPoints();
-        this.send(new Messages.HitPoints(this.maxHitPoints).serialize());
-      }
-    }
+    EquipmentHandler.equipItem(this, item);
   }
 
   updateHitPoints() {
-    this.resetHitPoints(Formulas.hp(this.armorLevel, this.level));
+    EquipmentHandler.updateHitPoints(this);
   }
 
   updatePosition() {
@@ -303,21 +304,11 @@ export class Player extends Character {
   }
 
   // ============================================================================
-  // ZONE SYSTEM
+  // ZONE SYSTEM - Delegated to ZoneHandler
   // ============================================================================
 
-  /**
-   * Check if player entered a new zone and send notification
-   */
   checkZoneChange(x: number, y: number) {
-    const result = this.world.zoneManager.updatePlayerZone(String(this.id), x, y, this.level);
-    if (result.changed && result.zone) {
-      // Send zone enter notification
-      this.send(this.world.zoneManager.createZoneEnterMessage(result.zone, result.warning));
-      // Send zone info (bonus percentages)
-      this.send(this.world.zoneManager.createZoneInfoMessage(result.zone));
-      console.log(`[Zone] ${this.name} entered ${result.zone.name} (Level ${result.zone.minLevel}-${result.zone.maxLevel})`);
-    }
+    ZoneHandler.checkZoneChange(this, x, y);
   }
 
   // ============================================================================
@@ -446,38 +437,8 @@ export class Player extends Character {
     await VeniceHandler.handleNewsRequest(this);
   }
 
-  // Handle dropping currently equipped item (unified for all slots)
   handleDropItem(itemType: string) {
-    const slot = itemType as EquipmentSlot;
-    console.log(`[Drop] ${this.name} dropping ${slot}`);
-
-    // Use unified drop - handles default check internally
-    const droppedKind = this.equipment.drop(slot);
-    if (!droppedKind) {
-      console.log(`[Drop] Cannot drop default ${slot}`);
-      return;
-    }
-
-    // Create item at player's position
-    const item = this.world.createItemWithProperties(droppedKind, this.x, this.y);
-    if (item) {
-      this.world.addItem(item);
-      this.broadcast(new Messages.Spawn(item), false);
-      console.log(`[Drop] Created item ${Types.getKindAsString(droppedKind)} at (${this.x}, ${this.y})`);
-    }
-
-    // Get the new default item that was auto-equipped
-    const newKind = this.equipment.getEquipped(slot);
-
-    // Tell the player and others about the equipment change
-    this.send(this.equip(newKind).serialize());
-    this.broadcast(this.equip(newKind));
-
-    // Update HP if armor changed
-    if (slot === 'armor') {
-      this.updateHitPoints();
-      this.send(new Messages.HitPoints(this.maxHitPoints).serialize());
-    }
+    EquipmentHandler.handleDropItem(this, itemType);
   }
 
   // ============================================================================
