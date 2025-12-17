@@ -50,6 +50,7 @@ import * as InventoryHandler from './handlers/inventory.handler';
 import * as GameEventHandler from './handlers/game-event.handler';
 import * as NetworkConnectionHandler from './handlers/network-connection.handler';
 import { PlayerController } from './player/player-controller';
+import { InteractionController } from './player/interaction-controller';
 
 export class Game {
 
@@ -86,6 +87,7 @@ export class Game {
   spriteLoader: SpriteLoader | null = null;
   fractureAtmosphere: FractureAtmosphere | null = null;
   playerController: PlayerController | null = null;
+  interactionController: InteractionController | null = null;
 
   // Entity accessors (delegate to entityManager)
   get entities() { return this.entityManager?.entities ?? {}; }
@@ -636,6 +638,29 @@ export class Game {
           fractureAtmosphere: self.fractureAtmosphere
         });
 
+        // Initialize interaction controller
+        self.interactionController = new InteractionController({
+          client: self.client,
+          map: self.map,
+          audioManager: self.audioManager,
+          getPlayer: () => self.player,
+          getPlayerId: () => self.playerId,
+          isStarted: () => self.started,
+          isZoning: () => self.isZoning(),
+          isZoningTile: (x, y) => self.isZoningTile(x, y),
+          getEntityAt: (x, y) => self.getEntityAt(x, y),
+          getMouseGridPosition: () => self.getMouseGridPosition(),
+          makeCharacterGoTo: (c, x, y) => self.makeCharacterGoTo(c, x, y),
+          hoveringCollidingTile: () => self.hoveringCollidingTile,
+          hoveringPlateauTile: () => self.hoveringPlateauTile,
+          showBubbleFor: (e, msg) => self.showBubbleFor(e, msg),
+          tryUnlockingAchievement: (id) => self.tryUnlockingAchievement(id),
+          getPreviousClickPosition: () => self.previousClickPosition,
+          setPreviousClickPosition: (pos) => { self.previousClickPosition = pos; },
+          setCurrentNpcTalk: (npc) => { self.currentNpcTalk = npc; },
+          getCurrentNpcTalk: () => self.currentNpcTalk
+        });
+
         self.setPathfinder(new Pathfinder(self.map.width, self.map.height));
 
         // Set camera map bounds to prevent rendering outside the map
@@ -867,151 +892,33 @@ export class Game {
     }
   }
 
-  /**
-   * Moves the current player to a given target location.
-   * @see makeCharacterGoTo
-   */
+  // Movement and Interaction - Delegated to InteractionController
   makePlayerGoTo(x, y) {
-    this.makeCharacterGoTo(this.player, x, y);
+    this.interactionController?.makePlayerGoTo(x, y);
   }
 
-  /**
-   * Move player one tile in a direction (for WASD/Arrow key controls)
-   * @param dx Direction on X axis (-1 = left, 1 = right, 0 = none)
-   * @param dy Direction on Y axis (-1 = up, 1 = down, 0 = none)
-   */
   movePlayerInDirection(dx: number, dy: number) {
-    if (!this.player || this.player.isDead) return;
-
-    // Block movement during zone transition to prevent camera desync
-    if (this.zoningManager?.isZoning()) return;
-
-    const targetX = this.player.gridX + dx;
-    const targetY = this.player.gridY + dy;
-
-    // Check for entity at target position and interact if present
-    const entity = this.getEntityAt(targetX, targetY);
-    if (entity) {
-      // Interact with entity instead of moving
-      if (entity instanceof Mob) {
-        this.makePlayerAttack(entity);
-        return;
-      }
-      else if (entity instanceof Chest) {
-        this.client.sendOpen(entity);
-        this.audioManager.playSound('chest');
-        return;
-      }
-      else if (entity instanceof Item) {
-        this.makePlayerGoToItem(entity);
-        return;
-      }
-      else if (entity instanceof Npc) {
-        this.makeNpcTalk(entity);
-        return;
-      }
-      else if (entity instanceof Player && entity.id !== this.playerId) {
-        // Another player - request inspect data from server
-        this.client.sendPlayerInspect(entity.id);
-        return;
-      }
-      // Other entities block movement
-      return;
-    }
-
-    // Check if target is walkable
-    if (this.map && this.map.isColliding(targetX, targetY)) {
-      return; // Can't walk into walls
-    }
-
-    // Check plateau restrictions
-    if (this.map) {
-      const playerOnPlateau = this.player.isOnPlateau;
-      const targetOnPlateau = this.map.isPlateau(targetX, targetY);
-      if (playerOnPlateau !== targetOnPlateau) {
-        return; // Can't cross plateau boundary directly
-      }
-    }
-
-    this.makePlayerGoTo(targetX, targetY);
+    this.interactionController?.movePlayerInDirection(dx, dy);
   }
 
-  /**
-   * Moves the current player towards a specific item.
-   * @see makeCharacterGoTo
-   */
   makePlayerGoToItem(item) {
-    if (item) {
-      this.player.isLootMoving = true;
-      this.makePlayerGoTo(item.gridX, item.gridY);
-      this.client.sendLootMove(item, item.gridX, item.gridY);
-    }
+    this.interactionController?.makePlayerGoToItem(item);
   }
 
-  /**
-   *
-   */
   makePlayerTalkTo(npc) {
-    if (npc) {
-      this.player.setTarget(npc);
-      this.player.follow(npc);
-    }
+    this.interactionController?.makePlayerTalkTo(npc);
   }
 
   makePlayerOpenChest(chest) {
-    if (chest) {
-      this.player.setTarget(chest);
-      this.player.follow(chest);
-    }
+    this.interactionController?.makePlayerOpenChest(chest);
   }
 
-  /**
-   *
-   */
   makePlayerAttack(mob) {
-    // Don't attack dying/dead mobs (prevents immortal mob bug)
-    if (mob.isDying || mob.isDead) {
-      return;
-    }
-    this.createAttackLink(this.player, mob);
-    this.client.sendAttack(mob);
+    this.interactionController?.makePlayerAttack(mob);
   }
 
-  /**
-   *
-   */
   makeNpcTalk(npc) {
-    var self = this;
-
-    if (npc) {
-      this.previousClickPosition = { x: -1, y: -1 };
-      this.tryUnlockingAchievement('SMALL_TALK');
-
-      if (npc.kind === Types.Entities.RICK) {
-        this.tryUnlockingAchievement('RICKROLLD');
-      }
-
-      // Store current NPC for when response arrives
-      this.currentNpcTalk = npc;
-
-      // Show thinking indicator
-      this.showBubbleFor(npc, '...');
-
-      // Request AI-generated dialogue from server
-      this.client.sendNpcTalk(npc.kind);
-
-      // Fallback: if no response in 5 seconds, use static dialogue
-      setTimeout(function() {
-        if (self.currentNpcTalk === npc) {
-          self.currentNpcTalk = null;
-          var msg = npc.talk();
-          if (msg) {
-            self.showBubbleFor(npc, msg);
-          }
-          self.audioManager.playSound('npc');
-        }
-      }, 5000);
-    }
+    this.interactionController?.makeNpcTalk(npc);
   }
 
   // Current NPC being talked to (for Venice AI response handling)
@@ -1244,55 +1151,7 @@ export class Game {
    * Processes game logic when the user triggers a click/touch event during the game.
    */
   click() {
-    var pos = this.getMouseGridPosition(),
-      entity;
-
-    if (pos.x === this.previousClickPosition.x
-      && pos.y === this.previousClickPosition.y) {
-      return;
-    } else {
-      this.previousClickPosition = pos;
-    }
-
-    if (this.started
-      && this.player
-      && !this.isZoning()
-      && !this.isZoningTile(this.player.nextGridX, this.player.nextGridY)
-      && !this.player.isDead
-      && !this.hoveringCollidingTile
-      && !this.hoveringPlateauTile) {
-      entity = this.getEntityAt(pos.x, pos.y);
-      console.log('[Click Debug] Position:', pos.x, pos.y, 'Entity:', entity ? entity.kind : null, 'isChest:', entity instanceof Chest, 'constructor:', entity ? entity.constructor.name : null);
-
-      if (entity instanceof Mob) {
-        this.makePlayerAttack(entity);
-      }
-      else if (entity instanceof Chest) {
-        // Check Chest BEFORE Item since Chest extends Item
-        const isAdjacent = this.player.isAdjacentNonDiagonal(entity);
-        console.log('[Chest Debug] Player at:', this.player.gridX, this.player.gridY, 'Chest at:', entity.gridX, entity.gridY, 'Adjacent:', isAdjacent);
-        if (isAdjacent === false) {
-          this.makePlayerOpenChest(entity);
-        } else {
-          console.log('[Chest Debug] Sending OPEN to server for chest:', entity.id);
-          this.client.sendOpen(entity);
-          this.audioManager.playSound('chest');
-        }
-      }
-      else if (entity instanceof Item) {
-        this.makePlayerGoToItem(entity);
-      }
-      else if (entity instanceof Npc) {
-        if (this.player.isAdjacentNonDiagonal(entity) === false) {
-          this.makePlayerTalkTo(entity);
-        } else {
-          this.makeNpcTalk(entity);
-        }
-      }
-      else {
-        this.makePlayerGoTo(pos.x, pos.y);
-      }
-    }
+    this.interactionController?.click();
   }
 
   isMobOnSameTile(mob, x?, y?) {
