@@ -10,6 +10,7 @@ import { Messages } from '../message';
 import { Inventory } from '../inventory/inventory';
 import { serializeSlot, SerializedInventorySlot } from '../../../shared/ts/inventory/inventory-types';
 import { serializeProperties } from '../../../shared/ts/items/item-types';
+import { EquipmentSlot } from '../../../shared/ts/equipment/equipment-types';
 
 /**
  * Player context for inventory operations
@@ -36,6 +37,11 @@ export interface InventoryPlayerContext {
 
   // Inventory instance
   getInventory: () => Inventory;
+
+  // Equipment management
+  getEquipment: () => {
+    getEquipped: (slot: EquipmentSlot) => number;
+  };
 
   // World access
   getWorld: () => {
@@ -276,4 +282,63 @@ export function getInventoryState(ctx: InventoryPlayerContext): (SerializedInven
  */
 export function loadInventory(ctx: InventoryPlayerContext, data: (SerializedInventorySlot | null)[]): void {
   ctx.getInventory().loadFromData(data);
+}
+
+/**
+ * Handle unequip equipment to inventory (instead of dropping to ground)
+ */
+export function handleUnequipToInventory(ctx: InventoryPlayerContext, slot: string): void {
+  const inventory = ctx.getInventory();
+
+  // Validate slot
+  if (slot !== 'weapon' && slot !== 'armor') {
+    console.log(`[Inventory] Invalid slot type: ${slot}`);
+    return;
+  }
+
+  // Get currently equipped item
+  const currentKind = slot === 'weapon' ? ctx.weapon : ctx.armor;
+  const defaultKind = slot === 'weapon' ? Types.Entities.SWORD1 : Types.Entities.CLOTHARMOR;
+
+  // Cannot unequip default items
+  if (currentKind === defaultKind) {
+    console.log(`[Inventory] Cannot unequip default ${slot}`);
+    return;
+  }
+
+  // Check if inventory has room
+  if (!inventory.hasRoom(currentKind)) {
+    console.log(`[Inventory] ${ctx.name}'s inventory is full - cannot unequip ${slot}`);
+    return;
+  }
+
+  // Add to inventory
+  const slotIndex = inventory.addItem(currentKind, null, 1);
+  if (slotIndex === -1) {
+    console.log(`[Inventory] Failed to add ${slot} to inventory`);
+    return;
+  }
+
+  // Equip default item
+  if (slot === 'weapon') {
+    ctx.equipWeapon(defaultKind);
+  } else {
+    ctx.equipArmor(defaultKind);
+    ctx.updateHitPoints();
+    ctx.send(new Messages.HitPoints(ctx.maxHitPoints).serialize());
+  }
+
+  // Broadcast equipment change
+  ctx.broadcast(ctx.equip(defaultKind));
+
+  // Send inventory add message
+  ctx.send([
+    Types.Messages.INVENTORY_ADD,
+    slotIndex,
+    currentKind,
+    null,
+    1
+  ]);
+
+  console.log(`[Inventory] ${ctx.name} unequipped ${Types.getKindAsString(currentKind)} to inventory slot ${slotIndex}`);
 }

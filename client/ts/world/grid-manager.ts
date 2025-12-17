@@ -184,7 +184,10 @@ export class GridManager {
           this.pathingGrid[y][x] = 1;
         }
       }
-      if (entity instanceof Item) {
+      // Only add actual pickupable items to itemGrid (not Chests which extend Item)
+      // This fixes a 2012 bug where items dropped from chests couldn't be picked up
+      // because the Chest was also in itemGrid and getItemAt() returned it instead
+      if (entity instanceof Item && !(entity instanceof Chest)) {
         this.itemGrid[y][x][entity.id] = entity;
       }
 
@@ -205,8 +208,8 @@ export class GridManager {
     }
 
     // Check itemGrid first - items are always pickupable and should take priority
-    // This fixes the bug where items dropped from chests couldn't be picked up
-    // because the dying chest was still in entityGrid
+    // Chests are NOT in itemGrid (excluded in registerEntityPosition), so this
+    // correctly returns dropped items even when a dying chest is still in entityGrid
     const item = this.getItemAt(x, y);
     if (item) {
       return item;

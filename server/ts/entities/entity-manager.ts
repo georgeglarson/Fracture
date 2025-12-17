@@ -8,6 +8,7 @@ import { Npc } from '../npc.js';
 import { Chest } from '../chest.js';
 import { Item } from '../item.js';
 import { generateItem } from '../items/index.js';
+import { getZoneAtPosition } from '../../../shared/ts/zones';
 
 // Using 'any' for entities to avoid type conflicts with various entity classes
 // The actual entity classes (Player, Mob, Item, Npc) have different interfaces
@@ -139,8 +140,14 @@ export class EntityManager {
   createItem(kind: number, x: number, y: number): Item | Chest {
     const id = '9' + this.itemCount++;
 
-    if (kind === Types.Entities.CHEST) {
-      return new Chest(id, x, y);
+    if (Types.isChest(kind)) {
+      // Get zone-appropriate chest kind if generic CHEST was requested
+      let chestKind = kind;
+      if (kind === Types.Entities.CHEST) {
+        const zone = getZoneAtPosition(x, y);
+        chestKind = zone ? Types.getChestKindForZone(zone.id) : Types.Entities.CHEST;
+      }
+      return new Chest(id, x, y, chestKind);
     } else {
       return new Item(id, kind, x, y);
     }
@@ -156,8 +163,14 @@ export class EntityManager {
   createItemWithProperties(kind: number, x: number, y: number, existingPropertiesOrZone?: any): Item | Chest {
     const id = '9' + this.itemCount++;
 
-    if (kind === Types.Entities.CHEST) {
-      return new Chest(id, x, y);
+    if (Types.isChest(kind)) {
+      // Get zone-appropriate chest kind if generic CHEST was requested
+      let chestKind = kind;
+      if (kind === Types.Entities.CHEST) {
+        const zone = getZoneAtPosition(x, y);
+        chestKind = zone ? Types.getChestKindForZone(zone.id) : Types.Entities.CHEST;
+      }
+      return new Chest(id, x, y, chestKind);
     } else {
       // Check if we got a zone (has rarityBonus) or existing properties
       let properties;

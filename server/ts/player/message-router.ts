@@ -115,6 +115,7 @@ export interface MessageHandlerContext {
   handleInventoryDrop(slotIndex: number): void;
   handleInventorySwap(fromSlot: number, toSlot: number): void;
   handleInventoryPickup(itemId: number): void;
+  handleUnequipToInventory(slot: string): void;
 
   // Boss leaderboard
   handleLeaderboardRequest(): void;
@@ -366,6 +367,13 @@ export function createMessageHandlers(
         const kind = item.kind;
 
         if (Types.isItem(kind)) {
+          // Equipment goes to inventory instead of auto-equipping
+          if (Types.isArmor(kind) || Types.isWeapon(kind)) {
+            ctx.handleInventoryPickup(item.id);
+            return;
+          }
+
+          // Consumables are used immediately (original behavior)
           ctx.broadcast(item.despawn());
           ctx.world.removeEntity(item);
 
@@ -392,9 +400,6 @@ export function createMessageHandlers(
               ctx.regenHealthBy(amount);
               ctx.world.pushToPlayer(ctx, ctx.health());
             }
-          } else if (Types.isArmor(kind) || Types.isWeapon(kind)) {
-            ctx.equipItem(item);
-            ctx.broadcast(ctx.equip(kind));
           }
         }
       }
@@ -572,6 +577,12 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.INVENTORY_PICKUP, {
     handler: (ctx, msg) => {
       ctx.handleInventoryPickup(msg[1]);
+    }
+  });
+
+  handlers.set(Types.Messages.UNEQUIP_TO_INVENTORY, {
+    handler: (ctx, msg) => {
+      ctx.handleUnequipToInventory(msg[1]);
     }
   });
 

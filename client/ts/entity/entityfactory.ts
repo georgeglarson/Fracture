@@ -157,7 +157,32 @@ EntityFactory.builders[Types.Entities.CAKE] = function (id) {
 };
 
 EntityFactory.builders[Types.Entities.CHEST] = function (id) {
-  return new Chest(id);
+  return new Chest(id, Types.Entities.CHEST);
+};
+
+// Zone-themed chests
+EntityFactory.builders[Types.Entities.CHEST_CRATE] = function (id) {
+  return new Chest(id, Types.Entities.CHEST_CRATE);
+};
+
+EntityFactory.builders[Types.Entities.CHEST_LOG] = function (id) {
+  return new Chest(id, Types.Entities.CHEST_LOG);
+};
+
+EntityFactory.builders[Types.Entities.CHEST_STONE] = function (id) {
+  return new Chest(id, Types.Entities.CHEST_STONE);
+};
+
+EntityFactory.builders[Types.Entities.CHEST_URN] = function (id) {
+  return new Chest(id, Types.Entities.CHEST_URN);
+};
+
+EntityFactory.builders[Types.Entities.CHEST_OBSIDIAN] = function (id) {
+  return new Chest(id, Types.Entities.CHEST_OBSIDIAN);
+};
+
+EntityFactory.builders[Types.Entities.CHEST_GLITCH] = function (id) {
+  return new Chest(id, Types.Entities.CHEST_GLITCH);
 };
 
 //====== NPCs ======

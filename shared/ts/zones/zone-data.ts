@@ -1,5 +1,8 @@
 /**
  * Zone definitions with metadata for progression and loot modifiers
+ *
+ * Map is 172 x 314 tiles. Zones are contiguous horizontal bands
+ * progressing from safe (south) to dangerous (north).
  */
 
 export interface ZoneBounds {
@@ -26,8 +29,29 @@ export interface ZoneDefinition {
   areas: ZoneBounds[];
 }
 
-// Zone definitions with progression from south (refuge) to north (fracture source)
+// Full map: 172 x 314
+// Zones progress south (safe) to north (dangerous)
+// Each zone spans full width (172) as horizontal bands
+
 export const ZONE_DATA: Record<string, ZoneDefinition> = {
+  // === SOUTH: Safe starting areas ===
+
+  beach: {
+    id: 'beach',
+    name: 'Shattered Coast',
+    description: 'Where reality meets the void. Waves crash against broken fragments of what was.',
+    minLevel: 1,
+    maxLevel: 5,
+    rarityBonus: 0.05,
+    goldBonus: 0.1,
+    xpBonus: 0.05,
+    armorDropBonus: 0,
+    weaponDropBonus: 0.05,
+    areas: [
+      { x: 0, y: 253, w: 172, h: 61 }  // y: 253-314 (bottom of map)
+    ]
+  },
+
   village: {
     id: 'village',
     name: 'The Refuge',
@@ -40,26 +64,11 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
     armorDropBonus: 0,
     weaponDropBonus: 0,
     areas: [
-      { x: 1, y: 195, w: 84, h: 58 }
+      { x: 0, y: 195, w: 172, h: 58 }  // y: 195-253
     ]
   },
 
-  beach: {
-    id: 'beach',
-    name: 'Shattered Coast',
-    description: 'Where reality meets the void. Waves crash against broken fragments of what was.',
-    minLevel: 2,
-    maxLevel: 5,
-    rarityBonus: 0.05,      // +5% rarity
-    goldBonus: 0.1,         // +10% gold
-    xpBonus: 0.05,
-    armorDropBonus: 0,
-    weaponDropBonus: 0.05,
-    areas: [
-      { x: 2, y: 265, w: 84, h: 37 },
-      { x: 112, y: 156, w: 30, h: 16 }
-    ]
-  },
+  // === MIDDLE: Progression zones ===
 
   forest: {
     id: 'forest',
@@ -67,13 +76,13 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
     description: 'Trees frozen mid-corruption. Digital artifacts flicker between the branches.',
     minLevel: 3,
     maxLevel: 7,
-    rarityBonus: 0.1,       // +10% rarity
+    rarityBonus: 0.1,
     goldBonus: 0.15,
     xpBonus: 0.1,
-    armorDropBonus: 0.1,    // +10% armor drops
+    armorDropBonus: 0.1,
     weaponDropBonus: 0,
     areas: [
-      { x: 4, y: 145, w: 81, h: 36 }
+      { x: 0, y: 145, w: 172, h: 50 }  // y: 145-195
     ]
   },
 
@@ -83,16 +92,17 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
     description: 'Collapsed infrastructure echoes with whispers of civilization that was.',
     minLevel: 7,
     maxLevel: 12,
-    rarityBonus: 0.15,      // +15% rarity
+    rarityBonus: 0.15,
     goldBonus: 0.2,
     xpBonus: 0.15,
-    armorDropBonus: 0.15,   // Good for armor
+    armorDropBonus: 0.15,
     weaponDropBonus: 0.1,
     areas: [
-      { x: 112, y: 193, w: 58, h: 50 },
-      { x: 110, y: 104, w: 60, h: 20 }
+      { x: 0, y: 100, w: 172, h: 45 }  // y: 100-145
     ]
   },
+
+  // === NORTH: Dangerous endgame zones ===
 
   desert: {
     id: 'desert',
@@ -100,16 +110,13 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
     description: 'Where reality has been erased. Nothing survives here for long.',
     minLevel: 10,
     maxLevel: 15,
-    rarityBonus: 0.2,       // +20% rarity
+    rarityBonus: 0.2,
     goldBonus: 0.25,
     xpBonus: 0.2,
     armorDropBonus: 0.1,
-    weaponDropBonus: 0.15,  // Good for weapons
+    weaponDropBonus: 0.15,
     areas: [
-      { x: 4, y: 71, w: 81, h: 62 },
-      { x: 140, y: 24, w: 30, h: 16 },
-      { x: 113, y: 250, w: 57, h: 27 },
-      { x: 150, y: 14, w: 10, h: 8 }
+      { x: 0, y: 60, w: 172, h: 40 }   // y: 60-100
     ]
   },
 
@@ -119,18 +126,17 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
     description: 'Heart of the Fracture. Raw dimensional energy tears through reality.',
     minLevel: 15,
     maxLevel: 35,
-    rarityBonus: 0.3,       // +30% rarity
+    rarityBonus: 0.3,
     goldBonus: 0.35,
     xpBonus: 0.3,
     armorDropBonus: 0.2,
-    weaponDropBonus: 0.25,  // Best loot
+    weaponDropBonus: 0.25,
     areas: [
-      { x: 1, y: 1, w: 113, h: 60 },
-      { x: 110, y: 81, w: 60, h: 20 },
-      { x: 145, y: 156, w: 20, h: 16 },
-      { x: 146, y: 176, w: 20, h: 16 }
+      { x: 0, y: 0, w: 172, h: 60 }    // y: 0-60 (top of map)
     ]
   },
+
+  // === SPECIAL: Boss arena (checked first due to order) ===
 
   boss: {
     id: 'boss',
@@ -138,25 +144,37 @@ export const ZONE_DATA: Record<string, ZoneDefinition> = {
     description: 'Where the Fracture originated. The Architect waits.',
     minLevel: 25,
     maxLevel: 50,
-    rarityBonus: 0.5,       // +50% rarity - best drops
+    rarityBonus: 0.5,
     goldBonus: 0.5,
     xpBonus: 0.5,
     armorDropBonus: 0.3,
     weaponDropBonus: 0.3,
     areas: [
-      { x: 140, y: 48, w: 29, h: 25 }
+      { x: 140, y: 48, w: 29, h: 25 }  // Special boss arena within lavaland
     ]
   }
 };
 
 // Zone progression order (for level warnings)
-export const ZONE_PROGRESSION = ['village', 'beach', 'forest', 'cave', 'desert', 'lavaland', 'boss'];
+export const ZONE_PROGRESSION = ['beach', 'village', 'forest', 'cave', 'desert', 'lavaland', 'boss'];
 
 /**
  * Get zone at a given position
+ * Boss zone is checked first since it overlaps lavaland
  */
 export function getZoneAtPosition(x: number, y: number): ZoneDefinition | null {
+  // Check boss zone first (special area that overlaps lavaland)
+  const bossZone = ZONE_DATA.boss;
+  for (const area of bossZone.areas) {
+    if (x >= area.x && x < area.x + area.w &&
+        y >= area.y && y < area.y + area.h) {
+      return bossZone;
+    }
+  }
+
+  // Check other zones
   for (const zoneId of Object.keys(ZONE_DATA)) {
+    if (zoneId === 'boss') continue; // Already checked
     const zone = ZONE_DATA[zoneId];
     for (const area of zone.areas) {
       if (x >= area.x && x < area.x + area.w &&

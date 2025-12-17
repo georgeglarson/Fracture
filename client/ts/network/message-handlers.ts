@@ -385,9 +385,11 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
         player.setWeaponName(itemName);
       }
 
-      // Play equip sound for local player
+      // For local player, update equipment display and play sound
       if (playerId === game.playerId) {
         game.audioManager.playSound('equip');
+        // Update equipment display in inventory UI
+        game.updateEquippedDisplay();
       }
     }
   });

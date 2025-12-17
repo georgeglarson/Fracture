@@ -6,8 +6,9 @@
  */
 
 import { InventoryManager } from '../inventory/inventory-manager';
-import { InventoryUI } from '../ui/inventory-ui';
+import { InventoryUI, EquippedItems } from '../ui/inventory-ui';
 import { SerializedInventorySlot } from '../../../shared/ts/inventory/inventory-types';
+import { Types } from '../../../shared/ts/gametypes';
 
 /**
  * Game context for inventory operations
@@ -47,6 +48,14 @@ export function initInventory(ctx: InventoryGameContext): { manager: InventoryMa
     onSell: (slotIndex: number) => {
       console.log('[Inventory] Sell slot', slotIndex);
       ctx.client?.sendShopSell(slotIndex);
+    },
+    onUnequip: (slot: 'weapon' | 'armor') => {
+      console.log('[Inventory] Drop equipped', slot);
+      ctx.client?.sendDropItem(slot);
+    },
+    onUnequipToInventory: (slot: 'weapon' | 'armor') => {
+      console.log('[Inventory] Unequip to inventory', slot);
+      ctx.client?.sendUnequipToInventory(slot);
     },
     isShopOpen: () => {
       return ctx.shopUI?.isOpen() ?? false;
@@ -156,5 +165,14 @@ export function pickupItemToInventory(ctx: InventoryGameContext, itemId: number)
   if (ctx.client && itemId) {
     console.log('[Inventory] Requesting pickup of item', itemId);
     ctx.client.sendInventoryPickup(itemId);
+  }
+}
+
+/**
+ * Update the equipped items display in the inventory UI
+ */
+export function updateEquippedDisplay(ctx: InventoryGameContext, weaponKind: number | null, armorKind: number | null): void {
+  if (ctx.inventoryUI) {
+    ctx.inventoryUI.updateEquipped(weaponKind, armorKind);
   }
 }

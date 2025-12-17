@@ -6,6 +6,12 @@ const beachnpc = require('../sprites/beachnpc.json');
 const bluesword = require('../sprites/bluesword.json');
 const boss = require('../sprites/boss.json');
 const chest = require('../sprites/chest.json');
+const chestcrate = require('../sprites/chestcrate.json');
+const chestlog = require('../sprites/chestlog.json');
+const cheststone = require('../sprites/cheststone.json');
+const chesturn = require('../sprites/chesturn.json');
+const chestobsidian = require('../sprites/chestobsidian.json');
+const chestglitch = require('../sprites/chestglitch.json');
 const clotharmor = require('../sprites/clotharmor.json');
 const coder = require('../sprites/coder.json');
 const crab = require('../sprites/crab.json');
@@ -82,6 +88,12 @@ export const sprites = {
   bluesword,
   boss,
   chest,
+  chestcrate,
+  chestlog,
+  cheststone,
+  chesturn,
+  chestobsidian,
+  chestglitch,
   clotharmor,
   coder,
   crab,

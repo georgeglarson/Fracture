@@ -6,8 +6,8 @@ import * as _ from 'lodash';
 export class Chest extends Item {
   items: any[] = [];
 
-  constructor(id: string | number, x: number, y: number) {
-    super(id, Types.Entities.CHEST, x, y);
+  constructor(id: string | number, x: number, y: number, kind: number = Types.Entities.CHEST) {
+    super(id, kind, x, y);
   }
 
   setItems(items: any[]): void {

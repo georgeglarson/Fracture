@@ -112,7 +112,10 @@ export const Types: any = {
     NEMESIS_KILLED: 85,           // Server: [85, mobId, nemesisName, title, kills, killerName, isRevenge]
 
     // Authentication
-    AUTH_FAIL: 86                 // Server: [86, reason] - "wrong_password" | "name_taken"
+    AUTH_FAIL: 86,                // Server: [86, reason] - "wrong_password" | "name_taken"
+
+    // Unequip to inventory
+    UNEQUIP_TO_INVENTORY: 87      // Client: [87, slot] - slot is "weapon" or "armor"
   },
 
   Entities: {
@@ -177,7 +180,15 @@ export const Types: any = {
     GOLDENSWORD: 63,
     MORNINGSTAR: 64,
     AXE: 65,
-    BLUESWORD: 66
+    BLUESWORD: 66,
+
+    // Zone-themed chests
+    CHEST_CRATE: 70,    // Village - wooden crate
+    CHEST_LOG: 71,      // Forest - hollow log
+    CHEST_STONE: 72,    // Cave - stone coffer
+    CHEST_URN: 73,      // Desert - clay urn
+    CHEST_OBSIDIAN: 74, // Lavaland - obsidian chest
+    CHEST_GLITCH: 75    // Boss - reality-glitched container
   },
 
   Orientations: {
@@ -229,6 +240,14 @@ var kinds: Record<string, any[]> = {
   burger: [Types.Entities.BURGER, 'object'],
   chest: [Types.Entities.CHEST, 'object'],
   firepotion: [Types.Entities.FIREPOTION, 'object'],
+
+  // Zone-themed chests
+  chestcrate: [Types.Entities.CHEST_CRATE, 'object'],
+  chestlog: [Types.Entities.CHEST_LOG, 'object'],
+  cheststone: [Types.Entities.CHEST_STONE, 'object'],
+  chesturn: [Types.Entities.CHEST_URN, 'object'],
+  chestobsidian: [Types.Entities.CHEST_OBSIDIAN, 'object'],
+  chestglitch: [Types.Entities.CHEST_GLITCH, 'object'],
 
   guard: [Types.Entities.GUARD, 'npc'],
   villagegirl: [Types.Entities.VILLAGEGIRL, 'npc'],
@@ -310,7 +329,27 @@ Types.isObject = function (kind: number): boolean {
 };
 
 Types.isChest = function (kind: number): boolean {
-  return kind === Types.Entities.CHEST;
+  return kind === Types.Entities.CHEST
+    || kind === Types.Entities.CHEST_CRATE
+    || kind === Types.Entities.CHEST_LOG
+    || kind === Types.Entities.CHEST_STONE
+    || kind === Types.Entities.CHEST_URN
+    || kind === Types.Entities.CHEST_OBSIDIAN
+    || kind === Types.Entities.CHEST_GLITCH;
+};
+
+// Map zone IDs to chest types
+Types.getChestKindForZone = function (zone: string): number {
+  const zoneChests: Record<string, number> = {
+    'village': Types.Entities.CHEST_CRATE,
+    'beach': Types.Entities.CHEST,        // Keep gold chest for beach (transitional)
+    'forest': Types.Entities.CHEST_LOG,
+    'cave': Types.Entities.CHEST_STONE,
+    'desert': Types.Entities.CHEST_URN,
+    'lavaland': Types.Entities.CHEST_OBSIDIAN,
+    'boss': Types.Entities.CHEST_GLITCH
+  };
+  return zoneChests[zone] || Types.Entities.CHEST;
 };
 
 Types.isItem = function (kind: number): boolean {

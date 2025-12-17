@@ -466,6 +466,17 @@ export class Game {
   loadAudio() {
     this.audioManager = new AudioManager(this);
     this.fractureAtmosphere = new FractureAtmosphere();
+
+    // Load saved audio settings immediately
+    if (this.storage) {
+      const settings = this.storage.getAudioSettings();
+      this.audioManager.initVolumeSettings(
+        settings.masterVolume,
+        settings.musicVolume,
+        settings.sfxVolume,
+        settings.muted
+      );
+    }
   }
 
   /**
@@ -1815,6 +1826,20 @@ export class Game {
     InventoryHandler.useFirstConsumable(this);
   }
 
+  updateEquippedDisplay() {
+    if (!this.player || !this.inventoryUI) return;
+
+    // Get weapon kind from name
+    const weaponName = this.player.getWeaponName();
+    const weaponKind = weaponName ? Types.getKindFromString(weaponName) : null;
+
+    // Get armor kind from sprite name
+    const armorName = this.player.getSpriteName();
+    const armorKind = armorName ? Types.getKindFromString(armorName) : null;
+
+    InventoryHandler.updateEquippedDisplay(this, weaponKind, armorKind);
+  }
+
   initMinimap() {
     if (this.minimapUI) return;
 
@@ -1843,6 +1868,8 @@ export class Game {
 
   handleInventoryInit(serializedSlots: (SerializedInventorySlot | null)[]) {
     InventoryHandler.handleInventoryInit(this, serializedSlots);
+    // Update equipment display with current player equipment
+    this.updateEquippedDisplay();
   }
 
   handleInventoryAdd(slotIndex: number, kind: number, properties: Record<string, unknown> | null, count: number) {

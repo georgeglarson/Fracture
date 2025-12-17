@@ -55,6 +55,7 @@ export class FormatChecker {
     this.formats[Types.Messages.INVENTORY_DROP] = ['n']; // slotIndex
     this.formats[Types.Messages.INVENTORY_SWAP] = ['n', 'n']; // fromSlot, toSlot
     this.formats[Types.Messages.INVENTORY_PICKUP] = ['n']; // itemEntityId
+    this.formats[Types.Messages.UNEQUIP_TO_INVENTORY] = ['s']; // slot ("weapon" or "armor")
   }
 
   check(msg: any[]): boolean {

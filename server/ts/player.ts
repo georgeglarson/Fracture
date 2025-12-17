@@ -570,6 +570,10 @@ export class Player extends Character {
     InventoryHandler.handleInventorySwap(this, fromSlot, toSlot);
   }
 
+  handleUnequipToInventory(slot: string) {
+    InventoryHandler.handleUnequipToInventory(this, slot);
+  }
+
   getInventoryState(): (SerializedInventorySlot | null)[] {
     return InventoryHandler.getInventoryState(this);
   }

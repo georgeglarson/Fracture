@@ -12,7 +12,14 @@ export interface InventoryCallbacks {
   onEquip: (slotIndex: number) => void;
   onDrop: (slotIndex: number) => void;
   onSell: (slotIndex: number) => void;
+  onUnequip: (slot: 'weapon' | 'armor') => void;
+  onUnequipToInventory: (slot: 'weapon' | 'armor') => void;
   isShopOpen: () => boolean;
+}
+
+export interface EquippedItems {
+  weapon: number | null;  // Entity kind
+  armor: number | null;   // Entity kind
 }
 
 export class InventoryUI {
@@ -21,10 +28,21 @@ export class InventoryUI {
   private callbacks: InventoryCallbacks | null = null;
   private panel: HTMLDivElement | null = null;
   private contextMenu: HTMLDivElement | null = null;
+  private equipped: EquippedItems = { weapon: null, armor: null };
 
   constructor() {
     // Close context menu on click outside
     document.addEventListener('click', () => this.hideContextMenu());
+  }
+
+  /**
+   * Update equipped items display
+   */
+  updateEquipped(weapon: number | null, armor: number | null): void {
+    this.equipped = { weapon, armor };
+    if (this.visible) {
+      this.render();
+    }
   }
 
   /**
@@ -119,7 +137,7 @@ export class InventoryUI {
         justify-content: space-between;
         align-items: center;
       ">
-        <span style="font-weight: bold; font-size: 14px;">Inventory</span>
+        <span style="font-weight: bold; font-size: 14px;">Equipment & Inventory</span>
         <button id="inventory-close" style="
           width: 24px;
           height: 24px;
@@ -132,6 +150,22 @@ export class InventoryUI {
           line-height: 1;
         ">X</button>
       </div>
+    `;
+
+    // Equipment slots section
+    html += this.renderEquipmentSection();
+
+    // Inventory label
+    html += `
+      <div style="
+        padding: 6px 10px;
+        background: rgba(0,0,0,0.2);
+        border-bottom: 1px solid #333;
+        font-size: 11px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      ">Backpack</div>
     `;
 
     // Grid
@@ -222,6 +256,39 @@ export class InventoryUI {
     if (closeBtn) {
       closeBtn.addEventListener('click', () => this.hide());
     }
+
+    // Equipment slot handlers
+    const equipSlots = this.panel.querySelectorAll('.equipment-slot');
+    equipSlots.forEach((el) => {
+      const slotType = (el as HTMLElement).dataset.equipSlot as 'weapon' | 'armor';
+
+      // Right-click to unequip
+      (el as HTMLElement).addEventListener('contextmenu', (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const hasItem = slotType === 'weapon'
+          ? (this.equipped.weapon && this.equipped.weapon !== Types.Entities.SWORD1)
+          : (this.equipped.armor && this.equipped.armor !== Types.Entities.CLOTHARMOR);
+
+        if (hasItem) {
+          this.showEquipmentContextMenu(slotType, e.clientX, e.clientY);
+        }
+      });
+
+      // Hover effects
+      el.addEventListener('mouseenter', () => {
+        const hasItem = slotType === 'weapon'
+          ? (this.equipped.weapon && this.equipped.weapon !== Types.Entities.SWORD1)
+          : (this.equipped.armor && this.equipped.armor !== Types.Entities.CLOTHARMOR);
+        if (hasItem) {
+          (el as HTMLElement).style.transform = 'scale(1.05)';
+        }
+      });
+      el.addEventListener('mouseleave', () => {
+        (el as HTMLElement).style.transform = 'scale(1)';
+      });
+    });
 
     // Slot handlers - attach to ALL slots, check slot existence at click time
     const slotElements = this.panel.querySelectorAll('.inventory-slot');
@@ -407,6 +474,179 @@ export class InventoryUI {
       this.contextMenu.remove();
       this.contextMenu = null;
     }
+  }
+
+  /**
+   * Show context menu for equipped items
+   */
+  private showEquipmentContextMenu(slotType: 'weapon' | 'armor', x: number, y: number): void {
+    this.hideContextMenu();
+
+    const itemKind = slotType === 'weapon' ? this.equipped.weapon : this.equipped.armor;
+    if (!itemKind) return;
+
+    const itemName = this.formatItemName(Types.getKindAsString(itemKind));
+
+    this.contextMenu = document.createElement('div');
+    this.contextMenu.id = 'inventory-context-menu';
+    this.contextMenu.style.cssText = `
+      position: fixed;
+      left: ${x}px;
+      top: ${y}px;
+      min-width: 120px;
+      background: rgba(40, 40, 50, 0.95);
+      border: 1px solid #555;
+      border-radius: 6px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      z-index: 10001;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      overflow: hidden;
+    `;
+
+    this.contextMenu.innerHTML = `
+      <div style="
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border-bottom: 1px solid #444;
+        color: #ddd;
+        font-weight: bold;
+        font-size: 12px;
+      ">${itemName} (Equipped)</div>
+      <div class="ctx-option" data-action="unequip" style="
+        padding: 8px 12px;
+        color: #ff9966;
+        cursor: pointer;
+      ">Unequip to Backpack</div>
+      <div class="ctx-option" data-action="drop" style="
+        padding: 8px 12px;
+        color: #ff6666;
+        cursor: pointer;
+      ">Drop</div>
+    `;
+
+    document.body.appendChild(this.contextMenu);
+
+    // Add handlers
+    const options = this.contextMenu.querySelectorAll('.ctx-option');
+    options.forEach((opt) => {
+      const action = (opt as HTMLElement).dataset.action;
+
+      opt.addEventListener('mouseenter', () => {
+        (opt as HTMLElement).style.background = 'rgba(74, 124, 74, 0.5)';
+      });
+      opt.addEventListener('mouseleave', () => {
+        (opt as HTMLElement).style.background = 'transparent';
+      });
+
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.hideContextMenu();
+
+        if (this.callbacks && action === 'unequip') {
+          this.callbacks.onUnequipToInventory(slotType);
+        } else if (this.callbacks && action === 'drop') {
+          this.callbacks.onUnequip(slotType); // Drop to ground
+        }
+      });
+    });
+  }
+
+  /**
+   * Render the equipment section (weapon + armor slots)
+   */
+  private renderEquipmentSection(): string {
+    const weaponKind = this.equipped.weapon;
+    const armorKind = this.equipped.armor;
+
+    // Get sprite names
+    const weaponName = weaponKind ? Types.getKindAsString(weaponKind) : null;
+    const armorName = armorKind ? Types.getKindAsString(armorKind) : null;
+
+    // Check for default items (which shouldn't be shown as "equipped")
+    const hasRealWeapon = weaponKind && weaponKind !== Types.Entities.SWORD1;
+    const hasRealArmor = armorKind && armorKind !== Types.Entities.CLOTHARMOR;
+
+    return `
+      <div style="
+        padding: 10px;
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        border-bottom: 1px solid #444;
+        background: rgba(0,0,0,0.15);
+      ">
+        <!-- Weapon Slot -->
+        <div class="equipment-slot" data-equip-slot="weapon" style="
+          width: 64px;
+          height: 64px;
+          background: ${hasRealWeapon ? 'rgba(70, 70, 90, 0.8)' : 'rgba(40, 40, 50, 0.5)'};
+          border: 2px solid ${hasRealWeapon ? '#8a6d3b' : '#444'};
+          border-radius: 6px;
+          cursor: ${hasRealWeapon ? 'pointer' : 'default'};
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+        ">
+          ${hasRealWeapon ? `
+            <div style="
+              width: 48px;
+              height: 48px;
+              background-image: url('/img/1/item-${weaponName}.png');
+              background-size: 288px 48px;
+              background-repeat: no-repeat;
+              background-position: 0 0;
+            "></div>
+          ` : `
+            <div style="color: #555; font-size: 20px;">⚔</div>
+          `}
+          <span style="
+            position: absolute;
+            bottom: 2px;
+            font-size: 8px;
+            color: #888;
+            text-transform: uppercase;
+          ">Weapon</span>
+        </div>
+
+        <!-- Armor Slot -->
+        <div class="equipment-slot" data-equip-slot="armor" style="
+          width: 64px;
+          height: 64px;
+          background: ${hasRealArmor ? 'rgba(70, 70, 90, 0.8)' : 'rgba(40, 40, 50, 0.5)'};
+          border: 2px solid ${hasRealArmor ? '#5a7a5a' : '#444'};
+          border-radius: 6px;
+          cursor: ${hasRealArmor ? 'pointer' : 'default'};
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+        ">
+          ${hasRealArmor ? `
+            <div style="
+              width: 48px;
+              height: 48px;
+              background-image: url('/img/1/item-${armorName}.png');
+              background-size: 288px 48px;
+              background-repeat: no-repeat;
+              background-position: 0 0;
+            "></div>
+          ` : `
+            <div style="color: #555; font-size: 20px;">🛡</div>
+          `}
+          <span style="
+            position: absolute;
+            bottom: 2px;
+            font-size: 8px;
+            color: #888;
+            text-transform: uppercase;
+          ">Armor</span>
+        </div>
+      </div>
+    `;
   }
 
   /**

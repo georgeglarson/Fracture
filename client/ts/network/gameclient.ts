@@ -718,6 +718,10 @@ export class GameClient extends EventEmitter {
     this.sendMessage([Types.Messages.DROP_ITEM, itemType]);
   }
 
+  sendUnequipToInventory(slot: string) {
+    this.sendMessage([Types.Messages.UNEQUIP_TO_INVENTORY, slot]);
+  }
+
   sendDailyCheck(lastLoginDate: string, currentStreak: number) {
     this.sendMessage([Types.Messages.DAILY_CHECK, lastLoginDate, currentStreak]);
   }

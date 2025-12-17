@@ -9,6 +9,7 @@ import { Types } from '../../../shared/ts/gametypes';
 import { Messages } from '../message';
 import { getEconomyService } from './economy.service';
 import { Inventory } from '../inventory/inventory';
+import { serializeProperties } from '../../../shared/ts/items/item-types';
 
 /**
  * Player context for shop operations
@@ -45,22 +46,49 @@ export function handleShopBuy(ctx: ShopPlayerContext, npcKind: number, itemKind:
   const result = economyService.processPurchase(npcKind, itemKind, ctx.gold);
 
   if (result.success) {
-    // Deduct gold
-    ctx.setGold(result.newGold);
-    console.log(`[Shop] ${ctx.name} purchased item ${itemKind} for ${result.cost}g (new balance: ${ctx.gold}g)`);
+    // Equipment goes to inventory instead of auto-equipping
+    if (result.isWeapon || result.isArmor) {
+      const inventory = ctx.getInventory();
 
-    // Give item to player (equip it)
-    if (result.isWeapon) {
-      ctx.equipWeapon(itemKind);
-      ctx.broadcast(new Messages.EquipItem(ctx as any, itemKind).serialize());
-    } else if (result.isArmor) {
-      ctx.equipArmor(itemKind);
-      ctx.broadcast(new Messages.EquipItem(ctx as any, itemKind).serialize());
-    } else if (result.isConsumable && result.healAmount > 0) {
-      // Consumables heal immediately
-      if (ctx.hitPoints < ctx.maxHitPoints) {
-        ctx.regenHealthBy(result.healAmount);
-        ctx.broadcast(new Messages.Health(ctx.hitPoints).serialize(), false);
+      // Check if inventory has room
+      if (!inventory.hasRoom(itemKind)) {
+        console.log(`[Shop] ${ctx.name}'s inventory is full`);
+        ctx.send(new Messages.ShopBuyResult(false, itemKind, ctx.gold, 'Inventory is full').serialize());
+        return;
+      }
+
+      // Deduct gold
+      ctx.setGold(result.newGold);
+      console.log(`[Shop] ${ctx.name} purchased item ${itemKind} for ${result.cost}g (new balance: ${ctx.gold}g)`);
+
+      // Add to inventory (shop items have no special properties)
+      const slotIndex = inventory.addItem(itemKind, null, 1);
+      if (slotIndex >= 0) {
+        // Send inventory add message
+        ctx.send([Types.Messages.INVENTORY_ADD, slotIndex, itemKind, null, 1]);
+        console.log(`[Shop] ${ctx.name} added ${Types.getKindAsString(itemKind)} to inventory slot ${slotIndex}`);
+      }
+    } else if (result.isConsumable) {
+      // Consumables go to inventory (player can use them when needed)
+      const inventory = ctx.getInventory();
+
+      // Check if inventory has room
+      if (!inventory.hasRoom(itemKind)) {
+        console.log(`[Shop] ${ctx.name}'s inventory is full`);
+        ctx.send(new Messages.ShopBuyResult(false, itemKind, ctx.gold, 'Inventory is full').serialize());
+        return;
+      }
+
+      // Deduct gold
+      ctx.setGold(result.newGold);
+      console.log(`[Shop] ${ctx.name} purchased item ${itemKind} for ${result.cost}g (new balance: ${ctx.gold}g)`);
+
+      // Add to inventory (consumables stack)
+      const slotIndex = inventory.addItem(itemKind, null, 1);
+      if (slotIndex >= 0) {
+        const slot = inventory.getSlot(slotIndex);
+        ctx.send([Types.Messages.INVENTORY_ADD, slotIndex, itemKind, null, slot?.count || 1]);
+        console.log(`[Shop] ${ctx.name} added ${Types.getKindAsString(itemKind)} to inventory slot ${slotIndex}`);
       }
     }
 
