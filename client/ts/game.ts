@@ -48,6 +48,8 @@ import {FractureAtmosphere} from './ui/fracture-atmosphere';
 import * as AchievementHandler from './handlers/achievement.handler';
 import * as ShopHandler from './handlers/shop.handler';
 import * as PartyHandler from './handlers/party.handler';
+import * as InventoryHandler from './handlers/inventory.handler';
+import * as GameEventHandler from './handlers/game-event.handler';
 
 export class Game {
 
@@ -2190,85 +2192,26 @@ export class Game {
     return PartyHandler.rightClick(this, screenX, screenY);
   }
 
-  // Inventory System
+  // Inventory System - Delegated to InventoryHandler
   initInventory() {
-    this.inventoryManager = new InventoryManager();
-    this.inventoryUI = new InventoryUI();
-
-    // Set up inventory UI callbacks
-    this.inventoryUI.setCallbacks({
-      onUse: (slotIndex: number) => {
-        console.log('[Inventory] Use slot', slotIndex);
-        this.client.sendInventoryUse(slotIndex);
-      },
-      onEquip: (slotIndex: number) => {
-        console.log('[Inventory] Equip slot', slotIndex);
-        this.client.sendInventoryEquip(slotIndex);
-      },
-      onDrop: (slotIndex: number) => {
-        console.log('[Inventory] Drop slot', slotIndex);
-        this.client.sendInventoryDrop(slotIndex);
-      },
-      onSell: (slotIndex: number) => {
-        console.log('[Inventory] Sell slot', slotIndex);
-        this.client.sendShopSell(slotIndex);
-      },
-      isShopOpen: () => {
-        return this.shopUI?.isOpen() ?? false;
-      }
-    });
-
-    // Sync inventory manager changes to UI
-    this.inventoryManager.onChange((slots) => {
-      if (this.inventoryUI) {
-        this.inventoryUI.updateSlots(slots);
-      }
-      // Also save to storage
-      this.storage.saveInventory(slots);
-    });
-
-    console.info('[Inventory] Initialized');
+    const result = InventoryHandler.initInventory(this);
+    this.inventoryManager = result.manager;
+    this.inventoryUI = result.ui;
   }
 
   toggleInventory() {
-    console.log('[Inventory] Toggle called, inventoryUI exists:', !!this.inventoryUI);
     if (!this.inventoryUI) {
-      // Create inventory UI on demand if not initialized yet
-      console.log('[Inventory] Creating InventoryUI on demand');
       this.initInventory();
     }
-    if (this.inventoryUI) {
-      this.inventoryUI.toggle();
-    } else {
-      console.error('[Inventory] inventoryUI is null - initialization failed');
-    }
+    InventoryHandler.toggleInventory(this);
   }
 
-  /**
-   * Use an inventory slot by index (for hotkeys 1-5)
-   */
   useInventorySlot(slotIndex: number) {
-    if (!this.inventoryManager) return;
-
-    const slot = this.inventoryManager.getSlot(slotIndex);
-    if (!slot) return;
-
-    // Only use consumables via hotkey
-    if (this.inventoryManager.isSlotConsumable(slotIndex)) {
-      this.client.sendInventoryUse(slotIndex);
-    }
+    InventoryHandler.useInventorySlot(this, slotIndex);
   }
 
-  /**
-   * Use the first consumable item in inventory (for Q hotkey)
-   */
   useFirstConsumable() {
-    if (!this.inventoryManager) return;
-
-    const slotIndex = this.inventoryManager.findFirstConsumable();
-    if (slotIndex >= 0) {
-      this.client.sendInventoryUse(slotIndex);
-    }
+    InventoryHandler.useFirstConsumable(this);
   }
 
   initMinimap() {
@@ -2298,41 +2241,23 @@ export class Game {
   }
 
   handleInventoryInit(serializedSlots: (SerializedInventorySlot | null)[]) {
-    if (this.inventoryManager) {
-      this.inventoryManager.loadFromServer(serializedSlots);
-      console.info('[Inventory] Loaded', this.inventoryManager.getFilledSlotCount(), 'items');
-    }
+    InventoryHandler.handleInventoryInit(this, serializedSlots);
   }
 
   handleInventoryAdd(slotIndex: number, kind: number, properties: Record<string, unknown> | null, count: number) {
-    if (this.inventoryManager) {
-      this.inventoryManager.updateSlot(slotIndex, kind, properties, count);
-      // Show notification
-      const itemName = this.inventoryManager.getItemName(slotIndex);
-      this.showNotification(`Picked up ${itemName}${count > 1 ? ' x' + count : ''}`);
-    }
+    InventoryHandler.handleInventoryAdd(this, slotIndex, kind, properties, count);
   }
 
   handleInventoryRemove(slotIndex: number) {
-    if (this.inventoryManager) {
-      this.inventoryManager.removeSlot(slotIndex);
-    }
+    InventoryHandler.handleInventoryRemove(this, slotIndex);
   }
 
   handleInventoryUpdate(slotIndex: number, count: number) {
-    if (this.inventoryManager) {
-      this.inventoryManager.updateCount(slotIndex, count);
-    }
+    InventoryHandler.handleInventoryUpdate(this, slotIndex, count);
   }
 
-  /**
-   * Send pickup request to server for inventory-based pickup
-   */
   pickupItemToInventory(item: Item) {
-    if (this.client && item && item.id) {
-      console.log('[Inventory] Requesting pickup of item', item.id);
-      this.client.sendInventoryPickup(item.id);
-    }
+    InventoryHandler.pickupItemToInventory(this, item?.id);
   }
 
   // ============================================================================
@@ -2342,82 +2267,38 @@ export class Game {
   // Current zone tracking
   currentZone: { id: string; name: string; minLevel: number; maxLevel: number } | null = null;
 
+  // Zone System - Delegated to GameEventHandler
   handleZoneEnter(zoneId: string, zoneName: string, minLevel: number, maxLevel: number, warning: string | null) {
-    this.currentZone = { id: zoneId, name: zoneName, minLevel, maxLevel };
-
-    // Show zone enter notification using narrator style for epic feel
-    const levelRange = `Level ${minLevel}-${maxLevel}`;
-    this.showNarratorText(`Entering ${zoneName}`, 'zone');
-
-    // Show warning if under-leveled
-    if (warning) {
-      setTimeout(() => {
-        this.showNotification(warning);
-      }, 2000);
-    }
-
-    console.info(`[Zone] Entered ${zoneName} (${levelRange})`);
+    this.currentZone = GameEventHandler.handleZoneEnter(this, zoneId, zoneName, minLevel, maxLevel, warning);
   }
 
   handleZoneInfo(zoneId: string, rarityBonus: number, goldBonus: number, xpBonus: number) {
-    // Store zone bonuses for UI display
-    if (this.currentZone && this.currentZone.id === zoneId) {
-      console.info(`[Zone] Bonuses - Rarity: +${rarityBonus}%, Gold: +${goldBonus}%, XP: +${xpBonus}%`);
-    }
+    GameEventHandler.handleZoneInfo(this, zoneId, rarityBonus, goldBonus, xpBonus);
   }
 
-  // Boss Leaderboard handlers
+  // Boss/Kill Events - Delegated to GameEventHandler
   handleLeaderboardResponse(entries: Array<{ rank: number; name: string; kills: number }>) {
-    console.info('[Leaderboard] Received entries:', entries);
-    // For now, just show in notifications. A full UI can be built later.
-    if (entries && entries.length > 0) {
-      this.showNotification('Boss Kill Leaderboard');
-      entries.slice(0, 5).forEach((entry) => {
-        this.showNotification(`#${entry.rank} ${entry.name}: ${entry.kills} kills`);
-      });
-    } else {
-      this.showNotification('No boss kills recorded yet!');
-    }
+    GameEventHandler.handleLeaderboardResponse(this, entries);
   }
 
   handleBossKill(bossName: string, killerName: string) {
-    // Show a dramatic notification for boss kills
-    this.showNotification(`${killerName} has slain ${bossName}!`);
-    console.info(`[Boss] ${killerName} has slain ${bossName}!`);
+    GameEventHandler.handleBossKill(this, bossName, killerName);
   }
 
   handleKillStreak(playerId: number, playerName: string, streakCount: number, tierTitle: string, announcement: string) {
-    // Show a dramatic announcement for kill streaks
-    this.showNotification(announcement);
-    console.info(`[KillStreak] ${playerName} - ${tierTitle} (${streakCount} kills)`);
+    GameEventHandler.handleKillStreak(this, playerId, playerName, streakCount, tierTitle, announcement);
   }
 
   handleKillStreakEnded(playerId: number, playerName: string, streakCount: number, endedByName: string) {
-    // Show notification when a streak ends
-    if (streakCount >= 5) {
-      const message = endedByName
-        ? `${playerName}'s ${streakCount}-kill streak was ended by ${endedByName}!`
-        : `${playerName}'s ${streakCount}-kill streak has ended!`;
-      this.showNotification(message);
-      console.info(`[KillStreak] ${message}`);
-    }
+    GameEventHandler.handleKillStreakEnded(this, playerId, playerName, streakCount, endedByName);
   }
 
   handleNemesisPowerUp(mobId: number, originalName: string, nemesisName: string, title: string, powerLevel: number, kills: number, victimName: string) {
-    // Show ominous notification when a nemesis grows stronger
-    const message = kills === 2
-      ? `A ${originalName} has become ${nemesisName} ${title} after killing ${victimName}!`
-      : `${nemesisName} ${title} grows stronger! (${powerLevel}% power)`;
-    this.showNotification(message);
-    console.info(`[Nemesis] ${message}`);
+    GameEventHandler.handleNemesisPowerUp(this, mobId, originalName, nemesisName, title, powerLevel, kills, victimName);
   }
 
   handleNemesisKilled(mobId: number, nemesisName: string, title: string, kills: number, killerName: string, isRevenge: boolean) {
-    // Show triumphant notification when a nemesis is slain
-    const revengeText = isRevenge ? ' REVENGE!' : '';
-    const message = `${killerName} has slain ${nemesisName} ${title}!${revengeText}`;
-    this.showNotification(message);
-    console.info(`[Nemesis] ${message}`);
+    GameEventHandler.handleNemesisKilled(this, mobId, nemesisName, title, kills, killerName, isRevenge);
   }
 
   // Achievement Panel UI
