@@ -18,6 +18,25 @@ import {
   getZoneSpawnPosition
 } from './zone-boss-config';
 import { ZONE_DATA } from '../../shared/ts/zones/zone-data';
+import type { Player } from './player';
+
+// Minimal World interface for RoamingBoss needs
+interface BossWorld {
+  players: Record<string | number, PlayerLike>;
+  map: { width: number; height: number; isColliding(x: number, y: number): boolean } | null;
+  addMob(mob: Mob): void;
+  handleMobHate(mobId: number, playerId: number, hate: number): void;
+  pushToPlayer(player: PlayerLike, message: unknown): void;
+}
+
+// Minimal Player interface for proximity detection
+interface PlayerLike {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  isDead: boolean;
+}
 
 export class RoamingBoss extends Mob {
   // Config reference
@@ -29,7 +48,7 @@ export class RoamingBoss extends Mob {
   difficultyInterval: NodeJS.Timeout | null = null;
 
   // World reference for player detection
-  world: any = null;
+  world: BossWorld | null = null;
 
   // Zone boundaries for roaming (from config)
   zoneAreas: Array<{ x: number; y: number; w: number; h: number }> = [];
@@ -69,7 +88,7 @@ export class RoamingBoss extends Mob {
   /**
    * Set world reference for player detection
    */
-  setWorld(world: any) {
+  setWorld(world: BossWorld) {
     this.world = world;
   }
 
@@ -243,7 +262,7 @@ export class RoamingBoss extends Mob {
   checkProximityAggro() {
     if (!this.world || this.hasTarget()) return;
 
-    let closestPlayer: any = null;
+    let closestPlayer: PlayerLike | null = null;
     let closestDistance = this.aggroRange;
 
     // Check all players
@@ -269,7 +288,7 @@ export class RoamingBoss extends Mob {
   /**
    * Initiate aggro on a player
    */
-  aggroPlayer(player: any) {
+  aggroPlayer(player: PlayerLike) {
     // Add player to hatelist
     this.increaseHateFor(player.id, 100);
 
@@ -306,7 +325,7 @@ export class RoamingBoss extends Mob {
  * ZoneBossManager - Handles spawning and tracking all zone bosses
  */
 export class ZoneBossManager {
-  private world: any;
+  private world: BossWorld;
   private bosses: Map<number, RoamingBoss> = new Map();
   private bossIdCounter = 200000; // Reserved ID range for zone bosses
   private respawnTimers: Map<string, NodeJS.Timeout> = new Map();
@@ -317,7 +336,7 @@ export class ZoneBossManager {
   // Global leaderboard (all bosses combined)
   private globalKills: Map<number, { name: string; kills: number }> = new Map();
 
-  constructor(world: any) {
+  constructor(world: BossWorld) {
     this.world = world;
   }
 

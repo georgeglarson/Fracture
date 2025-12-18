@@ -1,6 +1,11 @@
 import {Messages} from './message';
 import {Utils} from './utils';
 
+// Message return type for serializable messages
+interface SerializableMessage {
+  serialize(): unknown[];
+}
+
 export abstract class Entity {
   id: number;
   type: string;
@@ -19,7 +24,7 @@ export abstract class Entity {
 
   abstract destroy(): void;
 
-  _getBaseState(): any[] {
+  _getBaseState(): unknown[] {
     return [
       this.id,
       this.kind,
@@ -28,15 +33,15 @@ export abstract class Entity {
     ];
   }
 
-  getState(): any[] {
+  getState(): unknown[] {
     return this._getBaseState();
   }
 
-  spawn(): any {
+  spawn(): SerializableMessage {
     return new Messages.Spawn(this);
   }
 
-  despawn(): any {
+  despawn(): SerializableMessage {
     return new Messages.Despawn(this.id);
   }
 

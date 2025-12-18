@@ -1,5 +1,18 @@
 import * as _ from 'lodash';
 import {Utils} from './utils';
+import type {Entity} from './entity';
+
+// Minimal World interface to avoid circular dependencies
+interface WorldLike {
+  isValidPosition(x: number, y: number): boolean;
+}
+
+// Entity-like object for area management
+interface AreaEntity {
+  id: number | string;
+  isDead?: boolean;
+  area?: Area;
+}
 
 export class Area {
 
@@ -8,13 +21,13 @@ export class Area {
   y: number;
   width: number;
   height: number;
-  world: any;
-  entities: any[] = [];
+  world: WorldLike;
+  entities: AreaEntity[] = [];
   hasCompletelyRespawned = true;
   nbEntities: number = 0;
   empty_callback: (() => void) | null = null;
 
-  constructor(id: number, x: number, y: number, width: number, height: number, world: any) {
+  constructor(id: number, x: number, y: number, width: number, height: number, world: WorldLike) {
     this.id = id;
     this.x = x;
     this.y = y;
@@ -36,7 +49,7 @@ export class Area {
     return pos;
   }
 
-  removeFromArea(entity: any): void {
+  removeFromArea(entity: AreaEntity): void {
     var i = _.indexOf(_.map(this.entities, 'id'), entity.id);
     this.entities.splice(i, 1);
 
@@ -46,7 +59,7 @@ export class Area {
     }
   }
 
-  addToArea(entity: any): void {
+  addToArea(entity: AreaEntity): void {
     if (entity) {
       this.entities.push(entity);
       entity.area = this;
@@ -62,7 +75,7 @@ export class Area {
   }
 
   isEmpty(): boolean {
-    return !_.some(this.entities, function (entity: any) {
+    return !_.some(this.entities, function (entity: AreaEntity) {
       return !entity.isDead
     });
   }

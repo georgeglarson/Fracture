@@ -34,7 +34,9 @@ export interface BroadcasterContext {
 }
 
 export interface WorldContext {
-  onMobMoveCallback(mob: any): void;
+  onMobMoveCallback(mob: Mob): void;
+  isValidPosition(x: number, y: number): boolean;
+  addMob(mob: Mob): void;
 }
 
 export class SpawnManager {

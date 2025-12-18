@@ -4,12 +4,20 @@ import {Types} from '../../shared/ts/gametypes';
 import * as _ from 'lodash';
 import {Utils} from './utils';
 
+// Extended World interface for MobArea's needs
+interface MobAreaWorld {
+  isValidPosition(x: number, y: number): boolean;
+  addMob(mob: Mob): void;
+  onMobMoveCallback: (mob: Mob) => void;
+}
+
 export class MobArea extends Area {
   nb: number;
   kind: string;
-  respawns: any[] = [];
+  respawns: unknown[] = [];
+  declare world: MobAreaWorld; // Override parent type
 
-  constructor(id: number, nb: number, kind: string, x: number, y: number, width: number, height: number, world: any) {
+  constructor(id: number, nb: number, kind: string, x: number, y: number, width: number, height: number, world: MobAreaWorld) {
     super(id, x, y, width, height, world);
     this.nb = nb;
     this.kind = kind;
@@ -50,7 +58,7 @@ export class MobArea extends Area {
     }, delay);
   }
 
-  addToArea(entity: any) {
+  addToArea(entity: Mob) {
     super.addToArea(entity);
     if (entity instanceof Mob) {
       this.world.addMob(entity);
@@ -61,7 +69,8 @@ export class MobArea extends Area {
     var self = this;
 
     setInterval(function () {
-      _.each(self.entities, function (mob: any) {
+      _.each(self.entities, function (entity) {
+        const mob = entity as Mob;
         var canRoam = (Utils.random(20) === 1),
           pos;
 
