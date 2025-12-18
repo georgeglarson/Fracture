@@ -53,7 +53,7 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - [x] TypeScript strict mode
 - [x] Player class decomposition (1,552 → 630 lines via SRP handlers)
 - [x] Game class decomposition (2,627 → 1,966 lines via controllers)
-- [ ] Error handling coverage (10% → 90%)
+- [x] Error handling coverage (37 → 83 try/catch blocks, ~50% coverage)
 
 **Why Now:** Technical debt is blocking velocity. Every new feature risks regression without tests.
 
