@@ -58,9 +58,9 @@ export class FormatChecker {
     this.formats[Types.Messages.UNEQUIP_TO_INVENTORY] = ['s']; // slot ("weapon" or "armor")
   }
 
-  check(msg: any[]): boolean {
+  check(msg: unknown[]): boolean {
     var message = msg.slice(0),
-      type = message[0],
+      type = message[0] as number,
       format = this.formats[type];
 
     message.shift();

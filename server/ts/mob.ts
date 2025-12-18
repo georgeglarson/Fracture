@@ -5,14 +5,20 @@ import {Messages} from './message';
 import {ChestArea} from './chestarea';
 import {MobArea} from './mobarea';
 import {Utils} from './utils';
+import type {Item} from './item';
 
 interface HateEntry {
   id: number;
   hate: number;
 }
 
+// Message return type
+interface SerializableMessage {
+  serialize(): unknown[];
+}
+
 export class Mob extends Character {
-  area: any;
+  area: MobArea | ChestArea | null = null;
   spawningX: number;
   spawningY: number;
   armorLevel: number;
@@ -112,7 +118,7 @@ export class Mob extends Character {
     this.returnToSpawningPosition(1);
   }
 
-  drop(item: any): any {
+  drop(item: Item | null): SerializableMessage | undefined {
     if (item) {
       return new Messages.Drop(this, item);
     }

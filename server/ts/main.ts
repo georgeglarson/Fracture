@@ -12,11 +12,31 @@ if (result.error) {
   console.info(`[ENV] Loaded environment from ${envPath}`);
 }
 import {World} from './world';
-import {Server} from './ws';
+import {Server, Connection} from './ws';
 import {Metrics} from './metrics';
 import {Player} from './player';
 import {initVeniceService, initFishAudioService, getVeniceClient} from './ai';
 import {initIntroService} from './ai/intro.service';
+
+// Server configuration interface
+interface ServerConfig {
+  port: number;
+  metrics_enabled: boolean;
+  // Metrics config (required when metrics_enabled is true)
+  memcached_port: number;
+  memcached_host: string;
+  server_name: string;
+  game_servers: { name: string }[];
+  // World config
+  nb_worlds: number;
+  nb_players_per_world: number;
+  map_filepath: string;
+  // AI config
+  venice_api_key?: string;
+  venice_model?: string;
+  venice_timeout?: number;
+  fish_audio_api_key?: string;
+}
 
 // Server singleton - PID file to prevent multiple instances
 const PID_FILE = path.join(__dirname, '../../.server.pid');
@@ -73,7 +93,7 @@ process.on('exit', releaseServerLock);
 process.on('SIGINT', () => { releaseServerLock(); process.exit(0); });
 process.on('SIGTERM', () => { releaseServerLock(); process.exit(0); });
 
-function main(config: any): void {
+function main(config: ServerConfig): void {
     var WorldServer = World,
         server = new Server(config.port),
         metrics = config.metrics_enabled ? new Metrics(config) : null,
@@ -131,7 +151,7 @@ function main(config: any): void {
         console.warn("[FishAudio] NPC voice acting will be disabled");
     }
 
-    server.onConnect(function(connection: any) {
+    server.onConnect(function(connection: Connection) {
         var world: World | undefined, // the one in which the player will be spawned
             connect = function() {
                 if(world && world.connect_callback) {
@@ -202,13 +222,13 @@ function getWorldDistribution(worlds: World[]): number[] {
     return distribution;
 }
 
-function getConfigFile(path: string, callback: (config: any) => void): void {
+function getConfigFile(path: string, callback: (config: ServerConfig | null) => void): void {
     fs.readFile(path, 'utf8', function(err, json_string) {
         if(err) {
             console.error("Could not open config file:", err.path);
             callback(null);
         } else {
-            callback(JSON.parse(json_string));
+            callback(JSON.parse(json_string) as ServerConfig);
         }
     });
 }
@@ -221,9 +241,13 @@ process.argv.forEach(function (val, index, array) {
     }
 });
 
-getConfigFile(configPath, function(config: any) {
+getConfigFile(configPath, function(config: ServerConfig | null) {
     // Acquire singleton lock before starting
     if (!acquireServerLock()) {
+        process.exit(1);
+    }
+    if (!config) {
+        console.error("Failed to load config file");
         process.exit(1);
     }
     main(config);

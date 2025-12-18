@@ -8,13 +8,11 @@ declare module 'memcache' {
   export class Client {
     constructor(port: number, host: string);
     connect(): void;
-    on(event: string, callback: (...args: any[]) => void): void;
-    set(key: string, value: any, callback?: () => void): void;
-    get(key: string, callback: (error: any, result: any) => void): void;
+    on(event: string, callback: (...args: unknown[]) => void): void;
+    set(key: string, value: unknown, callback?: () => void): void;
+    get(key: string, callback: (error: Error | null, result: string | null) => void): void;
   }
 }
 
-declare module 'express' {
-  const express: any;
-  export = express;
-}
+// Express types - use existing @types/express from package
+// No custom declaration needed as express types are provided by the package
