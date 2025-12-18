@@ -221,6 +221,78 @@ export interface NewspaperShowEvent {
   headlines: string[];
 }
 
+// ============ Inventory UI Events ============
+
+/** User clicked "use" on inventory slot */
+export interface InventoryUseEvent {
+  slotIndex: number;
+}
+
+/** User clicked "equip" on inventory slot */
+export interface InventoryEquipEvent {
+  slotIndex: number;
+}
+
+/** User clicked "drop" on inventory slot */
+export interface InventoryDropEvent {
+  slotIndex: number;
+}
+
+/** User clicked "sell" on inventory slot (shop open) */
+export interface InventorySellEvent {
+  slotIndex: number;
+}
+
+/** User clicked "unequip" on equipment slot */
+export interface InventoryUnequipEvent {
+  slot: 'weapon' | 'armor';
+  toInventory: boolean;
+}
+
+/** Inventory visibility toggled */
+export interface InventoryToggleEvent {
+  visible: boolean;
+}
+
+/** Inventory state updated (from network or local change) */
+export interface InventoryStateEvent {
+  slots: any[]; // InventorySlot[]
+}
+
+/** Equipment state updated */
+export interface EquipmentStateEvent {
+  weapon: number | null;
+  armor: number | null;
+}
+
+// ============ Shop UI Events ============
+
+/** User clicked buy in shop */
+export interface ShopBuyEvent {
+  npcKind: number;
+  itemKind: number;
+}
+
+/** User clicked sell in shop */
+export interface ShopSellEvent {
+  slotIndex: number;
+}
+
+/** Shop opened */
+export interface ShopOpenEvent {
+  npcKind: number;
+  shopName: string;
+  items: any[];
+}
+
+/** Shop closed */
+export interface ShopCloseEvent {}
+
+/** Gold amount changed */
+export interface GoldChangedEvent {
+  gold: number;
+}
+
 // ============ Event Map ============
 
 /**
@@ -270,6 +342,25 @@ export interface GameEventMap {
   'ui:narrator': NarratorShowEvent;
   'ui:notification': NotificationShowEvent;
   'ui:newspaper': NewspaperShowEvent;
+
+  // Inventory UI
+  'ui:inventory:use': InventoryUseEvent;
+  'ui:inventory:equip': InventoryEquipEvent;
+  'ui:inventory:drop': InventoryDropEvent;
+  'ui:inventory:sell': InventorySellEvent;
+  'ui:inventory:unequip': InventoryUnequipEvent;
+  'ui:inventory:toggle': InventoryToggleEvent;
+
+  // Inventory State
+  'state:inventory': InventoryStateEvent;
+  'state:equipment': EquipmentStateEvent;
+  'state:gold': GoldChangedEvent;
+
+  // Shop UI
+  'ui:shop:buy': ShopBuyEvent;
+  'ui:shop:sell': ShopSellEvent;
+  'ui:shop:open': ShopOpenEvent;
+  'ui:shop:close': ShopCloseEvent;
 }
 
 /** All possible event names */

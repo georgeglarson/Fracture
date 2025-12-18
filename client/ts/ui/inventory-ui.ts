@@ -1,11 +1,16 @@
 /**
  * InventoryUI - 4x5 grid inventory panel
  * Single Responsibility: Display and interact with inventory items
+ *
+ * Supports two modes:
+ * 1. EventBus mode (preferred) - emits events for actions
+ * 2. Callback mode (legacy) - calls callback functions directly
  */
 
 import { InventorySlot, INVENTORY_SIZE, INVENTORY_COLS, INVENTORY_ROWS, isStackable, isEquipment } from '../../../shared/ts/inventory/inventory-types';
 import { Rarity, RarityColors, RarityNames, ItemProperties, deserializeProperties, formatItemStats } from '../../../shared/ts/items/index';
 import { Types } from '../../../shared/ts/gametypes';
+import { EventBus } from '../../../shared/ts/events/event-bus';
 
 // Base stats for weapons (damage) - used when no properties are available
 const WEAPON_BASE_STATS: Record<number, { min: number; max: number }> = {
@@ -47,14 +52,95 @@ export class InventoryUI {
   private visible = false;
   private slots: (InventorySlot | null)[] = [];
   private callbacks: InventoryCallbacks | null = null;
+  private eventBus: EventBus | null = null;
   private panel: HTMLDivElement | null = null;
   private contextMenu: HTMLDivElement | null = null;
   private tooltip: HTMLDivElement | null = null;
   private equipped: EquippedItems = { weapon: null, armor: null };
 
-  constructor() {
+  constructor(eventBus?: EventBus) {
+    this.eventBus = eventBus || null;
+
     // Close context menu on click outside
     document.addEventListener('click', () => this.hideContextMenu());
+
+    // If using EventBus, subscribe to state changes
+    if (this.eventBus) {
+      this.eventBus.on('state:inventory', ({ slots }) => {
+        this.updateSlots(slots);
+      });
+      this.eventBus.on('state:equipment', ({ weapon, armor }) => {
+        this.updateEquipped(weapon, armor);
+      });
+    }
+  }
+
+  /**
+   * Set EventBus for event-driven mode
+   */
+  setEventBus(eventBus: EventBus): void {
+    this.eventBus = eventBus;
+  }
+
+  /**
+   * Emit action via EventBus or call callback (backward compat)
+   */
+  private emitAction(action: string, data: any): void {
+    if (this.eventBus) {
+      // EventBus mode - emit typed event
+      switch (action) {
+        case 'use':
+          this.eventBus.emit('ui:inventory:use', { slotIndex: data.slotIndex });
+          break;
+        case 'equip':
+          this.eventBus.emit('ui:inventory:equip', { slotIndex: data.slotIndex });
+          break;
+        case 'drop':
+          this.eventBus.emit('ui:inventory:drop', { slotIndex: data.slotIndex });
+          break;
+        case 'sell':
+          this.eventBus.emit('ui:inventory:sell', { slotIndex: data.slotIndex });
+          break;
+        case 'unequip':
+          this.eventBus.emit('ui:inventory:unequip', { slot: data.slot, toInventory: data.toInventory });
+          break;
+      }
+    } else if (this.callbacks) {
+      // Legacy callback mode
+      switch (action) {
+        case 'use':
+          this.callbacks.onUse(data.slotIndex);
+          break;
+        case 'equip':
+          this.callbacks.onEquip(data.slotIndex);
+          break;
+        case 'drop':
+          this.callbacks.onDrop(data.slotIndex);
+          break;
+        case 'sell':
+          this.callbacks.onSell(data.slotIndex);
+          break;
+        case 'unequip':
+          if (data.toInventory) {
+            this.callbacks.onUnequipToInventory(data.slot);
+          } else {
+            this.callbacks.onUnequip(data.slot);
+          }
+          break;
+      }
+    }
+  }
+
+  /**
+   * Check if shop is open (for context menu sell option)
+   */
+  private isShopCurrentlyOpen(): boolean {
+    if (this.callbacks?.isShopOpen) {
+      return this.callbacks.isShopOpen();
+    }
+    // In EventBus mode, shop state should be tracked elsewhere
+    // For now, return false as default
+    return false;
   }
 
   /**
@@ -349,14 +435,16 @@ export class InventoryUI {
 
         // Look up slot at click time, not render time
         const slot = this.slots[slotIndex];
-        if (!slot || !this.callbacks) return;
+        if (!slot) return;
+        // Need callbacks or eventBus to handle actions
+        if (!this.callbacks && !this.eventBus) return;
 
         if (isStackable(slot.kind)) {
           // Consumable: use it
-          this.callbacks.onUse(slotIndex);
+          this.emitAction('use', { slotIndex });
         } else if (isEquipment(slot.kind)) {
           // Equipment: equip it
-          this.callbacks.onEquip(slotIndex);
+          this.emitAction('equip', { slotIndex });
         }
       });
 
@@ -460,7 +548,7 @@ export class InventoryUI {
     }
 
     // Show Sell option when shop is open
-    if (this.callbacks?.isShopOpen()) {
+    if (this.isShopCurrentlyOpen()) {
       html += `
         <div class="ctx-option" data-action="sell" style="
           padding: 8px 12px;
@@ -506,21 +594,20 @@ export class InventoryUI {
         e.stopPropagation();
         this.hideContextMenu();
 
-        if (this.callbacks) {
-          switch (action) {
-            case 'use':
-              this.callbacks.onUse(slotIndex);
-              break;
-            case 'equip':
-              this.callbacks.onEquip(slotIndex);
-              break;
-            case 'sell':
-              this.callbacks.onSell(slotIndex);
-              break;
-            case 'drop':
-              this.callbacks.onDrop(slotIndex);
-              break;
-          }
+        // Use emitAction for both EventBus and callback modes
+        switch (action) {
+          case 'use':
+            this.emitAction('use', { slotIndex });
+            break;
+          case 'equip':
+            this.emitAction('equip', { slotIndex });
+            break;
+          case 'sell':
+            this.emitAction('sell', { slotIndex });
+            break;
+          case 'drop':
+            this.emitAction('drop', { slotIndex });
+            break;
         }
       });
     });
@@ -825,10 +912,11 @@ export class InventoryUI {
         e.stopPropagation();
         this.hideContextMenu();
 
-        if (this.callbacks && action === 'unequip') {
-          this.callbacks.onUnequipToInventory(slotType);
-        } else if (this.callbacks && action === 'drop') {
-          this.callbacks.onUnequip(slotType); // Drop to ground
+        // Use emitAction for both EventBus and callback modes
+        if (action === 'unequip') {
+          this.emitAction('unequip', { slot: slotType, toInventory: true });
+        } else if (action === 'drop') {
+          this.emitAction('unequip', { slot: slotType, toInventory: false });
         }
       });
     });
