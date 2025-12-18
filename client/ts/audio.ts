@@ -414,14 +414,15 @@ export class AudioManager {
     var self = this;
     if (music && !music.sound.fadingIn) {
       this.clearFadeOut(music);
+      const targetVolume = this.getMusicVolume();
       music.sound.fadingIn = setInterval(function () {
         var step = 0.01,
         volume = music.sound.volume + step;
 
-        if (self._enabled && volume < 1 - step) {
+        if (self._enabled && volume < targetVolume - step) {
           music.sound.volume = volume;
         } else {
-          music.sound.volume = 1;
+          music.sound.volume = targetVolume;
           self.clearFadeIn(music);
         }
       }, 30);

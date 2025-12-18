@@ -87,12 +87,14 @@ export const INTERIOR_ZONES: Record<string, ZoneDefinition> = {
   ),
 
   // Village house 3 - Entry at (27, 209)
+  // Room spans y=279-286, camera y=279, height=8 shows full room, excludes outdoor
   'interior_village_house_3': createInterior(
     'interior_village_house_3',
     'Western Dwelling',
-    148, 281,
+    148, 279,
     'village',
-    'A house on the western edge of The Refuge.'
+    'A house on the western edge of The Refuge.',
+    11, 8
   ),
 
   // ============================================
@@ -148,12 +150,15 @@ export const INTERIOR_ZONES: Record<string, ZoneDefinition> = {
   // ============================================
 
   // Forest cabin - Entry at (20, 145)
+  // Room spans y=114-121, outdoor starts at y=122
+  // Camera y=114, height=8 shows y=114-121 (full interior, excludes outdoor)
   'interior_forest_cabin': createInterior(
     'interior_forest_cabin',
     'Forest Cabin',
-    151, 115,
+    151, 114,
     'forest',
-    'An abandoned cabin in Glitch Woods.'
+    'An abandoned cabin in Glitch Woods.',
+    11, 8
   ),
 
   // Forest structure - Entry at (74, 145)

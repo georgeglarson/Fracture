@@ -164,7 +164,7 @@ export function createMessageHandlers(
   // HELLO - Initial handshake (special case, allowed before game entry)
   handlers.set(Types.Messages.HELLO, {
     rateLimit: 'auth', // 5 attempts per minute per IP
-    handler: (ctx, msg) => {
+    handler: async (ctx, msg) => {
       const name = Utils.sanitize(msg[1]);
       const password = msg[5] || ''; // Password is now at index 5
       (ctx as any).name = (name === '') ? 'lorem ipsum' : name.substr(0, 15);
@@ -233,7 +233,20 @@ export function createMessageHandlers(
       (ctx as any).isDead = false;
 
       ctx.initAchievements();
-      ctx.triggerNarration('join');
+      await ctx.triggerNarration('join');
+
+      // Send inventory state to client
+      (ctx as any).sendInventoryInit();
+
+      // Send current equipment to client (so UI can display it)
+      const weapon = (ctx as any).weapon;
+      const armor = (ctx as any).armor;
+      if (weapon) {
+        ctx.send([Types.Messages.EQUIP, ctx.id, weapon]);
+      }
+      if (armor) {
+        ctx.send([Types.Messages.EQUIP, ctx.id, armor]);
+      }
     },
     requiresGame: false
   });

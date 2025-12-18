@@ -88,7 +88,12 @@ function setupSpawnHandlers(game: Game, client: GameClient): void {
 
   client.on(ClientEvents.SPAWN_CHEST, function (chest, x, y) {
     console.info('Spawned chest (' + chest.id + ') at ' + x + ', ' + y);
-    chest.setSprite(game.sprites[chest.getSpriteName()]);
+    const chestSprite = game.sprites[chest.getSpriteName()];
+    if (chestSprite) {
+      chest.setSprite(chestSprite);
+    } else {
+      console.error('[Spawn] Missing sprite for chest:', chest.getSpriteName());
+    }
     chest.setGridPosition(x, y);
     chest.setAnimation('idle_down', 150);
     game.addEntity(chest);
@@ -97,7 +102,10 @@ function setupSpawnHandlers(game: Game, client: GameClient): void {
       game.removeFromEntityGrid(chest, chest.gridX, chest.gridY);
       game.removeFromPathingGrid(chest.gridX, chest.gridY);
       chest.stopBlinking();
-      chest.setSprite(game.sprites['death']);
+      const deathSprite = game.sprites['death'];
+      if (deathSprite) {
+        chest.setSprite(deathSprite);
+      }
       chest.setAnimation('death', 120, 1, function () {
         console.info(chest.id + ' was removed');
         game.removeEntity(chest);
@@ -111,7 +119,12 @@ function setupSpawnHandlers(game: Game, client: GameClient): void {
     if (!game.entityIdExists(entity.id)) {
       try {
         if (entity.id !== game.playerId) {
-          entity.setSprite(game.sprites[entity.getSpriteName()]);
+          const entitySprite = game.sprites[entity.getSpriteName()];
+          if (entitySprite) {
+            entity.setSprite(entitySprite);
+          } else {
+            console.error('[Spawn] Missing sprite for entity:', entity.getSpriteName());
+          }
           entity.setGridPosition(x, y);
           entity.setOrientation(orientation);
           entity.idle();
@@ -217,7 +230,11 @@ function setupCharacterCallbacks(game: Game, entity: Character): void {
     }
 
     entity.isDying = true;
-    entity.setSprite(game.sprites[entity instanceof Mobs.Rat ? 'rat' : 'death']);
+    const deathSpriteName = entity instanceof Mobs.Rat ? 'rat' : 'death';
+    const deathSprite = game.sprites[deathSpriteName];
+    if (deathSprite) {
+      entity.setSprite(deathSprite);
+    }
     entity.animate('death', 120, 1, function () {
       console.info(entity.id + ' was removed');
       game.removeEntity(entity);
@@ -228,7 +245,7 @@ function setupCharacterCallbacks(game: Game, entity: Character): void {
       attacker.disengage();
     });
 
-    if (game.player.target && game.player.target.id === entity.id) {
+    if (game.player && game.player.target && game.player.target.id === entity.id) {
       game.player.disengage();
     }
 
@@ -288,7 +305,7 @@ function setupEntityHandlers(game: Game, client: GameClient): void {
       var entity = game.getEntityById(id);
 
       if (entity) {
-        if (game.player.isAttackedBy(entity)) {
+        if (game.player && game.player.isAttackedBy(entity)) {
           game.tryUnlockingAchievement('COWARD');
         }
         entity.disengage();
@@ -364,6 +381,7 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
   });
 
   client.on(ClientEvents.HP, function (hp) {
+    if (!game.player) return;
     game.player.maxHitPoints = hp;
     game.player.hitPoints = hp;
     game.updateBars();
@@ -378,6 +396,10 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
         var sprite = game.sprites[itemName];
         if (sprite) {
           player.setSprite(sprite);
+          // Also update spriteName so getSpriteName() returns the correct armor
+          if (typeof player.setSpriteName === 'function') {
+            player.setSpriteName(itemName);
+          }
         } else {
           console.error('[Equip] Missing sprite for armor:', itemName);
         }
@@ -388,7 +410,6 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
       // For local player, update equipment display and play sound
       if (playerId === game.playerId) {
         game.audioManager.playSound('equip');
-        // Update equipment display in inventory UI
         game.updateEquippedDisplay();
       }
     }
@@ -473,7 +494,7 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
         if (hp <= 0 && !mob.isDying) {
           mob.isDying = true;
           // If player is targeting this mob, disengage
-          if (game.player.target && game.player.target.id === mob.id) {
+          if (game.player && game.player.target && game.player.target.id === mob.id) {
             game.player.disengage();
           }
         }
@@ -594,6 +615,22 @@ function setupAIHandlers(game: Game, client: GameClient): void {
   });
 
   client.on(ClientEvents.CHAT, function (entityId, message) {
+    // System messages should be shown as notifications, not chat bubbles
+    const systemMessages = [
+      'Inventory full',
+      'Cannot sell',
+      'Not enough gold'
+    ];
+
+    const isSystemMessage = systemMessages.some(prefix => message.startsWith(prefix));
+
+    if (isSystemMessage) {
+      // Show as toast notification instead of chat bubble
+      game.showNotification(message);
+      game.audioManager.playSound('noloot');
+      return;
+    }
+
     var entity = game.getEntityById(entityId);
     if (entity) {
       game.showBubbleFor(entity, message);
@@ -748,6 +785,8 @@ function setupInventoryHandlers(game: Game, client: GameClient): void {
 
   client.on(ClientEvents.INVENTORY_ADD, function (slotIndex, kind, properties, count) {
     game.handleInventoryAdd(slotIndex, kind, properties, count);
+    // Play loot sound when server confirms item was picked up
+    game.audioManager?.playSound('loot');
   });
 
   client.on(ClientEvents.INVENTORY_REMOVE, function (slotIndex) {

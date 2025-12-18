@@ -246,11 +246,11 @@ export class PlayerController {
 
     this.selectedCellVisible = false;
 
-    // Item pickup
+    // Item pickup - sound is played when server confirms via INVENTORY_ADD
     if (this.deps.isItemAt(x, y)) {
       const item = this.deps.getItemAt(x, y);
       this.deps.pickupItemToInventory(item);
-      this.deps.audioManager.playSound('loot');
+      // Note: loot sound moved to inventory add handler so it only plays on success
     }
 
     // Door handling

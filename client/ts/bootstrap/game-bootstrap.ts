@@ -188,7 +188,9 @@ export function initializeManagers(ctx: BootstrapContext): BootstrapResult {
   const unifiedZoneManager = new UnifiedZoneManager();
   unifiedZoneManager.setContext({
     camera: ctx.camera,
-    renderer: ctx.renderer
+    renderer: ctx.renderer,
+    // Provide collision check for dynamic room bounds calculation
+    isColliding: (x: number, y: number) => ctx.map?.isColliding(x, y) ?? true
   });
 
   // Initialize interior manager (deprecated - forwards to unified zone manager)

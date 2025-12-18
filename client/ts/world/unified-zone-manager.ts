@@ -39,6 +39,20 @@ interface UnifiedZoneContext {
     foreground: CanvasRenderingContext2D;
     renderStaticCanvases(): void;
   };
+  // Collision check for dynamic room bounds calculation
+  isColliding: (x: number, y: number) => boolean;
+}
+
+/**
+ * Room bounds calculated from collision data
+ */
+interface RoomBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  width: number;
+  height: number;
 }
 
 /**
@@ -106,10 +120,12 @@ export class UnifiedZoneManager {
   ): ZoneTransition | null {
     // Check if door leads to an interior zone
     const interiorZoneId = getInteriorZoneForDoor(doorX, doorY);
+    console.log('[UnifiedZone] Door transition:', doorX, doorY, '-> zoneId:', interiorZoneId);
 
     if (interiorZoneId) {
       // Door leads to a defined interior zone
       const zone = getInteriorZone(interiorZoneId);
+      console.log('[UnifiedZone] Found zone:', zone?.id, 'viewport:', zone?.viewport);
       if (zone) {
         return this.enterZone(zone, dest.x, dest.y, dest.orientation);
       }
@@ -117,6 +133,7 @@ export class UnifiedZoneManager {
 
     // Fallback: Check if door has camera coords (legacy interior format)
     if (dest.cameraX !== undefined && dest.cameraY !== undefined) {
+      console.log('[UnifiedZone] FALLBACK to legacy - door data cameraX/Y:', dest.cameraX, dest.cameraY);
       // Create a temporary zone from legacy door data
       const legacyZone = this.createLegacyInteriorZone(dest.cameraX, dest.cameraY);
       return this.enterZone(legacyZone, dest.x, dest.y, dest.orientation);
@@ -166,9 +183,10 @@ export class UnifiedZoneManager {
 
     this.currentZone = zone;
 
-    // Apply zone viewport to camera
-    if (this.context && zone.type === 'interior' && zone.viewport) {
-      this.applyZoneViewport(zone);
+    // Apply viewport to camera for interiors
+    // ROOT CAUSE FIX: Calculate viewport dynamically from room geometry
+    if (this.context && zone.type === 'interior') {
+      this.applyDynamicViewport(playerX, playerY, zone.name);
     }
 
     this.state = zone.type === 'interior' ? 'interior' : 'outdoor';
@@ -226,6 +244,10 @@ export class UnifiedZoneManager {
   private applyZoneViewport(zone: ZoneDefinition): void {
     if (!this.context || !zone.viewport) return;
 
+    console.log('[UnifiedZone] APPLYING viewport for zone:', zone.id);
+    console.log('[UnifiedZone] Zone viewport config:', JSON.stringify(zone.viewport));
+    console.log('[UnifiedZone] Camera BEFORE: gridX=', this.context.camera.gridX, 'gridY=', this.context.camera.gridY);
+
     // Clear canvases for clean transition
     this.context.renderer.clearScreen(this.context.renderer.context);
     this.context.renderer.clearScreen(this.context.renderer.background);
@@ -243,6 +265,8 @@ export class UnifiedZoneManager {
       zone.viewport.cameraX,
       zone.viewport.cameraY
     );
+
+    console.log('[UnifiedZone] Camera AFTER: gridX=', this.context.camera.gridX, 'gridY=', this.context.camera.gridY);
 
     // Re-render static canvases for new view
     this.context.renderer.renderStaticCanvases();
@@ -375,5 +399,120 @@ export class UnifiedZoneManager {
     }
 
     console.debug('[Zone] Reset to outdoor');
+  }
+
+  /**
+   * Calculate room bounds using flood-fill from a starting position.
+   * This finds all connected walkable tiles to determine the actual room size.
+   *
+   * @param startX Starting X position (player destination)
+   * @param startY Starting Y position (player destination)
+   * @returns RoomBounds or null if calculation fails
+   */
+  private calculateRoomBounds(startX: number, startY: number): RoomBounds | null {
+    if (!this.context) return null;
+
+    const isColliding = this.context.isColliding;
+    const visited = new Set<string>();
+    const queue: [number, number][] = [[startX, startY]];
+
+    let minX = startX, maxX = startX;
+    let minY = startY, maxY = startY;
+
+    // Flood-fill to find all connected walkable tiles
+    // Limit to prevent runaway in case of bugs (max ~400 tiles for a 20x20 room)
+    const MAX_TILES = 500;
+    let tileCount = 0;
+
+    while (queue.length > 0 && tileCount < MAX_TILES) {
+      const [x, y] = queue.shift()!;
+      const key = `${x},${y}`;
+
+      if (visited.has(key)) continue;
+      if (isColliding(x, y)) continue;
+
+      visited.add(key);
+      tileCount++;
+
+      // Update bounds
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+
+      // Add adjacent tiles to queue (4-directional)
+      queue.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    }
+
+    if (tileCount === 0) {
+      console.warn('[UnifiedZone] Room bounds calculation found no walkable tiles');
+      return null;
+    }
+
+    // Add 1 tile margin on all sides for walls
+    const bounds: RoomBounds = {
+      minX: minX - 1,
+      minY: minY - 1,
+      maxX: maxX + 1,
+      maxY: maxY + 1,
+      width: (maxX - minX) + 3,  // +3 = walkable width + 2 wall tiles
+      height: (maxY - minY) + 3
+    };
+
+    console.log('[UnifiedZone] Calculated room bounds:', bounds, `(${tileCount} walkable tiles)`);
+    return bounds;
+  }
+
+  /**
+   * Apply dynamically calculated viewport based on room geometry.
+   * This is the ROOT CAUSE FIX - viewport is calculated from actual room bounds,
+   * not from hardcoded door data.
+   */
+  private applyDynamicViewport(playerX: number, playerY: number, zoneName: string): void {
+    if (!this.context) return;
+
+    const bounds = this.calculateRoomBounds(playerX, playerY);
+    if (!bounds) {
+      console.warn('[UnifiedZone] Could not calculate room bounds, using fallback');
+      return;
+    }
+
+    console.log('[UnifiedZone] APPLYING DYNAMIC viewport for:', zoneName);
+    console.log('[UnifiedZone] Calculated bounds:', JSON.stringify(bounds));
+    console.log('[UnifiedZone] Camera BEFORE: gridX=', this.context.camera.gridX, 'gridY=', this.context.camera.gridY);
+
+    // Update the current zone's areas to match calculated bounds
+    // This ensures position clamping and bounds checking work correctly
+    if (this.currentZone) {
+      this.currentZone.areas = [{
+        x: bounds.minX,
+        y: bounds.minY,
+        w: bounds.width,
+        h: bounds.height
+      }];
+    }
+
+    // Clear canvases for clean transition
+    this.context.renderer.clearScreen(this.context.renderer.context);
+    this.context.renderer.clearScreen(this.context.renderer.background);
+    this.context.renderer.clearScreen(this.context.renderer.foreground);
+
+    // Set camera to calculated room dimensions
+    this.context.camera.setZoneViewport(
+      bounds.width,
+      bounds.height,
+      true // isFixed
+    );
+
+    // Position camera at room's top-left corner
+    this.context.camera.setGridPosition(
+      bounds.minX,
+      bounds.minY
+    );
+
+    console.log('[UnifiedZone] Camera AFTER: gridX=', this.context.camera.gridX, 'gridY=', this.context.camera.gridY);
+
+    // Re-render static canvases for new view
+    this.context.renderer.renderStaticCanvases();
   }
 }

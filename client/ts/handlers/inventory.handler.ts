@@ -35,27 +35,37 @@ export function initInventory(ctx: InventoryGameContext): { manager: InventoryMa
   ui.setCallbacks({
     onUse: (slotIndex: number) => {
       console.log('[Inventory] Use slot', slotIndex);
+      const itemName = manager.getItemName(slotIndex);
       ctx.client?.sendInventoryUse(slotIndex);
+      ctx.showNotification(`Used ${itemName}`);
     },
     onEquip: (slotIndex: number) => {
       console.log('[Inventory] Equip slot', slotIndex);
+      const itemName = manager.getItemName(slotIndex);
       ctx.client?.sendInventoryEquip(slotIndex);
+      ctx.showNotification(`Equipped ${itemName}`);
     },
     onDrop: (slotIndex: number) => {
       console.log('[Inventory] Drop slot', slotIndex);
+      const itemName = manager.getItemName(slotIndex);
       ctx.client?.sendInventoryDrop(slotIndex);
+      ctx.showNotification(`Dropped ${itemName}`);
     },
     onSell: (slotIndex: number) => {
       console.log('[Inventory] Sell slot', slotIndex);
+      const itemName = manager.getItemName(slotIndex);
       ctx.client?.sendShopSell(slotIndex);
+      ctx.showNotification(`Sold ${itemName}`);
     },
     onUnequip: (slot: 'weapon' | 'armor') => {
       console.log('[Inventory] Drop equipped', slot);
       ctx.client?.sendDropItem(slot);
+      ctx.showNotification(`Dropped ${slot}`);
     },
     onUnequipToInventory: (slot: 'weapon' | 'armor') => {
       console.log('[Inventory] Unequip to inventory', slot);
       ctx.client?.sendUnequipToInventory(slot);
+      ctx.showNotification(`Unequipped ${slot}`);
     },
     isShopOpen: () => {
       return ctx.shopUI?.isOpen() ?? false;
@@ -92,11 +102,18 @@ export function useInventorySlot(ctx: InventoryGameContext, slotIndex: number): 
   if (!ctx.inventoryManager) return;
 
   const slot = ctx.inventoryManager.getSlot(slotIndex);
-  if (!slot) return;
+  if (!slot) {
+    ctx.showNotification(`Slot ${slotIndex + 1} is empty`);
+    return;
+  }
 
   // Only use consumables via hotkey
   if (ctx.inventoryManager.isSlotConsumable(slotIndex)) {
+    const itemName = ctx.inventoryManager.getItemName(slotIndex);
     ctx.client?.sendInventoryUse(slotIndex);
+    ctx.showNotification(`Used ${itemName}`);
+  } else {
+    ctx.showNotification('Not a consumable item');
   }
 }
 
@@ -108,7 +125,11 @@ export function useFirstConsumable(ctx: InventoryGameContext): void {
 
   const slotIndex = ctx.inventoryManager.findFirstConsumable();
   if (slotIndex >= 0) {
+    const itemName = ctx.inventoryManager.getItemName(slotIndex);
     ctx.client?.sendInventoryUse(slotIndex);
+    ctx.showNotification(`Used ${itemName}`);
+  } else {
+    ctx.showNotification('No consumables in inventory');
   }
 }
 
@@ -134,9 +155,10 @@ export function handleInventoryAdd(
 ): void {
   if (ctx.inventoryManager) {
     ctx.inventoryManager.updateSlot(slotIndex, kind, properties, count);
-    // Show notification
     const itemName = ctx.inventoryManager.getItemName(slotIndex);
-    ctx.showNotification(`Picked up ${itemName}${count > 1 ? ' x' + count : ''}`);
+    // Note: For equipment swaps, the equip callback already showed "Equipped [new item]"
+    // so this will show for the old item going back to inventory - that's fine, it's useful feedback
+    ctx.showNotification(`${itemName} → Backpack${count > 1 ? ' x' + count : ''}`);
   }
 }
 

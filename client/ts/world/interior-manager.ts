@@ -61,10 +61,8 @@ export class InteriorManager {
 
   setContext(context: InteriorContext): void {
     this.context = context;
-    // Also set context on unified manager if available
-    if (this.unifiedManager) {
-      this.unifiedManager.setContext(context);
-    }
+    // Note: UnifiedZoneManager context is set separately in game-bootstrap.ts
+    // with the additional isColliding function for dynamic room bounds
   }
 
   /**

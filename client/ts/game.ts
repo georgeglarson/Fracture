@@ -716,6 +716,15 @@ export class Game {
     // Network connection handlers - delegated to NetworkConnectionHandler
     NetworkConnectionHandler.setupConnectionHandlers(this, this.client);
 
+    // Setup all network message handlers BEFORE HELLO is sent
+    // (so they can receive INVENTORY_INIT, EQUIP, etc. that follow WELCOME)
+    setupNetworkHandlers(this, this.client);
+
+    // Setup quest handlers early too
+    if (this.questController) {
+      setupQuestHandlers(this.client, this.questController);
+    }
+
     this.client.on(ClientEvents.LIST, function (list: number[]) {
       var entityIds = _.pluck(self.entities, 'id'),
         knownIds = _.intersection(entityIds, list),
@@ -797,13 +806,7 @@ export class Game {
       // Setup player behavior callbacks via PlayerController
       self.playerController.setupCallbacks(self.player);
 
-      // Setup all network message handlers (extracted to network/message-handlers.ts)
-      setupNetworkHandlers(self, self.client);
-
-      // Setup quest handlers
-      if (self.questController) {
-        setupQuestHandlers(self.client, self.questController);
-      }
+      // Note: Network handlers already set up before connection (see line ~720)
 
       self.gamestart_callback();
 

@@ -80,8 +80,15 @@ export function handleInventoryPickup(ctx: InventoryPlayerContext, itemId: numbe
   }
 
   // Check if inventory has room
+  const slots = inventory.getSlots();
+  const occupiedCount = slots.filter(s => s !== null).length;
+  console.log(`[Inventory] ${ctx.name} pickup check: ${occupiedCount}/${slots.length} slots occupied`);
+
   if (!inventory.hasRoom(item.kind)) {
-    console.log(`[Inventory] ${ctx.name}'s inventory is full`);
+    console.log(`[Inventory] ${ctx.name}'s inventory is full - hasRoom returned false`);
+    console.log(`[Inventory] Slots:`, slots.map((s, i) => s ? `${i}:${s.kind}` : null).filter(Boolean));
+    // Send rejection message to client so they get feedback
+    ctx.send([Types.Messages.CHAT, 'Inventory full! Drop or sell items first.']);
     return;
   }
 
@@ -222,8 +229,10 @@ export function handleInventoryEquip(ctx: InventoryPlayerContext, slotIndex: num
     ctx.send(new Messages.HitPoints(ctx.maxHitPoints).serialize());
   }
 
-  // Broadcast equipment change
-  ctx.broadcast(ctx.equip(newItemKind));
+  // Broadcast equipment change to other players
+  ctx.broadcast(ctx.equip(newItemKind), true);
+  // Also send directly to self (broadcast may not reach self reliably)
+  ctx.send(ctx.equip(newItemKind).serialize());
 
   console.log(`[Inventory] ${ctx.name} equipped ${Types.getKindAsString(newItemKind)}`);
 }

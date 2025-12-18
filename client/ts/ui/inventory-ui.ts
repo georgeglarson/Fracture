@@ -4,8 +4,29 @@
  */
 
 import { InventorySlot, INVENTORY_SIZE, INVENTORY_COLS, INVENTORY_ROWS, isStackable, isEquipment } from '../../../shared/ts/inventory/inventory-types';
-import { Rarity, RarityColors, RarityNames, ItemProperties, deserializeProperties } from '../../../shared/ts/items/index';
+import { Rarity, RarityColors, RarityNames, ItemProperties, deserializeProperties, formatItemStats } from '../../../shared/ts/items/index';
 import { Types } from '../../../shared/ts/gametypes';
+
+// Base stats for weapons (damage) - used when no properties are available
+const WEAPON_BASE_STATS: Record<number, { min: number; max: number }> = {
+  [Types.Entities.SWORD1]: { min: 3, max: 6 },
+  [Types.Entities.SWORD2]: { min: 6, max: 12 },
+  [Types.Entities.AXE]: { min: 10, max: 18 },
+  [Types.Entities.MORNINGSTAR]: { min: 15, max: 25 },
+  [Types.Entities.BLUESWORD]: { min: 20, max: 35 },
+  [Types.Entities.REDSWORD]: { min: 28, max: 45 },
+  [Types.Entities.GOLDENSWORD]: { min: 35, max: 55 },
+};
+
+// Base stats for armor (defense)
+const ARMOR_BASE_STATS: Record<number, number> = {
+  [Types.Entities.CLOTHARMOR]: 1,
+  [Types.Entities.LEATHERARMOR]: 3,
+  [Types.Entities.MAILARMOR]: 6,
+  [Types.Entities.PLATEARMOR]: 10,
+  [Types.Entities.REDARMOR]: 15,
+  [Types.Entities.GOLDENARMOR]: 20,
+};
 
 export interface InventoryCallbacks {
   onUse: (slotIndex: number) => void;
@@ -28,6 +49,7 @@ export class InventoryUI {
   private callbacks: InventoryCallbacks | null = null;
   private panel: HTMLDivElement | null = null;
   private contextMenu: HTMLDivElement | null = null;
+  private tooltip: HTMLDivElement | null = null;
   private equipped: EquippedItems = { weapon: null, armor: null };
 
   constructor() {
@@ -66,7 +88,6 @@ export class InventoryUI {
    * Toggle visibility
    */
   toggle(): void {
-    console.log('[InventoryUI] Toggle called, current visible state:', this.visible);
     if (this.visible) {
       this.hide();
     } else {
@@ -88,6 +109,7 @@ export class InventoryUI {
   hide(): void {
     this.visible = false;
     this.hideContextMenu();
+    this.hideTooltip();
     if (this.panel) {
       this.panel.remove();
       this.panel = null;
@@ -174,7 +196,8 @@ export class InventoryUI {
     for (let i = 0; i < INVENTORY_SIZE; i++) {
       const slot = this.slots[i];
       const borderColor = slot ? this.getRarityBorderColor(slot) : '#444';
-      const bgColor = slot ? 'rgba(60, 60, 70, 0.8)' : 'rgba(40, 40, 50, 0.5)';
+      const bgColor = slot ? this.getRarityBackground(slot) : 'rgba(40, 40, 50, 0.5)';
+      const glowEffect = slot ? this.getRarityGlow(slot) : 'none';
 
       html += `
         <div class="inventory-slot" data-slot="${i}" style="
@@ -188,6 +211,8 @@ export class InventoryUI {
           display: flex;
           align-items: center;
           justify-content: center;
+          box-shadow: ${glowEffect};
+          transition: transform 0.1s, box-shadow 0.2s;
         ">
       `;
 
@@ -266,6 +291,7 @@ export class InventoryUI {
       (el as HTMLElement).addEventListener('contextmenu', (e: MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        this.hideTooltip();
 
         const hasItem = slotType === 'weapon'
           ? (this.equipped.weapon && this.equipped.weapon !== Types.Entities.SWORD1)
@@ -276,17 +302,30 @@ export class InventoryUI {
         }
       });
 
-      // Hover effects
-      el.addEventListener('mouseenter', () => {
+      // Hover effects and tooltip
+      el.addEventListener('mouseenter', (e: Event) => {
         const hasItem = slotType === 'weapon'
           ? (this.equipped.weapon && this.equipped.weapon !== Types.Entities.SWORD1)
           : (this.equipped.armor && this.equipped.armor !== Types.Entities.CLOTHARMOR);
         if (hasItem) {
           (el as HTMLElement).style.transform = 'scale(1.05)';
+          const mouseEvent = e as MouseEvent;
+          const itemKind = slotType === 'weapon' ? this.equipped.weapon : this.equipped.armor;
+          if (itemKind) {
+            this.showEquipmentTooltip(itemKind, slotType, mouseEvent.clientX, mouseEvent.clientY);
+          }
+        }
+      });
+      el.addEventListener('mousemove', (e: Event) => {
+        if (this.tooltip) {
+          const mouseEvent = e as MouseEvent;
+          this.tooltip.style.left = (mouseEvent.clientX + 15) + 'px';
+          this.tooltip.style.top = mouseEvent.clientY + 'px';
         }
       });
       el.addEventListener('mouseleave', () => {
         (el as HTMLElement).style.transform = 'scale(1)';
+        this.hideTooltip();
       });
     });
 
@@ -317,23 +356,36 @@ export class InventoryUI {
       (el as HTMLElement).addEventListener('contextmenu', (e: MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        this.hideTooltip();  // Hide tooltip so context menu is visible
         const slot = this.slots[slotIndex];
         if (slot) {
           this.showContextMenu(slotIndex, e.clientX, e.clientY);
         }
       });
 
-      // Hover effects
-      el.addEventListener('mouseenter', () => {
+      // Hover effects and tooltip
+      el.addEventListener('mouseenter', (e: Event) => {
         const slot = this.slots[slotIndex];
         if (slot) {
           (el as HTMLElement).style.transform = 'scale(1.05)';
           (el as HTMLElement).style.zIndex = '1';
+          // Show tooltip
+          const mouseEvent = e as MouseEvent;
+          this.showTooltip(slot, mouseEvent.clientX, mouseEvent.clientY);
+        }
+      });
+      el.addEventListener('mousemove', (e: Event) => {
+        const slot = this.slots[slotIndex];
+        if (slot && this.tooltip) {
+          const mouseEvent = e as MouseEvent;
+          this.tooltip.style.left = (mouseEvent.clientX + 15) + 'px';
+          this.tooltip.style.top = mouseEvent.clientY + 'px';
         }
       });
       el.addEventListener('mouseleave', () => {
         (el as HTMLElement).style.transform = 'scale(1)';
         (el as HTMLElement).style.zIndex = '0';
+        this.hideTooltip();
       });
     });
   }
@@ -358,13 +410,13 @@ export class InventoryUI {
       border: 1px solid #555;
       border-radius: 6px;
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-      z-index: 10001;
+      z-index: 9000;
       font-family: Arial, sans-serif;
       font-size: 13px;
       overflow: hidden;
     `;
 
-    const itemName = this.formatItemName(Types.getKindAsString(slot.kind));
+    const itemName = this.formatItemName(Types.getKindAsString(slot.kind), slot);
     const isConsumable = isStackable(slot.kind);
     const isEquip = isEquipment(slot.kind);
 
@@ -477,6 +529,228 @@ export class InventoryUI {
   }
 
   /**
+   * Show item tooltip with stats and comparison
+   */
+  private showTooltip(slot: InventorySlot, x: number, y: number): void {
+    this.hideTooltip();
+
+    const itemName = this.formatItemName(Types.getKindAsString(slot.kind), slot);
+    const isWeapon = Types.isWeapon(slot.kind);
+    const isArmor = Types.isArmor(slot.kind);
+    const isConsumable = isStackable(slot.kind);
+
+    this.tooltip = document.createElement('div');
+    this.tooltip.id = 'inventory-tooltip';
+    this.tooltip.style.cssText = `
+      position: fixed;
+      left: ${x + 15}px;
+      top: ${y}px;
+      min-width: 160px;
+      max-width: 220px;
+      background: rgba(20, 20, 30, 0.95);
+      border: 2px solid ${this.getRarityBorderColor(slot)};
+      border-radius: 6px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+      z-index: 8500;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      pointer-events: none;
+    `;
+
+    let html = `
+      <div style="
+        padding: 8px 10px;
+        border-bottom: 1px solid #333;
+      ">
+        <div style="color: ${this.getRarityColor(slot)}; font-weight: bold; font-size: 13px;">
+          ${itemName}
+        </div>
+    `;
+
+    // Show rarity if properties exist
+    if (slot.properties) {
+      const props = slot.properties as ItemProperties;
+      const rarityName = RarityNames[props.rarity] || 'Common';
+      html += `<div style="color: ${this.getRarityColor(slot)}; font-size: 10px; opacity: 0.8;">${rarityName}</div>`;
+    }
+
+    html += `</div>`;
+
+    // Stats section
+    html += `<div style="padding: 8px 10px;">`;
+
+    if (slot.properties) {
+      const statsText = formatItemStats(slot.properties as ItemProperties);
+      if (statsText) {
+        html += `<div style="color: #aaffaa; margin-bottom: 6px;">${statsText}</div>`;
+      }
+    } else {
+      // Show base stats for items without properties
+      if (isWeapon && WEAPON_BASE_STATS[slot.kind]) {
+        const stats = WEAPON_BASE_STATS[slot.kind];
+        html += `<div style="color: #aaffaa; margin-bottom: 6px;">${stats.min}-${stats.max} damage</div>`;
+      } else if (isArmor && ARMOR_BASE_STATS[slot.kind]) {
+        html += `<div style="color: #aaffaa; margin-bottom: 6px;">+${ARMOR_BASE_STATS[slot.kind]} defense</div>`;
+      }
+    }
+
+    // Comparison with equipped item
+    if (isWeapon && this.equipped.weapon) {
+      html += this.getComparisonHtml(slot, this.equipped.weapon, 'weapon');
+    } else if (isArmor && this.equipped.armor) {
+      html += this.getComparisonHtml(slot, this.equipped.armor, 'armor');
+    }
+
+    // Usage hint
+    if (isConsumable) {
+      html += `<div style="color: #888; font-size: 10px; margin-top: 4px;">Click to use</div>`;
+    } else if (isWeapon || isArmor) {
+      html += `<div style="color: #888; font-size: 10px; margin-top: 4px;">Click to equip</div>`;
+    }
+
+    html += `</div>`;
+
+    this.tooltip.innerHTML = html;
+    document.body.appendChild(this.tooltip);
+
+    // Adjust position if off-screen
+    const rect = this.tooltip.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      this.tooltip.style.left = (x - rect.width - 5) + 'px';
+    }
+    if (rect.bottom > window.innerHeight) {
+      this.tooltip.style.top = (window.innerHeight - rect.height - 10) + 'px';
+    }
+  }
+
+  /**
+   * Get comparison HTML between inventory item and equipped item
+   */
+  private getComparisonHtml(slot: InventorySlot, equippedKind: number, type: 'weapon' | 'armor'): string {
+    // Get item stats (use properties if available, otherwise base stats)
+    let itemStat = 0;
+    let equippedStat = 0;
+
+    if (type === 'weapon') {
+      if (slot.properties && (slot.properties as ItemProperties).damageMin !== undefined) {
+        const props = slot.properties as ItemProperties;
+        itemStat = ((props.damageMin || 0) + (props.damageMax || 0)) / 2;
+      } else if (WEAPON_BASE_STATS[slot.kind]) {
+        const stats = WEAPON_BASE_STATS[slot.kind];
+        itemStat = (stats.min + stats.max) / 2;
+      }
+
+      if (WEAPON_BASE_STATS[equippedKind]) {
+        const stats = WEAPON_BASE_STATS[equippedKind];
+        equippedStat = (stats.min + stats.max) / 2;
+      }
+    } else {
+      if (slot.properties && (slot.properties as ItemProperties).defense !== undefined) {
+        itemStat = (slot.properties as ItemProperties).defense || 0;
+      } else if (ARMOR_BASE_STATS[slot.kind]) {
+        itemStat = ARMOR_BASE_STATS[slot.kind];
+      }
+
+      if (ARMOR_BASE_STATS[equippedKind]) {
+        equippedStat = ARMOR_BASE_STATS[equippedKind];
+      }
+    }
+
+    const diff = itemStat - equippedStat;
+    if (diff === 0) {
+      return `<div style="color: #888; font-size: 11px; border-top: 1px solid #333; padding-top: 6px;">Same as equipped</div>`;
+    }
+
+    const color = diff > 0 ? '#55ff55' : '#ff5555';
+    const arrow = diff > 0 ? '▲' : '▼';
+    const statName = type === 'weapon' ? 'damage' : 'defense';
+
+    return `
+      <div style="color: ${color}; font-size: 11px; border-top: 1px solid #333; padding-top: 6px;">
+        ${arrow} ${diff > 0 ? '+' : ''}${diff.toFixed(0)} ${statName} vs equipped
+      </div>
+    `;
+  }
+
+  /**
+   * Hide item tooltip
+   */
+  private hideTooltip(): void {
+    if (this.tooltip) {
+      this.tooltip.remove();
+      this.tooltip = null;
+    }
+  }
+
+  /**
+   * Show tooltip for equipped item
+   */
+  private showEquipmentTooltip(itemKind: number, slotType: 'weapon' | 'armor', x: number, y: number): void {
+    this.hideTooltip();
+
+    const itemName = this.formatItemName(Types.getKindAsString(itemKind));
+    const isWeapon = slotType === 'weapon';
+
+    this.tooltip = document.createElement('div');
+    this.tooltip.id = 'inventory-tooltip';
+    this.tooltip.style.cssText = `
+      position: fixed;
+      left: ${x + 15}px;
+      top: ${y}px;
+      min-width: 160px;
+      max-width: 220px;
+      background: rgba(20, 20, 30, 0.95);
+      border: 2px solid ${isWeapon ? '#8a6d3b' : '#5a7a5a'};
+      border-radius: 6px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+      z-index: 8500;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      pointer-events: none;
+    `;
+
+    let html = `
+      <div style="
+        padding: 8px 10px;
+        border-bottom: 1px solid #333;
+      ">
+        <div style="color: #fff; font-weight: bold; font-size: 13px;">
+          ${itemName}
+        </div>
+        <div style="color: ${isWeapon ? '#8a6d3b' : '#5a7a5a'}; font-size: 10px; opacity: 0.8;">
+          Equipped ${isWeapon ? 'Weapon' : 'Armor'}
+        </div>
+      </div>
+    `;
+
+    // Stats section
+    html += `<div style="padding: 8px 10px;">`;
+
+    // Show base stats for equipped items
+    if (isWeapon && WEAPON_BASE_STATS[itemKind]) {
+      const stats = WEAPON_BASE_STATS[itemKind];
+      html += `<div style="color: #aaffaa; margin-bottom: 6px;">${stats.min}-${stats.max} damage</div>`;
+    } else if (!isWeapon && ARMOR_BASE_STATS[itemKind]) {
+      html += `<div style="color: #aaffaa; margin-bottom: 6px;">+${ARMOR_BASE_STATS[itemKind]} defense</div>`;
+    }
+
+    html += `<div style="color: #888; font-size: 10px; margin-top: 4px;">Right-click to unequip</div>`;
+    html += `</div>`;
+
+    this.tooltip.innerHTML = html;
+    document.body.appendChild(this.tooltip);
+
+    // Adjust position if off-screen
+    const rect = this.tooltip.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      this.tooltip.style.left = (x - rect.width - 5) + 'px';
+    }
+    if (rect.bottom > window.innerHeight) {
+      this.tooltip.style.top = (window.innerHeight - rect.height - 10) + 'px';
+    }
+  }
+
+  /**
    * Show context menu for equipped items
    */
   private showEquipmentContextMenu(slotType: 'weapon' | 'armor', x: number, y: number): void {
@@ -498,7 +772,7 @@ export class InventoryUI {
       border: 1px solid #555;
       border-radius: 6px;
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-      z-index: 10001;
+      z-index: 9000;
       font-family: Arial, sans-serif;
       font-size: 13px;
       overflow: hidden;
@@ -553,6 +827,44 @@ export class InventoryUI {
   }
 
   /**
+   * Check if inventory has a better item than equipped
+   */
+  private hasBetterInInventory(type: 'weapon' | 'armor'): boolean {
+    const equippedKind = type === 'weapon' ? this.equipped.weapon : this.equipped.armor;
+    const equippedStat = type === 'weapon'
+      ? (equippedKind && WEAPON_BASE_STATS[equippedKind] ? (WEAPON_BASE_STATS[equippedKind].min + WEAPON_BASE_STATS[equippedKind].max) / 2 : 0)
+      : (equippedKind && ARMOR_BASE_STATS[equippedKind] ? ARMOR_BASE_STATS[equippedKind] : 0);
+
+    for (const slot of this.slots) {
+      if (!slot) continue;
+      const isMatchingType = type === 'weapon' ? Types.isWeapon(slot.kind) : Types.isArmor(slot.kind);
+      if (!isMatchingType) continue;
+
+      let slotStat = 0;
+      if (type === 'weapon') {
+        if (slot.properties && (slot.properties as ItemProperties).damageMin !== undefined) {
+          const props = slot.properties as ItemProperties;
+          slotStat = ((props.damageMin || 0) + (props.damageMax || 0)) / 2;
+        } else if (WEAPON_BASE_STATS[slot.kind]) {
+          const stats = WEAPON_BASE_STATS[slot.kind];
+          slotStat = (stats.min + stats.max) / 2;
+        }
+      } else {
+        if (slot.properties && (slot.properties as ItemProperties).defense !== undefined) {
+          slotStat = (slot.properties as ItemProperties).defense || 0;
+        } else if (ARMOR_BASE_STATS[slot.kind]) {
+          slotStat = ARMOR_BASE_STATS[slot.kind];
+        }
+      }
+
+      if (slotStat > equippedStat) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Render the equipment section (weapon + armor slots)
    */
   private renderEquipmentSection(): string {
@@ -566,6 +878,10 @@ export class InventoryUI {
     // Check for default items (which shouldn't be shown as "equipped")
     const hasRealWeapon = weaponKind && weaponKind !== Types.Entities.SWORD1;
     const hasRealArmor = armorKind && armorKind !== Types.Entities.CLOTHARMOR;
+
+    // Check for upgrades available in inventory
+    const hasWeaponUpgrade = this.hasBetterInInventory('weapon');
+    const hasArmorUpgrade = this.hasBetterInInventory('armor');
 
     return `
       <div style="
@@ -589,7 +905,27 @@ export class InventoryUI {
           flex-direction: column;
           align-items: center;
           justify-content: center;
+          ${hasWeaponUpgrade ? 'box-shadow: 0 0 8px rgba(0, 255, 0, 0.6);' : ''}
         ">
+          ${hasWeaponUpgrade ? `
+            <div style="
+              position: absolute;
+              top: -4px;
+              right: -4px;
+              width: 16px;
+              height: 16px;
+              background: #22aa22;
+              border: 1px solid #00ff00;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 10px;
+              color: #fff;
+              text-shadow: 0 0 2px #000;
+              z-index: 1;
+            ">▲</div>
+          ` : ''}
           ${hasRealWeapon ? `
             <div style="
               width: 48px;
@@ -624,7 +960,27 @@ export class InventoryUI {
           flex-direction: column;
           align-items: center;
           justify-content: center;
+          ${hasArmorUpgrade ? 'box-shadow: 0 0 8px rgba(0, 255, 0, 0.6);' : ''}
         ">
+          ${hasArmorUpgrade ? `
+            <div style="
+              position: absolute;
+              top: -4px;
+              right: -4px;
+              width: 16px;
+              height: 16px;
+              background: #22aa22;
+              border: 1px solid #00ff00;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 10px;
+              color: #fff;
+              text-shadow: 0 0 2px #000;
+              z-index: 1;
+            ">▲</div>
+          ` : ''}
           ${hasRealArmor ? `
             <div style="
               width: 48px;
@@ -670,11 +1026,43 @@ export class InventoryUI {
   }
 
   /**
-   * Format item name for display
+   * Get rarity glow effect (box-shadow)
    */
-  private formatItemName(name: string): string {
+  private getRarityGlow(slot: InventorySlot): string {
+    if (!slot.properties) return 'none';
+
+    const rarity = (slot.properties as ItemProperties).rarity;
+    switch (rarity) {
+      case Rarity.UNCOMMON: return '0 0 8px rgba(30, 255, 0, 0.5)';
+      case Rarity.RARE: return '0 0 10px rgba(0, 112, 221, 0.6)';
+      case Rarity.EPIC: return '0 0 12px rgba(163, 53, 238, 0.7)';
+      case Rarity.LEGENDARY: return '0 0 15px rgba(255, 128, 0, 0.8), 0 0 25px rgba(255, 128, 0, 0.4)';
+      default: return 'none';
+    }
+  }
+
+  /**
+   * Get rarity background tint
+   */
+  private getRarityBackground(slot: InventorySlot): string {
+    if (!slot.properties) return 'rgba(60, 60, 70, 0.8)';
+
+    const rarity = (slot.properties as ItemProperties).rarity;
+    switch (rarity) {
+      case Rarity.UNCOMMON: return 'rgba(30, 70, 30, 0.7)';
+      case Rarity.RARE: return 'rgba(20, 50, 90, 0.7)';
+      case Rarity.EPIC: return 'rgba(70, 30, 70, 0.7)';
+      case Rarity.LEGENDARY: return 'rgba(90, 50, 10, 0.7)';
+      default: return 'rgba(60, 60, 70, 0.8)';
+    }
+  }
+
+  /**
+   * Format item name for display (with optional rarity prefix)
+   */
+  private formatItemName(name: string, slot?: InventorySlot): string {
     if (!name) return 'Unknown';
-    return name
+    const baseName = name
       .replace(/([a-z])([A-Z0-9])/g, '$1 $2')
       .replace(/sword/i, ' Sword')
       .replace(/armor/i, ' Armor')
@@ -689,6 +1077,16 @@ export class InventoryUI {
       .split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
+
+    // Add rarity prefix for non-common items
+    if (slot?.properties) {
+      const rarity = (slot.properties as ItemProperties).rarity;
+      if (rarity && rarity !== Rarity.COMMON) {
+        const rarityName = RarityNames[rarity];
+        return `${rarityName} ${baseName}`;
+      }
+    }
+    return baseName;
   }
 
   /**
