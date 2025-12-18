@@ -12,6 +12,20 @@ import { EquipmentManager } from '../equipment/equipment-manager';
 import { EquipmentSlot } from '../../../shared/ts/equipment/equipment-types';
 
 /**
+ * Item with equipment kind
+ */
+interface EquippableItem {
+  kind: number;
+}
+
+/**
+ * Message interface for network messages
+ */
+interface SerializableMessage {
+  serialize(): unknown[];
+}
+
+/**
  * Player context for equipment operations
  */
 export interface EquipmentPlayerContext {
@@ -54,7 +68,7 @@ export function equipWeapon(ctx: EquipmentPlayerContext, kind: number): void {
 /**
  * Equip an item (auto-detect slot)
  */
-export function equipItem(ctx: EquipmentPlayerContext, item: any): void {
+export function equipItem(ctx: EquipmentPlayerContext, item: EquippableItem | null): void {
   if (!item) return;
 
   console.debug(`${ctx.name} equips ${Types.getKindAsString(item.kind)}`);
@@ -79,8 +93,9 @@ export function updateHitPoints(ctx: EquipmentPlayerContext): void {
 /**
  * Create equip message for broadcasting
  */
-export function createEquipMessage(ctx: EquipmentPlayerContext, itemKind: number): any {
-  return new Messages.EquipItem(ctx as any, itemKind);
+export function createEquipMessage(ctx: EquipmentPlayerContext, itemKind: number): SerializableMessage {
+  // Messages.EquipItem expects a player-like object with id property
+  return new Messages.EquipItem(ctx, itemKind);
 }
 
 /**

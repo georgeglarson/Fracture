@@ -7,6 +7,7 @@
 
 import * as _ from 'lodash';
 import { Character } from '../character';
+import { Mob } from '../mob';
 import { Types } from '../../../shared/ts/gametypes';
 import { Utils } from '../utils';
 import { Messages } from '../message';
@@ -14,6 +15,32 @@ import { Properties } from '../properties';
 import { Formulas } from '../formulas';
 import { World } from '../world';
 import { getVeniceService } from './venice.service';
+
+/**
+ * Minimal mob interface for haters list
+ */
+interface MobReference {
+  id: number | string;
+  x: number;
+  y: number;
+}
+
+/**
+ * Combat target interface
+ */
+interface CombatTarget {
+  id: number | string;
+  hitPoints: number;
+  armorLevel: number;
+  receiveDamage(damage: number, attackerId: number | string): void;
+}
+
+/**
+ * Serializable message interface
+ */
+interface SerializableMessage {
+  serialize(): unknown[];
+}
 
 // AI personality types affect behavior and chat style
 type Personality = 'warrior' | 'explorer' | 'social' | 'hunter' | 'newbie';
@@ -128,7 +155,7 @@ export class AIPlayer extends Character {
   private targetY: number | null = null;
 
   // Haters list (mobs targeting this AI)
-  haters: Record<string | number, any> = {};
+  haters: Record<string | number, MobReference> = {};
 
   // Required Player-like properties
   hasEnteredGame = true;
@@ -460,7 +487,7 @@ export class AIPlayer extends Character {
     let avgAttackerY = 0;
     let count = 0;
 
-    this.forEachAttacker((attacker: any) => {
+    this.forEachAttacker((attacker: MobReference) => {
       avgAttackerX += attacker.x;
       avgAttackerY += attacker.y;
       count++;
@@ -509,7 +536,7 @@ export class AIPlayer extends Character {
     this.startWandering();
   }
 
-  private performAttack(target: any): void {
+  private performAttack(target: Mob): void {
     if (!target) return;
 
     // Broadcast attack animation so other players see us swing
@@ -518,7 +545,7 @@ export class AIPlayer extends Character {
     const dmg = Formulas.dmg(this.weaponLevel, target.armorLevel);
 
     if (dmg > 0) {
-      target.receiveDamage(dmg, this.id);
+      target.receiveDamage(dmg, this.id as number);
       this.world.handleMobHate(target.id, this.id, dmg);
       this.world.handleHurtEntity(target, this, dmg);
 
@@ -624,24 +651,24 @@ export class AIPlayer extends Character {
   }
 
   // Hater management (same as Player)
-  addHater(mob: any): void {
+  addHater(mob: MobReference): void {
     if (mob && !(mob.id in this.haters)) {
       this.haters[mob.id] = mob;
     }
   }
 
-  removeHater(mob: any): void {
+  removeHater(mob: MobReference): void {
     if (mob && mob.id in this.haters) {
       delete this.haters[mob.id];
     }
   }
 
-  forEachHater(callback: (mob: any) => void): void {
+  forEachHater(callback: (mob: MobReference) => void): void {
     _.each(this.haters, callback);
   }
 
   // Equip display (for Messages.EquipItem)
-  equip(item: number): any {
+  equip(item: number): SerializableMessage {
     return new Messages.EquipItem(this, item);
   }
 }

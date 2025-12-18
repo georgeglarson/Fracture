@@ -25,6 +25,7 @@ export interface MessageHandlerContext {
   // Player identity
   id: number;
   name: string;
+  kind: number;
   clientIp: string; // For rate limiting
 
   // Player state
@@ -34,11 +35,21 @@ export interface MessageHandlerContext {
   maxHitPoints: number;
   x: number;
   y: number;
+  orientation: number;
 
-  // Equipment levels
+  // Progression
+  level: number;
+  xp: number;
+  gold: number;
+
+  // Equipment (kind numbers)
+  weapon: number;
+  armor: number;
   weaponLevel: number;
   armorLevel: number;
-  armor: number;
+
+  // Checkpoints
+  lastCheckpoint: { id: number; x: number; y: number } | null;
 
   // World reference
   world: any; // World type - using any to avoid circular deps
@@ -71,6 +82,12 @@ export interface MessageHandlerContext {
 
   // Zone
   checkZoneChange(x: number, y: number): void;
+
+  // Position update (broadcasts to zone)
+  updatePosition(): void;
+
+  // Inventory initialization (sends to client)
+  sendInventoryInit(): void;
 
   // Callbacks
   zone_callback?: () => void;
@@ -167,16 +184,16 @@ export function createMessageHandlers(
     handler: async (ctx, msg) => {
       const name = Utils.sanitize(msg[1]);
       const password = msg[5] || ''; // Password is now at index 5
-      (ctx as any).name = (name === '') ? 'lorem ipsum' : name.substr(0, 15);
-      (ctx as any).kind = Types.Entities.WARRIOR;
+      ctx.name = (name === '') ? 'lorem ipsum' : name.substr(0, 15);
+      ctx.kind = Types.Entities.WARRIOR;
 
       const storage = ctx.world.getStorageService();
-      const characterExists = storage.characterExists((ctx as any).name);
+      const characterExists = storage.characterExists(ctx.name);
 
       if (characterExists) {
         // Existing character - verify password
-        if (!storage.verifyPassword((ctx as any).name, password)) {
-          console.log(`[Auth] Wrong password for: ${(ctx as any).name}`);
+        if (!storage.verifyPassword(ctx.name, password)) {
+          console.log(`[Auth] Wrong password for: ${ctx.name}`);
           ctx.send([Types.Messages.AUTH_FAIL, 'wrong_password']);
           return; // Don't proceed - client should disconnect
         }
@@ -184,68 +201,66 @@ export function createMessageHandlers(
         // Password correct - load character
         const loaded = ctx.loadFromStorage(storage);
         if (loaded) {
-          console.log(`[Storage] Loaded returning player: ${(ctx as any).name}`);
+          console.log(`[Storage] Loaded returning player: ${ctx.name}`);
         }
       } else {
         // New character - password is required
         if (!password || password.length < 3) {
-          console.log(`[Auth] Password too short for new character: ${(ctx as any).name}`);
+          console.log(`[Auth] Password too short for new character: ${ctx.name}`);
           ctx.send([Types.Messages.AUTH_FAIL, 'password_required']);
           return;
         }
 
         // Create new character with password
-        const newChar = storage.createCharacter((ctx as any).name, password);
+        const newChar = storage.createCharacter(ctx.name, password);
         ctx.characterId = newChar.id;
 
         // Apply client-provided starting equipment
         ctx.equipArmor(msg[2]);
         ctx.equipWeapon(msg[3]);
         ctx.setGold(msg[4] || 0);
-        console.log(`[Storage] Created new character: ${(ctx as any).name} (${ctx.characterId})`);
+        console.log(`[Storage] Created new character: ${ctx.name} (${ctx.characterId})`);
       }
 
-      (ctx as any).orientation = Utils.randomOrientation();
+      ctx.orientation = Utils.randomOrientation();
       ctx.updateHitPoints();
-      (ctx as any).updatePosition();
+      ctx.updatePosition();
 
       ctx.world.addPlayer(ctx);
       ctx.world.enter_callback(ctx);
 
       // Get player's XP to next level (using Formulas)
-      const xpToNext = Formulas.xpToNextLevel((ctx as any).level || 1);
+      const xpToNext = Formulas.xpToNextLevel(ctx.level || 1);
 
       // Send expanded WELCOME with full player state
       // [WELCOME, id, name, x, y, hp, level, xp, xpToNext, gold]
       ctx.send([
         Types.Messages.WELCOME,
         ctx.id,
-        (ctx as any).name,
+        ctx.name,
         ctx.x,
         ctx.y,
         ctx.hitPoints,
-        (ctx as any).level || 1,
-        (ctx as any).xp || 0,
+        ctx.level || 1,
+        ctx.xp || 0,
         xpToNext,
-        (ctx as any).gold || 0
+        ctx.gold || 0
       ]);
-      (ctx as any).hasEnteredGame = true;
-      (ctx as any).isDead = false;
+      ctx.hasEnteredGame = true;
+      ctx.isDead = false;
 
       ctx.initAchievements();
       await ctx.triggerNarration('join');
 
       // Send inventory state to client
-      (ctx as any).sendInventoryInit();
+      ctx.sendInventoryInit();
 
       // Send current equipment to client (so UI can display it)
-      const weapon = (ctx as any).weapon;
-      const armor = (ctx as any).armor;
-      if (weapon) {
-        ctx.send([Types.Messages.EQUIP, ctx.id, weapon]);
+      if (ctx.weapon) {
+        ctx.send([Types.Messages.EQUIP, ctx.id, ctx.weapon]);
       }
-      if (armor) {
-        ctx.send([Types.Messages.EQUIP, ctx.id, armor]);
+      if (ctx.armor) {
+        ctx.send([Types.Messages.EQUIP, ctx.id, ctx.armor]);
       }
     },
     requiresGame: false
@@ -358,11 +373,11 @@ export function createMessageHandlers(
       // Check mob exists, is alive (isDead flag + hitPoints > 0), and player is alive
       // Double-check (hitPoints > 0) prevents damage from mobs in death animation
       if (mob && !mob.isDead && mob.hitPoints > 0 && ctx.hitPoints > 0) {
-        (ctx as any).hitPoints -= Formulas.dmg(mob.weaponLevel, ctx.armorLevel);
+        ctx.hitPoints -= Formulas.dmg(mob.weaponLevel, ctx.armorLevel);
         ctx.world.handleHurtEntity(ctx);
 
         if (ctx.hitPoints <= 0) {
-          (ctx as any).isDead = true;
+          ctx.isDead = true;
           if (ctx.firepotionTimeout) {
             clearTimeout(ctx.firepotionTimeout);
           }
@@ -393,11 +408,11 @@ export function createMessageHandlers(
           if (kind === Types.Entities.FIREPOTION) {
             ctx.updateHitPoints();
             ctx.broadcast(ctx.equip(Types.Entities.FIREFOX));
-            (ctx as any).firepotionTimeout = setTimeout(() => {
+            ctx.firepotionTimeout = setTimeout(() => {
               ctx.broadcast(ctx.equip(ctx.armor));
-              (ctx as any).firepotionTimeout = null;
+              ctx.firepotionTimeout = null;
             }, 15000);
-            ctx.send(new Messages.HitPoints((ctx as any).maxHitPoints).serialize());
+            ctx.send(new Messages.HitPoints(ctx.maxHitPoints).serialize());
           } else if (Types.isHealingItem(kind)) {
             let amount = 0;
             switch (kind) {
@@ -450,7 +465,7 @@ export function createMessageHandlers(
     handler: (ctx, msg) => {
       const checkpoint = ctx.world.map.getCheckpoint(msg[1]);
       if (checkpoint) {
-        (ctx as any).lastCheckpoint = checkpoint;
+        ctx.lastCheckpoint = checkpoint;
       }
     }
   });
