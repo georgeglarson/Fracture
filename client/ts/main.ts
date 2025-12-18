@@ -9,6 +9,10 @@ import * as _ from 'lodash';
 var app, game;
 var volumeUI: VolumeUI;
 
+// Track held movement keys to prevent U-turn issues
+var movementKeysHeld: Set<number> = new Set();
+var lastMovementDirection: { dx: number, dy: number } | null = null;
+
 var initApp = function () {
   $(function () {
     app = new App();
@@ -400,8 +404,6 @@ var initGame = function () {
     var key = e.which,
       $chat = $('#chatinput');
 
-    console.log('[KeyDown] Key pressed:', key, 'chatinput focused:', $('#chatinput:focus').length, 'nameinput focused:', $('#nameinput:focus').length);
-
     if ($('#chatinput:focus').length == 0 && $('#nameinput:focus').length == 0) {
       if (key === 13) { // Enter
         if (game.ready) {
@@ -431,7 +433,6 @@ var initGame = function () {
         return false;
       }
       if (key === 88) { // X - Drop current weapon (changed from D for WASD)
-        console.log('[KeyPress] X key pressed, game.ready:', game.ready, 'game.started:', game.started);
         if (game.ready && game.started) {
           game.dropCurrentWeapon();
         }
@@ -440,24 +441,32 @@ var initGame = function () {
       // WASD and Arrow keys for movement
       if (key === 87 || key === 38) { // W or Up Arrow
         if (game.ready && game.started && game.player) {
+          movementKeysHeld.add(key);
+          lastMovementDirection = { dx: 0, dy: -1 };
           game.movePlayerInDirection(0, -1);
         }
         return false;
       }
       if (key === 65 || key === 37) { // A or Left Arrow
         if (game.ready && game.started && game.player) {
+          movementKeysHeld.add(key);
+          lastMovementDirection = { dx: -1, dy: 0 };
           game.movePlayerInDirection(-1, 0);
         }
         return false;
       }
       if (key === 83 || key === 40) { // S or Down Arrow
         if (game.ready && game.started && game.player) {
+          movementKeysHeld.add(key);
+          lastMovementDirection = { dx: 0, dy: 1 };
           game.movePlayerInDirection(0, 1);
         }
         return false;
       }
       if (key === 68 || key === 39) { // D or Right Arrow
         if (game.ready && game.started && game.player) {
+          movementKeysHeld.add(key);
+          lastMovementDirection = { dx: 1, dy: 0 };
           game.movePlayerInDirection(1, 0);
         }
         return false;
@@ -468,8 +477,6 @@ var initGame = function () {
         return false;
       }
       if (key === 73) { // I - Toggle inventory
-        console.log('[KeyPress] I key pressed, game.ready:', game.ready, 'game.started:', game.started);
-        // Toggle inventory even if game isn't ready - the UI should still show
         game.toggleInventory();
         return false;
       }
@@ -493,6 +500,25 @@ var initGame = function () {
         return false;
       }
     }
+  });
+
+  // Track key releases for movement
+  $(document).bind('keyup', function (e) {
+    var key = e.which;
+    // Clear movement key from held set
+    if ([87, 38, 65, 37, 83, 40, 68, 39].includes(key)) {
+      movementKeysHeld.delete(key);
+      // Clear direction if no movement keys held
+      if (movementKeysHeld.size === 0) {
+        lastMovementDirection = null;
+      }
+    }
+  });
+
+  // Clear all held keys when window loses focus (prevents stuck keys)
+  $(window).on('blur', function () {
+    movementKeysHeld.clear();
+    lastMovementDirection = null;
   });
 
   if (game.renderer.tablet) {

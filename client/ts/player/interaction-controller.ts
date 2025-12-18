@@ -80,8 +80,12 @@ export class InteractionController {
     // Block movement during zone transition
     if (this.deps.isZoning()) return;
 
-    const targetX = player.gridX + dx;
-    const targetY = player.gridY + dy;
+    // Use nextGrid position if moving, otherwise current grid position
+    // This prevents U-turns when changing direction mid-move
+    const baseX = player.isMoving() ? player.nextGridX : player.gridX;
+    const baseY = player.isMoving() ? player.nextGridY : player.gridY;
+    const targetX = baseX + dx;
+    const targetY = baseY + dy;
 
     // Check for entity at target position
     const entity = this.deps.getEntityAt(targetX, targetY);
