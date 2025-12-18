@@ -2,10 +2,15 @@ import {Entity} from './entity';
 import {Utils} from './utils';
 import {Messages} from './message';
 
+// Message return type for serializable messages
+interface SerializableMessage {
+  serialize(): unknown[];
+}
+
 export abstract class Character extends Entity {
 
   orientation: number;
-  attackers: Record<number | string, any> = {};
+  attackers: Record<number | string, Character> = {};
   target: number | null = null;
   maxHitPoints: number = 0;
   hitPoints: number = 0;
@@ -16,9 +21,9 @@ export abstract class Character extends Entity {
     this.orientation = Utils.randomOrientation();
   }
 
-  getState(): any[] {
-    var basestate = this._getBaseState(),
-      state: any[] = [];
+  getState(): unknown[] {
+    const basestate = this._getBaseState();
+    const state: unknown[] = [];
 
     state.push(this.orientation);
     if (this.target) {
@@ -63,33 +68,33 @@ export abstract class Character extends Entity {
     return this.target !== null;
   }
 
-  attack(): any {
+  attack(): SerializableMessage {
     return new Messages.Attack(this.id, this.target);
   }
 
-  health(): any {
+  health(): SerializableMessage {
     return new Messages.Health(this.hitPoints, false);
   }
 
-  regen(): any {
+  regen(): SerializableMessage {
     return new Messages.Health(this.hitPoints, true);
   }
 
-  addAttacker(entity: any): void {
+  addAttacker(entity: Character): void {
     if (entity) {
       this.attackers[entity.id] = entity;
     }
   }
 
-  removeAttacker(entity: any): void {
+  removeAttacker(entity: Character): void {
     if (entity && entity.id in this.attackers) {
       delete this.attackers[entity.id];
       console.debug(this.id + " REMOVED ATTACKER " + entity.id);
     }
   }
 
-  forEachAttacker(callback: (attacker: any) => void): void {
-    for (var id in this.attackers) {
+  forEachAttacker(callback: (attacker: Character) => void): void {
+    for (const id in this.attackers) {
       callback(this.attackers[id]);
     }
   }

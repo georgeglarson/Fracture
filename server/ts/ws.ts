@@ -6,6 +6,9 @@ import * as _ from 'lodash';
 import {Utils} from './utils';
 import { getIntroService } from './ai/intro.service';
 
+// Message type - can be a serializable object or raw array
+type MessagePayload = { serialize(): unknown[] } | unknown[];
+
 /**
  * Get CORS origins from environment or use defaults
  * Set CORS_ORIGINS env var as comma-separated list: "http://localhost:8008,https://game.example.com"
@@ -53,7 +56,8 @@ export class Server {
     app.use('/tts', express.static(ttsPath));
 
     // API: Generate intro story with TTS
-    app.post('/api/intro', async (req: any, res: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express handler types
+    app.post('/api/intro', async (req, res) => {
       const { playerName } = req.body;
       if (!playerName || typeof playerName !== 'string') {
         return res.status(400).json({ error: 'playerName is required' });
@@ -135,7 +139,7 @@ export class Server {
     return '5' + Utils.random(99) + '' + (this._counter++);
   }
 
-  broadcast(message: any): void {
+  broadcast(message: MessagePayload): void {
     this.forEachConnection(function (connection: Connection) {
       connection.send(message);
     });
@@ -144,14 +148,14 @@ export class Server {
   /**
    * Broadcast to all connections in a specific zone
    */
-  broadcastToZone(zoneId: string, message: any): void {
+  broadcastToZone(zoneId: string, message: MessagePayload): void {
     this.io.to(`zone:${zoneId}`).emit('message', message);
   }
 
   /**
    * Broadcast to all connections in a specific party
    */
-  broadcastToParty(partyId: string, message: any): void {
+  broadcastToParty(partyId: string, message: MessagePayload): void {
     this.io.to(`party:${partyId}`).emit('message', message);
   }
 
@@ -197,7 +201,7 @@ export class Connection {
   _server: Server;
   id: string;
   clientIp: string;
-  listen_callback: ((message: any) => void) | null = null;
+  listen_callback: ((message: unknown[]) => void) | null = null;
   close_callback: (() => void) | null = null;
   private _currentZone: string | null = null;
 
@@ -233,19 +237,19 @@ export class Connection {
     this.close_callback = callback;
   }
 
-  listen(callback: (message: any) => void): void {
+  listen(callback: (message: unknown[]) => void): void {
     this.listen_callback = callback;
   }
 
-  broadcast(message: any): void {
+  broadcast(message: MessagePayload): void {
     throw new Error('Not implemented');
   }
 
-  send(message: any): void {
+  send(message: MessagePayload): void {
     this._connection.emit('message', message);
   }
 
-  sendUTF8(data: any): void {
+  sendUTF8(data: string): void {
     this._connection.emit('message', data);
   }
 
@@ -283,7 +287,7 @@ export class Connection {
   /**
    * Broadcast message to all players in the same zone (excluding self)
    */
-  broadcastToZone(message: any): void {
+  broadcastToZone(message: MessagePayload): void {
     if (this._currentZone) {
       this._connection.to(`zone:${this._currentZone}`).emit('message', message);
     }
@@ -306,7 +310,7 @@ export class Connection {
   /**
    * Broadcast to party members
    */
-  broadcastToParty(partyId: string, message: any): void {
+  broadcastToParty(partyId: string, message: MessagePayload): void {
     this._connection.to(`party:${partyId}`).emit('message', message);
   }
 

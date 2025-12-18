@@ -140,7 +140,8 @@ export class World {
       const move_callback = function (x: number, y: number) {
         console.debug(player.name + ' is moving to (' + x + ', ' + y + ').');
 
-        player.forEachAttacker(function (mob: Mob) {
+        player.forEachAttacker(function (attacker) {
+          const mob = attacker as Mob;
           if (!mob.target) return;
           var target = self.getEntityById(mob.target);
           if (target) {

@@ -8,15 +8,70 @@ interface Position {
   y: number;
 }
 
+// Map data interfaces from JSON
+interface MobAreaData {
+  id: number;
+  type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  nb?: number;
+}
+
+interface ChestAreaData {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  i?: number[];
+  tx?: number;
+  ty?: number;
+}
+
+interface StaticChestData {
+  x: number;
+  y: number;
+  i?: number[];
+}
+
+interface DoorData {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+}
+
+interface CheckpointData {
+  id: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  s?: number; // starting area flag
+}
+
+interface MapData {
+  width: number;
+  height: number;
+  collisions: number[];
+  roamingAreas: MobAreaData[];
+  chestAreas: ChestAreaData[];
+  staticChests: StaticChestData[];
+  staticEntities: Record<string, string>; // Entity name strings e.g. "rat", "skeleton"
+  doors: DoorData[];
+  checkpoints: CheckpointData[];
+}
+
 export class Map {
   isLoaded = false;
   width: number = 0;
   height: number = 0;
   collisions: number[] = [];
-  mobAreas: any[] = [];
-  chestAreas: any[] = [];
-  staticChests: any[] = [];
-  staticEntities: Record<string, any> = {};
+  mobAreas: MobAreaData[] = [];
+  chestAreas: ChestAreaData[] = [];
+  staticChests: StaticChestData[] = [];
+  staticEntities: Record<string, string> = {}; // Entity name strings e.g. "rat", "skeleton"
   zoneWidth: number = 0;
   zoneHeight: number = 0;
   groupWidth: number = 0;
@@ -45,7 +100,7 @@ export class Map {
     });
   }
 
-  initMap(map: any) {
+  initMap(map: MapData) {
     this.width = map.width;
     this.height = map.height;
     this.collisions = map.collisions;
@@ -185,11 +240,11 @@ export class Map {
     }
   }
 
-  initConnectedGroups(doors: any[]) {
+  initConnectedGroups(doors: DoorData[]) {
     var self = this;
 
     this.connectedGroups = {};
-    _.each(doors, function (door: any) {
+    _.each(doors, function (door: DoorData) {
       var groupId = self.getGroupIdFromPosition(door.x, door.y),
         connectedGroupId = self.getGroupIdFromPosition(door.tx, door.ty),
         connectedPosition = self.GroupIdToGroupPosition(connectedGroupId);
@@ -202,13 +257,13 @@ export class Map {
     });
   }
 
-  initCheckpoints(cpList: any[]) {
+  initCheckpoints(cpList: CheckpointData[]) {
     var self = this;
 
     this.checkpoints = {};
     this.startingAreas = [];
 
-    _.each(cpList, function (cp: any) {
+    _.each(cpList, function (cp: CheckpointData) {
       var checkpoint = new Checkpoint(cp.id, cp.x, cp.y, cp.w, cp.h);
       self.checkpoints[checkpoint.id] = checkpoint;
       if (cp.s === 1) {

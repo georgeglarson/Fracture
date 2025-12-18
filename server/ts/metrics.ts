@@ -1,14 +1,30 @@
 import * as _ from 'lodash';
 import {World} from './world';
 
+// Config interface for metrics
+interface MetricsConfig {
+  memcached_port: number;
+  memcached_host: string;
+  server_name: string;
+  game_servers: { name: string }[];
+}
+
+// Memcache client interface (minimal)
+interface MemcacheClient {
+  connect(): void;
+  on(event: string, callback: () => void): void;
+  get(key: string, callback: (error: Error | null, result: string | null) => void): void;
+  set(key: string, value: unknown, callback?: () => void): void;
+}
+
 export class Metrics {
-  config: any;
-  client: any;
+  config: MetricsConfig;
+  client: MemcacheClient;
   isReady = false;
   ready_callback: (() => void) | null = null;
 
 
-  constructor(config: any) {
+  constructor(config: MetricsConfig) {
     var self = this;
 
     this.config = config;
@@ -43,8 +59,8 @@ export class Metrics {
         var total_players = 0;
 
         // Recalculate the total number of players and set it
-        _.each(config.game_servers, function (server: any) {
-          self.client.get('player_count_' + server.name, function (error: any, result: any) {
+        _.each(config.game_servers, function (server) {
+          self.client.get('player_count_' + server.name, function (error, result) {
             var count = result ? parseInt(result) : 0;
 
             total_players += count;
@@ -68,15 +84,15 @@ export class Metrics {
     this.client.set('world_distribution_' + this.config.server_name, worlds);
   }
 
-  getOpenWorldCount(callback: (result: any) => void): void {
-    this.client.get('world_count_' + this.config.server_name, function (error: any, result: any) {
-      callback(result);
+  getOpenWorldCount(callback: (result: number) => void): void {
+    this.client.get('world_count_' + this.config.server_name, function (error, result) {
+      callback(result ? parseInt(result) : 0);
     });
   }
 
-  getTotalPlayers(callback: (result: any) => void): void {
-    this.client.get('total_players', function (error: any, result: any) {
-      callback(result);
+  getTotalPlayers(callback: (result: number) => void): void {
+    this.client.get('total_players', function (error, result) {
+      callback(result ? parseInt(result) : 0);
     });
   }
 }
