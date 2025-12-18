@@ -210,7 +210,7 @@ describe('InventoryHandler', () => {
       handleInventoryEquip(mockCtx, 0);
 
       expect(mockInventory.removeItem).toHaveBeenCalledWith(0, 1);
-      expect(mockCtx.equipWeapon).toHaveBeenCalledWith(Types.Entities.SWORD2);
+      expect(mockCtx.equipWeapon).toHaveBeenCalledWith(Types.Entities.SWORD2, null);
       expect(mockCtx.broadcast).toHaveBeenCalled();
     });
 

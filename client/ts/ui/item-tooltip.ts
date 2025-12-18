@@ -5,6 +5,7 @@
 import { Item } from '../entity/objects/item';
 import { ItemProperties, Rarity, RarityColors, RarityNames, formatItemStats } from '../../../shared/ts/items/index';
 import { Types } from '../../../shared/ts/gametypes';
+import { getWeaponStats, getArmorStats, compareWeapons } from '../../../shared/ts/equipment/equipment-stats';
 
 export class ItemTooltip {
   private element: HTMLDivElement | null = null;
@@ -36,10 +37,16 @@ export class ItemTooltip {
     document.body.appendChild(this.element);
   }
 
-  show(item: Item, equippedWeaponKind: number | null, mouseX: number, mouseY: number): void {
+  show(
+    item: Item,
+    equippedWeaponKind: number | null,
+    mouseX: number,
+    mouseY: number,
+    equippedWeaponProps?: { damageMin?: number; damageMax?: number } | null
+  ): void {
     if (!this.element || !item) return;
 
-    const content = this.buildContent(item, equippedWeaponKind);
+    const content = this.buildContent(item, equippedWeaponKind, equippedWeaponProps);
     this.element.innerHTML = content;
 
     // Position tooltip near mouse but not overlapping
@@ -77,7 +84,11 @@ export class ItemTooltip {
     }
   }
 
-  private buildContent(item: Item, equippedWeaponKind: number | null): string {
+  private buildContent(
+    item: Item,
+    equippedWeaponKind: number | null,
+    equippedWeaponProps?: { damageMin?: number; damageMax?: number } | null
+  ): string {
     const props = item.properties;
     const itemName = item.itemKind || 'Unknown Item';
     const rarity = item.getRarity();
@@ -93,31 +104,41 @@ export class ItemTooltip {
     }
     html += `${this.formatItemName(itemName)}</div>`;
 
-    // Stats
-    if (props) {
-      html += `<div style="color: #aaa; font-size: 10px; margin-bottom: 6px;">`;
+    // Stats - show properties if available, otherwise base stats from shared module
+    html += `<div style="color: #aaa; font-size: 10px; margin-bottom: 6px;">`;
 
-      if (props.damageMin !== undefined && props.damageMax !== undefined) {
-        html += `Damage: ${props.damageMin}-${props.damageMax}<br>`;
+    if (props && props.damageMin !== undefined && props.damageMax !== undefined) {
+      html += `Damage: ${props.damageMin}-${props.damageMax}<br>`;
+    } else if (Types.isWeapon(item.kind)) {
+      const weaponStats = getWeaponStats(item.kind);
+      if (weaponStats) {
+        html += `Damage: ${weaponStats.min}-${weaponStats.max}<br>`;
       }
-      if (props.defense !== undefined) {
-        html += `Defense: ${props.defense}<br>`;
-      }
-      if (props.bonusHealth) {
-        html += `<span style="color: #4f4;">+${props.bonusHealth} Health</span><br>`;
-      }
-      if (props.bonusStrength) {
-        html += `<span style="color: #f44;">+${props.bonusStrength} Strength</span><br>`;
-      }
-      if (props.bonusCritChance) {
-        html += `<span style="color: #ff4;">+${Math.round(props.bonusCritChance * 100)}% Crit</span><br>`;
-      }
-      html += `</div>`;
+    }
 
-      // Comparison with equipped (for weapons)
-      if (Types.isWeapon(item.kind) && equippedWeaponKind) {
-        html += this.buildComparison(props, equippedWeaponKind);
+    if (props && props.defense !== undefined) {
+      html += `Defense: ${props.defense}<br>`;
+    } else if (Types.isArmor(item.kind)) {
+      const armorStats = getArmorStats(item.kind);
+      if (armorStats) {
+        html += `Defense: ${armorStats.defense}<br>`;
       }
+    }
+
+    if (props?.bonusHealth) {
+      html += `<span style="color: #4f4;">+${props.bonusHealth} Health</span><br>`;
+    }
+    if (props?.bonusStrength) {
+      html += `<span style="color: #f44;">+${props.bonusStrength} Strength</span><br>`;
+    }
+    if (props?.bonusCritChance) {
+      html += `<span style="color: #ff4;">+${Math.round(props.bonusCritChance * 100)}% Crit</span><br>`;
+    }
+    html += `</div>`;
+
+    // Comparison with equipped (for weapons) using shared compareWeapons
+    if (Types.isWeapon(item.kind) && equippedWeaponKind) {
+      html += this.buildComparison(item.kind, props, equippedWeaponKind, equippedWeaponProps);
     }
 
     // Hint to pick up
@@ -126,28 +147,24 @@ export class ItemTooltip {
     return html;
   }
 
-  private buildComparison(newProps: ItemProperties, equippedKind: number): string {
-    // Compare against equipped weapon's BASE stats
-    // Note: This doesn't account for equipped weapon's bonuses (properties not tracked)
+  /**
+   * Build comparison HTML using shared compareWeapons function
+   */
+  private buildComparison(
+    itemKind: number,
+    props: ItemProperties | null,
+    equippedKind: number,
+    equippedProps?: { damageMin?: number; damageMax?: number } | null
+  ): string {
     const equippedName = Types.getKindAsString(equippedKind);
 
-    if (!newProps.damageMin || !newProps.damageMax) return '';
-
-    // Base damage stats by weapon kind - matches inventory-ui.ts WEAPON_BASE_STATS
-    const baseDamages: Record<number, [number, number]> = {
-      [Types.Entities.SWORD1]: [3, 6],
-      [Types.Entities.SWORD2]: [6, 12],
-      [Types.Entities.AXE]: [10, 18],
-      [Types.Entities.MORNINGSTAR]: [15, 25],
-      [Types.Entities.BLUESWORD]: [20, 35],
-      [Types.Entities.REDSWORD]: [28, 45],
-      [Types.Entities.GOLDENSWORD]: [35, 55],
-    };
-
-    const equipped = baseDamages[equippedKind] || [3, 6];
-    const avgNew = (newProps.damageMin + newProps.damageMax) / 2;
-    const avgEquipped = (equipped[0] + equipped[1]) / 2;
-    const diff = avgNew - avgEquipped;
+    // Use shared compareWeapons with actual equipped properties for accurate comparison
+    const diff = compareWeapons(
+      itemKind,
+      equippedKind,
+      props as { damageMin?: number; damageMax?: number } | null,
+      equippedProps || null
+    );
 
     let html = `<div style="border-top: 1px solid #444; margin-top: 4px; padding-top: 4px;">`;
     html += `<span style="color: #888;">vs. ${this.formatItemName(equippedName)}: </span>`;

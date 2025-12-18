@@ -11,27 +11,7 @@ import { InventorySlot, INVENTORY_SIZE, INVENTORY_COLS, INVENTORY_ROWS, isStacka
 import { Rarity, RarityColors, RarityNames, ItemProperties, deserializeProperties, formatItemStats } from '../../../shared/ts/items/index';
 import { Types } from '../../../shared/ts/gametypes';
 import { EventBus } from '../../../shared/ts/events/event-bus';
-
-// Base stats for weapons (damage) - used when no properties are available
-const WEAPON_BASE_STATS: Record<number, { min: number; max: number }> = {
-  [Types.Entities.SWORD1]: { min: 3, max: 6 },
-  [Types.Entities.SWORD2]: { min: 6, max: 12 },
-  [Types.Entities.AXE]: { min: 10, max: 18 },
-  [Types.Entities.MORNINGSTAR]: { min: 15, max: 25 },
-  [Types.Entities.BLUESWORD]: { min: 20, max: 35 },
-  [Types.Entities.REDSWORD]: { min: 28, max: 45 },
-  [Types.Entities.GOLDENSWORD]: { min: 35, max: 55 },
-};
-
-// Base stats for armor (defense)
-const ARMOR_BASE_STATS: Record<number, number> = {
-  [Types.Entities.CLOTHARMOR]: 1,
-  [Types.Entities.LEATHERARMOR]: 3,
-  [Types.Entities.MAILARMOR]: 6,
-  [Types.Entities.PLATEARMOR]: 10,
-  [Types.Entities.REDARMOR]: 15,
-  [Types.Entities.GOLDENARMOR]: 20,
-};
+import { getWeaponStats, getArmorStats, compareWeapons, compareArmors } from '../../../shared/ts/equipment/equipment-stats';
 
 export interface InventoryCallbacks {
   onUse: (slotIndex: number) => void;
@@ -714,11 +694,13 @@ export class InventoryUI {
       }
     } else {
       // Show base stats for items without properties
-      if (isWeapon && WEAPON_BASE_STATS[slot.kind]) {
-        const stats = WEAPON_BASE_STATS[slot.kind];
-        html += `<div style="color: #aaffaa; margin-bottom: 6px;">${stats.min}-${stats.max} damage</div>`;
-      } else if (isArmor && ARMOR_BASE_STATS[slot.kind]) {
-        html += `<div style="color: #aaffaa; margin-bottom: 6px;">+${ARMOR_BASE_STATS[slot.kind]} defense</div>`;
+      const weaponStats = isWeapon ? getWeaponStats(slot.kind) : null;
+      const armorStats = isArmor ? getArmorStats(slot.kind) : null;
+
+      if (weaponStats) {
+        html += `<div style="color: #aaffaa; margin-bottom: 6px;">${weaponStats.min}-${weaponStats.max} damage</div>`;
+      } else if (armorStats) {
+        html += `<div style="color: #aaffaa; margin-bottom: 6px;">+${armorStats.defense} defense</div>`;
       }
     }
 
@@ -753,49 +735,29 @@ export class InventoryUI {
 
   /**
    * Get comparison HTML between inventory item and equipped item
-   * Now uses actual equipped properties for accurate comparison
+   * Uses shared equipment-stats module and actual equipped properties
    */
   private getComparisonHtml(slot: InventorySlot, equippedKind: number, type: 'weapon' | 'armor'): string {
-    // Get item stats (use properties if available, otherwise base stats)
-    let itemStat = 0;
-    let equippedStat = 0;
+    let diff: number;
 
     if (type === 'weapon') {
-      // New item stats
-      if (slot.properties && (slot.properties as ItemProperties).damageMin !== undefined) {
-        const props = slot.properties as ItemProperties;
-        itemStat = ((props.damageMin || 0) + (props.damageMax || 0)) / 2;
-      } else if (WEAPON_BASE_STATS[slot.kind]) {
-        const stats = WEAPON_BASE_STATS[slot.kind];
-        itemStat = (stats.min + stats.max) / 2;
-      }
-
-      // Equipped weapon stats - use ACTUAL properties if available
-      const equippedProps = this.equipped.weaponProps;
-      if (equippedProps && equippedProps.damageMin !== undefined) {
-        equippedStat = ((equippedProps.damageMin || 0) + (equippedProps.damageMax || 0)) / 2;
-      } else if (WEAPON_BASE_STATS[equippedKind]) {
-        const stats = WEAPON_BASE_STATS[equippedKind];
-        equippedStat = (stats.min + stats.max) / 2;
-      }
+      // Use compareWeapons with actual properties
+      diff = compareWeapons(
+        slot.kind,
+        equippedKind,
+        slot.properties as { damageMin?: number; damageMax?: number } | null,
+        this.equipped.weaponProps as { damageMin?: number; damageMax?: number } | null
+      );
     } else {
-      // New armor stats
-      if (slot.properties && (slot.properties as ItemProperties).defense !== undefined) {
-        itemStat = (slot.properties as ItemProperties).defense || 0;
-      } else if (ARMOR_BASE_STATS[slot.kind]) {
-        itemStat = ARMOR_BASE_STATS[slot.kind];
-      }
-
-      // Equipped armor stats - use ACTUAL properties if available
-      const equippedProps = this.equipped.armorProps;
-      if (equippedProps && equippedProps.defense !== undefined) {
-        equippedStat = equippedProps.defense || 0;
-      } else if (ARMOR_BASE_STATS[equippedKind]) {
-        equippedStat = ARMOR_BASE_STATS[equippedKind];
-      }
+      // Use compareArmors with actual properties
+      diff = compareArmors(
+        slot.kind,
+        equippedKind,
+        slot.properties as { defense?: number } | null,
+        this.equipped.armorProps as { defense?: number } | null
+      );
     }
 
-    const diff = itemStat - equippedStat;
     if (diff === 0) {
       return `<div style="color: #888; font-size: 11px; border-top: 1px solid #333; padding-top: 6px;">Same as equipped</div>`;
     }
@@ -866,11 +828,13 @@ export class InventoryUI {
     html += `<div style="padding: 8px 10px;">`;
 
     // Show base stats for equipped items
-    if (isWeapon && WEAPON_BASE_STATS[itemKind]) {
-      const stats = WEAPON_BASE_STATS[itemKind];
-      html += `<div style="color: #aaffaa; margin-bottom: 6px;">${stats.min}-${stats.max} damage</div>`;
-    } else if (!isWeapon && ARMOR_BASE_STATS[itemKind]) {
-      html += `<div style="color: #aaffaa; margin-bottom: 6px;">+${ARMOR_BASE_STATS[itemKind]} defense</div>`;
+    const weaponStats = isWeapon ? getWeaponStats(itemKind) : null;
+    const armorStats = !isWeapon ? getArmorStats(itemKind) : null;
+
+    if (weaponStats) {
+      html += `<div style="color: #aaffaa; margin-bottom: 6px;">${weaponStats.min}-${weaponStats.max} damage</div>`;
+    } else if (armorStats) {
+      html += `<div style="color: #aaffaa; margin-bottom: 6px;">+${armorStats.defense} defense</div>`;
     }
 
     html += `<div style="color: #888; font-size: 10px; margin-top: 4px;">Right-click to unequip</div>`;
@@ -968,36 +932,23 @@ export class InventoryUI {
 
   /**
    * Check if inventory has a better item than equipped
+   * Uses shared equipment-stats comparison functions
    */
   private hasBetterInInventory(type: 'weapon' | 'armor'): boolean {
     const equippedKind = type === 'weapon' ? this.equipped.weapon : this.equipped.armor;
-    const equippedStat = type === 'weapon'
-      ? (equippedKind && WEAPON_BASE_STATS[equippedKind] ? (WEAPON_BASE_STATS[equippedKind].min + WEAPON_BASE_STATS[equippedKind].max) / 2 : 0)
-      : (equippedKind && ARMOR_BASE_STATS[equippedKind] ? ARMOR_BASE_STATS[equippedKind] : 0);
+    const equippedProps = type === 'weapon' ? this.equipped.weaponProps : this.equipped.armorProps;
 
     for (const slot of this.slots) {
       if (!slot) continue;
       const isMatchingType = type === 'weapon' ? Types.isWeapon(slot.kind) : Types.isArmor(slot.kind);
       if (!isMatchingType) continue;
 
-      let slotStat = 0;
-      if (type === 'weapon') {
-        if (slot.properties && (slot.properties as ItemProperties).damageMin !== undefined) {
-          const props = slot.properties as ItemProperties;
-          slotStat = ((props.damageMin || 0) + (props.damageMax || 0)) / 2;
-        } else if (WEAPON_BASE_STATS[slot.kind]) {
-          const stats = WEAPON_BASE_STATS[slot.kind];
-          slotStat = (stats.min + stats.max) / 2;
-        }
-      } else {
-        if (slot.properties && (slot.properties as ItemProperties).defense !== undefined) {
-          slotStat = (slot.properties as ItemProperties).defense || 0;
-        } else if (ARMOR_BASE_STATS[slot.kind]) {
-          slotStat = ARMOR_BASE_STATS[slot.kind];
-        }
-      }
+      // Compare using shared functions with actual properties
+      const diff = type === 'weapon'
+        ? compareWeapons(slot.kind, equippedKind || 0, slot.properties as any, equippedProps as any)
+        : compareArmors(slot.kind, equippedKind || 0, slot.properties as any, equippedProps as any);
 
-      if (slotStat > equippedStat) {
+      if (diff > 0) {
         return true;
       }
     }

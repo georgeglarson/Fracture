@@ -1136,15 +1136,18 @@ export class Game {
       const pos = this.inputManager.getMouseGridPosition();
       const item = this.gridManager.getItemAt(pos.x, pos.y);
 
-      if (item && item.properties) {
+      if (item) {
         const equippedWeaponKind = this.player
           ? Types.getKindFromString(this.player.getWeaponName())
           : null;
+        // Get equipped weapon properties for accurate comparison
+        const equippedWeaponProps = this.inventoryController?.getUI()?.getEquippedWeaponProps();
         this.itemTooltip.show(
           item,
           equippedWeaponKind,
           this.mouse.x,
-          this.mouse.y
+          this.mouse.y,
+          equippedWeaponProps
         );
         return;
       }
