@@ -304,22 +304,14 @@ export class PlayerController {
       }
     );
 
-    if (transition) {
-      // Zone transition occurred - UnifiedZoneManager handles camera/viewport
-      // For outdoor exits, position camera on player
-      if (!this.deps.unifiedZoneManager.isIndoors()) {
-        if (dest.portal) {
-          this.deps.assignBubbleTo(this.player);
-        } else {
-          this.deps.camera.lookAt(this.player);
-        }
-      }
-    } else {
-      // No zone transition - just a simple door, position camera
-      if (!this.deps.unifiedZoneManager.isIndoors()) {
-        this.deps.camera.lookAt(this.player);
-      }
+    // After any door transition, ensure camera is correctly positioned
+    // For outdoor zones: camera follows player (lookAt)
+    // For indoor zones: camera is fixed by UnifiedZoneManager
+    if (!this.deps.unifiedZoneManager.isIndoors()) {
+      // Outdoor - camera must follow player
+      this.deps.camera.lookAt(this.player);
     }
+    // Indoor zones have fixed cameras set by enterZone(), no action needed here
 
     this.deps.resetZone();
 
