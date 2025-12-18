@@ -1,28 +1,38 @@
 import {Types} from '../../shared/ts/gametypes';
 import * as _ from 'lodash';
-import { serializeProperties } from '../../shared/ts/items/index.js';
+import { serializeProperties, ItemProperties } from '../../shared/ts/items/index.js';
+
+// Minimal interfaces for message serialization (avoid circular deps)
+interface HasState { getState(): unknown[]; }
+interface HasId { id: number | string; }
+interface HasPosition extends HasId { x: number; y: number; }
+interface HasHitPoints extends HasId { hitPoints?: number; maxHitPoints?: number; }
+interface HasKind { kind: number; }
+interface MobLike extends HasId, HasKind { hatelist?: Array<{ id: number }>; }
+interface ItemLike extends HasId, HasKind { properties?: ItemProperties | null; }
+
 export const Messages = {
   Spawn: class {
-    constructor(private entity: any) {
+    constructor(private entity: HasState) {
     }
 
-    serialize(): any[] {
-      return [Types.Messages.SPAWN].concat(this.entity.getState());
+    serialize(): unknown[] {
+      return [Types.Messages.SPAWN, ...(this.entity.getState() as unknown[])];
     }
   },
   Despawn: class {
     constructor(private entityId: number) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       return [Types.Messages.DESPAWN, this.entityId];
     }
   },
   Move: class {
-    constructor(private entity: any) {
+    constructor(private entity: HasPosition) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       return [Types.Messages.MOVE,
         this.entity.id,
         this.entity.x,
@@ -30,10 +40,10 @@ export const Messages = {
     }
   },
   LootMove: class {
-    constructor(private entity: any, private item: any) {
+    constructor(private entity: HasId, private item: HasId) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       return [Types.Messages.LOOTMOVE,
         this.entity.id,
         this.item.id];
@@ -43,7 +53,7 @@ export const Messages = {
     constructor(private attackerId: number, private targetId: number | null) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       return [Types.Messages.ATTACK,
         this.attackerId,
         this.targetId];
@@ -53,8 +63,8 @@ export const Messages = {
     constructor(private points: number, private isRegen: boolean = false) {
     }
 
-    serialize(): any[] {
-      var health: any[] = [Types.Messages.HEALTH,
+    serialize(): unknown[] {
+      const health: unknown[] = [Types.Messages.HEALTH,
         this.points];
 
       if (this.isRegen) {
@@ -67,33 +77,33 @@ export const Messages = {
     constructor(private maxHitPoints: number) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       return [Types.Messages.HP, this.maxHitPoints];
     }
   },
   EquipItem: class {
-    playerId: number;
-    constructor(private player: any, private itemKind: number) {
+    playerId: number | string;
+    constructor(private player: HasId, private itemKind: number) {
       this.playerId = player.id;
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       return [Types.Messages.EQUIP,
         this.playerId,
         this.itemKind];
     }
   },
   Drop: class {
-    constructor(private mob: any, private item: any) {
+    constructor(private mob: MobLike, private item: ItemLike) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       // Include item properties if available
       const properties = this.item.properties
         ? serializeProperties(this.item.properties)
         : null;
 
-      var drop: any[] = [Types.Messages.DROP,
+      const drop: unknown[] = [Types.Messages.DROP,
         this.mob.id,
         this.item.id,
         this.item.kind,
@@ -104,23 +114,23 @@ export const Messages = {
     }
   },
   Chat: class {
-    playerId: number;
+    playerId: number | string;
 
-    constructor(player: any, private message: string) {
+    constructor(player: HasId, private message: string) {
       this.playerId = player.id;
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       return [Types.Messages.CHAT,
         this.playerId,
         this.message];
     }
   },
   Teleport: class {
-    constructor(private entity: any) {
+    constructor(private entity: HasPosition) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       return [Types.Messages.TELEPORT,
         this.entity.id,
         this.entity.x,
@@ -129,10 +139,10 @@ export const Messages = {
   },
 
   Damage: class {
-    constructor(private entity: any, private points: number) {
+    constructor(private entity: HasHitPoints, private points: number) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       // Include mob HP for health bar display
       return [Types.Messages.DAMAGE,
         this.entity.id,
@@ -146,7 +156,7 @@ export const Messages = {
     constructor(private world: number, private total?: number) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       // Hacked this
       // Made total prop optional
       // Added condition to fallbac to world count
@@ -157,21 +167,21 @@ export const Messages = {
   },
 
   Kill: class {
-    constructor(private mob: any) {
+    constructor(private mob: HasKind) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       return [Types.Messages.KILL,
         this.mob.kind];
     }
   },
 
   List: class {
-    constructor(private ids: any[]) {
+    constructor(private ids: number[]) {
     }
 
-    serialize(): any[] {
-      var list = this.ids;
+    serialize(): unknown[] {
+      const list: unknown[] = [...this.ids];
 
       list.unshift(Types.Messages.LIST);
       return list;
@@ -179,20 +189,20 @@ export const Messages = {
   },
 
   Destroy: class {
-    constructor(private entity: any) {
+    constructor(private entity: HasId) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       return [Types.Messages.DESTROY,
         this.entity.id];
     }
   },
 
   Blink: class {
-    constructor(private item: any) {
+    constructor(private item: HasId) {
     }
 
-    serialize(): any[] {
+    serialize(): unknown[] {
       return [Types.Messages.BLINK,
         this.item.id];
     }
