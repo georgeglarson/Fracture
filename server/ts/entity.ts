@@ -7,6 +7,7 @@ export abstract class Entity {
   kind: number;
   x: number;
   y: number;
+  group?: string; // Spatial group ID, assigned by SpatialManager
 
   constructor(id: string | number, type: string, kind: number, x: number, y: number) {
     this.id = typeof id === 'string' ? parseInt(id) : id;

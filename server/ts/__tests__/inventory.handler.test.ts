@@ -24,6 +24,7 @@ describe('InventoryHandler', () => {
       addItem: vi.fn(() => 0), // Returns slot index
       removeItem: vi.fn(),
       getSlot: vi.fn(() => null),
+      getSlots: vi.fn(() => new Array(20).fill(null)), // 20 empty slots
       setSlot: vi.fn(),
       swapSlots: vi.fn(() => true),
       isSlotConsumable: vi.fn(() => false),
