@@ -27,6 +27,9 @@ import {MobArea} from './mobarea';
 import {ChestArea} from './chestarea';
 import type {Player} from './player'; // Type-only import to avoid circular dep
 
+// Message type for push methods - can be an object with serialize() or a raw array
+type MessagePayload = { serialize(): unknown[] } | unknown[];
+
 export class World {
 
   id: string | number;
@@ -165,11 +168,11 @@ export class World {
         }
       });
 
-      player.onBroadcast(function (message: { serialize(): unknown[] }, ignoreSelf: boolean) {
+      player.onBroadcast(function (message, ignoreSelf: boolean) {
         self.pushToAdjacentGroups(player.group!, message, ignoreSelf ? player.id : null);
       });
 
-      player.onBroadcastToZone(function (message: { serialize(): unknown[] }, ignoreSelf: boolean) {
+      player.onBroadcastToZone(function (message, ignoreSelf: boolean) {
         self.pushToGroup(player.group!, message, ignoreSelf ? player.id : null);
       });
 
@@ -522,16 +525,16 @@ export class World {
     this.broadcaster?.pushToPlayer(player, message);
   }
 
-  pushToGroup(groupId: string, message: { serialize(): unknown[] }, ignoredPlayer?: string | number) {
-    this.broadcaster?.pushToGroup(groupId, message, ignoredPlayer);
+  pushToGroup(groupId: string, message: MessagePayload, ignoredPlayer?: string | number) {
+    this.broadcaster?.pushToGroup(groupId, message as { serialize(): unknown[] }, ignoredPlayer);
   }
 
-  pushToAdjacentGroups(groupId: string, message: { serialize(): unknown[] }, ignoredPlayer?: string | number | null) {
-    this.broadcaster?.pushToAdjacentGroups(groupId, message, ignoredPlayer ?? undefined);
+  pushToAdjacentGroups(groupId: string, message: MessagePayload, ignoredPlayer?: string | number | null) {
+    this.broadcaster?.pushToAdjacentGroups(groupId, message as { serialize(): unknown[] }, ignoredPlayer ?? undefined);
   }
 
-  pushToPreviousGroups(player: Player, message: { serialize(): unknown[] }) {
-    this.broadcaster?.pushToPreviousGroups(player, message);
+  pushToPreviousGroups(player: Player, message: MessagePayload) {
+    this.broadcaster?.pushToPreviousGroups(player, message as { serialize(): unknown[] });
   }
 
   pushBroadcast(message: { serialize(): unknown[] }, ignoredPlayer?: string | number) {

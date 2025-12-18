@@ -8,13 +8,23 @@ import {Utils} from './utils';
 import {World} from './world';
 import {Messages} from './message';
 import {Formulas} from './formulas';
+import type {Mob} from './mob';
+import type {Checkpoint} from './checkpoint';
+import type {Item} from './item';
+
+// Minimal interface for serializable messages (avoid importing all message types)
+// Can be an object with serialize() or a raw array (already serialized)
+interface SerializableMessage {
+  serialize(): unknown[];
+}
+type MessagePayload = SerializableMessage | unknown[];
 import {Properties} from './properties';
 import {Chest} from './chest';
 import {EquipmentManager} from './equipment/equipment-manager';
 import {PlayerAchievements} from '../../shared/ts/achievements';
 import {Inventory} from './inventory/inventory';
 import {SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
-import {MessageRouter} from './player/message-router';
+import {MessageRouter, MessageHandlerContext} from './player/message-router';
 import {getDailyRewardService} from './player/daily-reward.service';
 import {ProgressionService, createProgressionService} from './player/progression.service';
 import {IStorageService, CharacterData, DailyData, PlayerSaveState} from './storage/storage.interface';
@@ -40,8 +50,8 @@ export class Player extends Character {
 
   hasEnteredGame = false;
   isDead = false;
-  haters: Record<number | string, any> = {};
-  lastCheckpoint: any = null;
+  haters: Record<number | string, Mob> = {};
+  lastCheckpoint: Checkpoint | null = null;
   disconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   formatChecker: FormatChecker;
   name!: string;
@@ -83,10 +93,10 @@ export class Player extends Character {
   zone_callback: ((zoneId: number) => void) | null = null;
   move_callback: ((x: number, y: number) => void) | null = null;
   lootmove_callback: ((x: number, y: number) => void) | null = null;
-  message_callback: ((message: any[]) => void) | null = null;
+  message_callback: ((message: unknown[]) => void) | null = null;
   exit_callback: (() => void) | null = null;
-  broadcast_callback: ((message: any, ignoreSelf: boolean) => void) | null = null;
-  broadcastzone_callback: ((message: any, ignoreSelf: boolean) => void) | null = null;
+  broadcast_callback: ((message: MessagePayload, ignoreSelf: boolean) => void) | null = null;
+  broadcastzone_callback: ((message: MessagePayload, ignoreSelf: boolean) => void) | null = null;
   orient_callback: ((orientation: number) => void) | null = null;
   requestpos_callback: (() => { x: number; y: number }) | null = null;
 
@@ -107,8 +117,8 @@ export class Player extends Character {
       getName: () => this.name
     });
 
-    this.connection.listen(async function (message: any[]) {
-      var action = parseInt(message[0]);
+    this.connection.listen(async function (message: unknown[]) {
+      var action = parseInt(String(message[0]));
 
       console.debug('Received: ' + message);
       if (!self.formatChecker.check(message)) {
@@ -128,7 +138,8 @@ export class Player extends Character {
       self.resetTimeout();
 
       // Route message through MessageRouter - delegates to appropriate handler
-      const handled = await Player.getMessageRouter().route(self as any, message);
+      // Cast needed because Player has private world but MessageHandlerContext expects public
+      const handled = await Player.getMessageRouter().route(self as unknown as MessageHandlerContext, message);
 
       // If not handled by router, pass to message callback
       if (!handled && self.message_callback) {
@@ -176,7 +187,7 @@ export class Player extends Character {
     return basestate.concat(state);
   }
 
-  send(message: any) {
+  send(message: MessagePayload) {
     this.connection.send(message);
   }
 
@@ -208,13 +219,13 @@ export class Player extends Character {
     return this.equipment;
   }
 
-  broadcast(message: any, ignoreSelf?: boolean) {
+  broadcast(message: MessagePayload, ignoreSelf?: boolean) {
     if (this.broadcast_callback) {
       this.broadcast_callback(message, ignoreSelf === undefined ? true : ignoreSelf);
     }
   }
 
-  broadcastToZone(message: any, ignoreSelf?: boolean) {
+  broadcastToZone(message: MessagePayload, ignoreSelf?: boolean) {
     if (this.broadcastzone_callback) {
       this.broadcastzone_callback(message, ignoreSelf === undefined ? true : ignoreSelf);
     }
@@ -240,15 +251,15 @@ export class Player extends Character {
     this.orient_callback = callback;
   }
 
-  onMessage(callback: (message: any[]) => void) {
+  onMessage(callback: (message: unknown[]) => void) {
     this.message_callback = callback;
   }
 
-  onBroadcast(callback: (message: any, ignoreSelf: boolean) => void) {
+  onBroadcast(callback: (message: MessagePayload, ignoreSelf: boolean) => void) {
     this.broadcast_callback = callback;
   }
 
-  onBroadcastToZone(callback: (message: any, ignoreSelf: boolean) => void) {
+  onBroadcastToZone(callback: (message: MessagePayload, ignoreSelf: boolean) => void) {
     this.broadcastzone_callback = callback;
   }
 
@@ -256,7 +267,7 @@ export class Player extends Character {
     return new Messages.EquipItem(this, item);
   }
 
-  addHater(mob: any) {
+  addHater(mob: Mob) {
     if (mob) {
       if (!(mob.id in this.haters)) {
         this.haters[mob.id] = mob;
@@ -264,13 +275,13 @@ export class Player extends Character {
     }
   }
 
-  removeHater(mob: any) {
+  removeHater(mob: Mob) {
     if (mob && mob.id in this.haters) {
       delete this.haters[mob.id];
     }
   }
 
-  forEachHater(callback: (mob: any) => void) {
+  forEachHater(callback: (mob: Mob) => void) {
     _.each(this.haters, function (mob) {
       callback(mob);
     });
@@ -288,7 +299,7 @@ export class Player extends Character {
     EquipmentHandler.equipWeapon(this, kind);
   }
 
-  equipItem(item: any) {
+  equipItem(item: Item) {
     EquipmentHandler.equipItem(this, item);
   }
 
@@ -445,7 +456,7 @@ export class Player extends Character {
   // AI NARRATOR - Delegated to VeniceHandler
   // ============================================================================
 
-  async triggerNarration(event: string, details?: Record<string, any>) {
+  async triggerNarration(event: string, details?: Record<string, unknown>) {
     await VeniceHandler.triggerNarration(this, event, details);
   }
 
