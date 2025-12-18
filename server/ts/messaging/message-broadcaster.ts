@@ -81,10 +81,14 @@ export class MessageBroadcaster {
    * Push a message to a specific player's queue
    */
   pushToPlayer(player: Player | undefined, message: Message): void {
-    if (player && player.id in this.outgoingQueues) {
-      this.outgoingQueues[player.id].push(message.serialize());
-    } else {
-      console.error('pushToPlayer: player was undefined or has no queue');
+    try {
+      if (player && player.id in this.outgoingQueues) {
+        this.outgoingQueues[player.id].push(message.serialize());
+      } else {
+        console.debug('[Broadcaster] pushToPlayer: player was undefined or has no queue');
+      }
+    } catch (error) {
+      console.error(`[Broadcaster] Failed to push to player ${player?.id}:`, error);
     }
   }
 
@@ -92,17 +96,21 @@ export class MessageBroadcaster {
    * Push a message to all players in a specific group
    */
   pushToGroup(groupId: string, message: Message, ignoredPlayer?: string | number): void {
-    const group = this.groups[groupId];
+    try {
+      const group = this.groups[groupId];
 
-    if (group) {
-      _.each(group.players, (playerId) => {
-        if (playerId != ignoredPlayer) {
-          const player = this.entityProvider.getEntityById(playerId);
-          this.pushToPlayer(player, message);
-        }
-      });
-    } else {
-      console.error('groupId: ' + groupId + ' is not a valid group');
+      if (group) {
+        _.each(group.players, (playerId) => {
+          if (playerId != ignoredPlayer) {
+            const player = this.entityProvider.getEntityById(playerId);
+            this.pushToPlayer(player, message);
+          }
+        });
+      } else {
+        console.debug('[Broadcaster] groupId: ' + groupId + ' is not a valid group');
+      }
+    } catch (error) {
+      console.error(`[Broadcaster] Failed to push to group ${groupId}:`, error);
     }
   }
 
@@ -110,20 +118,28 @@ export class MessageBroadcaster {
    * Push a message to all players in adjacent groups
    */
   pushToAdjacentGroups(groupId: string, message: Message, ignoredPlayer?: string | number): void {
-    this.map.forEachAdjacentGroup(groupId, (id) => {
-      this.pushToGroup(id, message, ignoredPlayer);
-    });
+    try {
+      this.map.forEachAdjacentGroup(groupId, (id) => {
+        this.pushToGroup(id, message, ignoredPlayer);
+      });
+    } catch (error) {
+      console.error(`[Broadcaster] Failed to push to adjacent groups of ${groupId}:`, error);
+    }
   }
 
   /**
    * Push a message to groups the player recently left
    */
   pushToPreviousGroups(player: Player, message: Message): void {
-    if (player.recentlyLeftGroups) {
-      _.each(player.recentlyLeftGroups, (id) => {
-        this.pushToGroup(id, message);
-      });
-      player.recentlyLeftGroups = [];
+    try {
+      if (player.recentlyLeftGroups) {
+        _.each(player.recentlyLeftGroups, (id) => {
+          this.pushToGroup(id, message);
+        });
+        player.recentlyLeftGroups = [];
+      }
+    } catch (error) {
+      console.error(`[Broadcaster] Failed to push to previous groups for player ${player?.id}:`, error);
     }
   }
 
@@ -131,10 +147,15 @@ export class MessageBroadcaster {
    * Push a message to ALL players (global broadcast)
    */
   pushBroadcast(message: Message, ignoredPlayer?: string | number): void {
-    for (const id in this.outgoingQueues) {
-      if (id != ignoredPlayer) {
-        this.outgoingQueues[id].push(message.serialize());
+    try {
+      const serialized = message.serialize();
+      for (const id in this.outgoingQueues) {
+        if (id != ignoredPlayer) {
+          this.outgoingQueues[id].push(serialized);
+        }
       }
+    } catch (error) {
+      console.error('[Broadcaster] Failed to push broadcast:', error);
     }
   }
 
@@ -143,12 +164,18 @@ export class MessageBroadcaster {
    */
   processQueues(): void {
     for (const id in this.outgoingQueues) {
-      if (this.outgoingQueues[id].length > 0) {
-        const connection = this.server.getConnection(id);
-        // Skip AI players that don't have real connections
-        if (connection) {
-          connection.send(this.outgoingQueues[id]);
+      try {
+        if (this.outgoingQueues[id].length > 0) {
+          const connection = this.server.getConnection(id);
+          // Skip AI players that don't have real connections
+          if (connection) {
+            connection.send(this.outgoingQueues[id]);
+          }
+          this.outgoingQueues[id] = [];
         }
+      } catch (error) {
+        console.error(`[Broadcaster] Failed to process queue for ${id}:`, error);
+        // Clear the queue even on error to prevent memory buildup
         this.outgoingQueues[id] = [];
       }
     }

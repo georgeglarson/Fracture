@@ -47,7 +47,9 @@ export interface PlayerSaveState {
 
 /**
  * Storage service interface
- * All methods are synchronous for better-sqlite3 compatibility
+ * All methods are synchronous for better-sqlite3 compatibility.
+ * Save methods return boolean for success/failure indication.
+ * Get methods return null on failure for graceful degradation.
  */
 export interface IStorageService {
   // Lifecycle
@@ -57,25 +59,25 @@ export interface IStorageService {
   // Character
   getCharacter(name: string): CharacterData | null;
   getCharacterById(id: string): CharacterData | null;
-  saveCharacter(data: CharacterData): void;
+  saveCharacter(data: CharacterData): boolean;
   createCharacter(name: string, password: string): CharacterData;
   characterExists(name: string): boolean;
   verifyPassword(name: string, password: string): boolean;
 
   // Inventory
   getInventory(characterId: string): (SerializedInventorySlot | null)[];
-  saveInventory(characterId: string, slots: (SerializedInventorySlot | null)[]): void;
+  saveInventory(characterId: string, slots: (SerializedInventorySlot | null)[]): boolean;
 
   // Achievements
   getAchievements(characterId: string): PlayerAchievements;
-  saveAchievements(characterId: string, data: PlayerAchievements): void;
+  saveAchievements(characterId: string, data: PlayerAchievements): boolean;
 
   // Daily login
   getDailyData(characterId: string): DailyData | null;
-  saveDailyData(characterId: string, data: DailyData): void;
+  saveDailyData(characterId: string, data: DailyData): boolean;
 
   // Convenience: Save all player data at once
-  savePlayerState(state: PlayerSaveState): void;
+  savePlayerState(state: PlayerSaveState): boolean;
 
   // Convenience: Load all player data at once
   loadPlayerState(characterName: string): PlayerSaveState | null;

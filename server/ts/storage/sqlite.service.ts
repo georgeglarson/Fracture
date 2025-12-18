@@ -7,6 +7,7 @@
 
 import Database from 'better-sqlite3';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as crypto from 'crypto';
 import {
   IStorageService,
@@ -19,6 +20,17 @@ import { PlayerAchievements, createEmptyPlayerAchievements } from '../../../shar
 
 const DB_PATH = path.join(process.cwd(), 'server', 'data', 'fracture.db');
 
+/**
+ * Storage operation error with context
+ */
+class StorageError extends Error {
+  constructor(operation: string, cause?: Error) {
+    super(`Storage error in ${operation}: ${cause?.message || 'unknown error'}`);
+    this.name = 'StorageError';
+    this.cause = cause;
+  }
+}
+
 export class SQLiteStorageService implements IStorageService {
   private db: Database.Database | null = null;
 
@@ -28,13 +40,25 @@ export class SQLiteStorageService implements IStorageService {
   initialize(): void {
     console.log(`[Storage] Initializing SQLite database at ${DB_PATH}`);
 
-    this.db = new Database(DB_PATH);
-    this.db.pragma('journal_mode = WAL');
+    try {
+      // Ensure data directory exists
+      const dataDir = path.dirname(DB_PATH);
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+        console.log(`[Storage] Created data directory: ${dataDir}`);
+      }
 
-    // Create tables
-    this.createTables();
+      this.db = new Database(DB_PATH);
+      this.db.pragma('journal_mode = WAL');
 
-    console.log('[Storage] Database initialized successfully');
+      // Create tables
+      this.createTables();
+
+      console.log('[Storage] Database initialized successfully');
+    } catch (error) {
+      console.error('[Storage] Failed to initialize database:', error);
+      throw new StorageError('initialize', error as Error);
+    }
   }
 
   /**
@@ -164,113 +188,153 @@ export class SQLiteStorageService implements IStorageService {
   // ============ Character Methods ============
 
   getCharacter(name: string): CharacterData | null {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db) {
+      console.error('[Storage] getCharacter: Database not initialized');
+      return null;
+    }
 
-    const stmt = this.db.prepare(`
-      SELECT id, name, level, xp, gold, armor_kind, weapon_kind, x, y,
-             created_at, last_saved
-      FROM characters WHERE name = ?
-    `);
+    try {
+      const stmt = this.db.prepare(`
+        SELECT id, name, level, xp, gold, armor_kind, weapon_kind, x, y,
+               created_at, last_saved
+        FROM characters WHERE name = ?
+      `);
 
-    const row = stmt.get(name) as any;
-    if (!row) return null;
+      const row = stmt.get(name) as any;
+      if (!row) return null;
 
-    return {
-      id: row.id,
-      name: row.name,
-      level: row.level,
-      xp: row.xp,
-      gold: row.gold,
-      armorKind: row.armor_kind,
-      weaponKind: row.weapon_kind,
-      x: row.x,
-      y: row.y,
-      createdAt: row.created_at,
-      lastSaved: row.last_saved
-    };
+      return {
+        id: row.id,
+        name: row.name,
+        level: row.level,
+        xp: row.xp,
+        gold: row.gold,
+        armorKind: row.armor_kind,
+        weaponKind: row.weapon_kind,
+        x: row.x,
+        y: row.y,
+        createdAt: row.created_at,
+        lastSaved: row.last_saved
+      };
+    } catch (error) {
+      console.error(`[Storage] getCharacter failed for ${name}:`, error);
+      return null;
+    }
   }
 
   getCharacterById(id: string): CharacterData | null {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db) {
+      console.error('[Storage] getCharacterById: Database not initialized');
+      return null;
+    }
 
-    const stmt = this.db.prepare(`
-      SELECT id, name, level, xp, gold, armor_kind, weapon_kind, x, y,
-             created_at, last_saved
-      FROM characters WHERE id = ?
-    `);
+    try {
+      const stmt = this.db.prepare(`
+        SELECT id, name, level, xp, gold, armor_kind, weapon_kind, x, y,
+               created_at, last_saved
+        FROM characters WHERE id = ?
+      `);
 
-    const row = stmt.get(id) as any;
-    if (!row) return null;
+      const row = stmt.get(id) as any;
+      if (!row) return null;
 
-    return {
-      id: row.id,
-      name: row.name,
-      level: row.level,
-      xp: row.xp,
-      gold: row.gold,
-      armorKind: row.armor_kind,
-      weaponKind: row.weapon_kind,
-      x: row.x,
-      y: row.y,
-      createdAt: row.created_at,
-      lastSaved: row.last_saved
-    };
+      return {
+        id: row.id,
+        name: row.name,
+        level: row.level,
+        xp: row.xp,
+        gold: row.gold,
+        armorKind: row.armor_kind,
+        weaponKind: row.weapon_kind,
+        x: row.x,
+        y: row.y,
+        createdAt: row.created_at,
+        lastSaved: row.last_saved
+      };
+    } catch (error) {
+      console.error(`[Storage] getCharacterById failed for ${id}:`, error);
+      return null;
+    }
   }
 
-  saveCharacter(data: CharacterData): void {
-    if (!this.db) throw new Error('Database not initialized');
+  saveCharacter(data: CharacterData): boolean {
+    if (!this.db) {
+      console.error('[Storage] saveCharacter: Database not initialized');
+      return false;
+    }
 
-    const stmt = this.db.prepare(`
-      UPDATE characters
-      SET level = ?, xp = ?, gold = ?, armor_kind = ?, weapon_kind = ?,
-          x = ?, y = ?, last_saved = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
+    try {
+      const stmt = this.db.prepare(`
+        UPDATE characters
+        SET level = ?, xp = ?, gold = ?, armor_kind = ?, weapon_kind = ?,
+            x = ?, y = ?, last_saved = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `);
 
-    stmt.run(
-      data.level,
-      data.xp,
-      data.gold,
-      data.armorKind,
-      data.weaponKind,
-      data.x,
-      data.y,
-      data.id
-    );
+      stmt.run(
+        data.level,
+        data.xp,
+        data.gold,
+        data.armorKind,
+        data.weaponKind,
+        data.x,
+        data.y,
+        data.id
+      );
+      return true;
+    } catch (error) {
+      console.error(`[Storage] saveCharacter failed for ${data.name}:`, error);
+      return false;
+    }
   }
 
   createCharacter(name: string, password: string): CharacterData {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db) {
+      throw new StorageError('createCharacter', new Error('Database not initialized'));
+    }
 
-    const id = this.generateId();
-    const passwordHash = this.hashPassword(password);
-    const stmt = this.db.prepare(`
-      INSERT INTO characters (id, name, password_hash, level, xp, gold, x, y)
-      VALUES (?, ?, ?, 1, 0, 0, 0, 0)
-    `);
+    try {
+      const id = this.generateId();
+      const passwordHash = this.hashPassword(password);
+      const stmt = this.db.prepare(`
+        INSERT INTO characters (id, name, password_hash, level, xp, gold, x, y)
+        VALUES (?, ?, ?, 1, 0, 0, 0, 0)
+      `);
 
-    stmt.run(id, name, passwordHash);
+      stmt.run(id, name, passwordHash);
 
-    console.log(`[Storage] Created new character: ${name} (${id})`);
+      console.log(`[Storage] Created new character: ${name} (${id})`);
 
-    return {
-      id,
-      name,
-      level: 1,
-      xp: 0,
-      gold: 0,
-      armorKind: null,
-      weaponKind: null,
-      x: 0,
-      y: 0
-    };
+      return {
+        id,
+        name,
+        level: 1,
+        xp: 0,
+        gold: 0,
+        armorKind: null,
+        weaponKind: null,
+        x: 0,
+        y: 0
+      };
+    } catch (error) {
+      console.error(`[Storage] createCharacter failed for ${name}:`, error);
+      throw new StorageError('createCharacter', error as Error);
+    }
   }
 
   characterExists(name: string): boolean {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db) {
+      console.error('[Storage] characterExists: Database not initialized');
+      return false;
+    }
 
-    const stmt = this.db.prepare('SELECT 1 FROM characters WHERE name = ?');
-    return stmt.get(name) !== undefined;
+    try {
+      const stmt = this.db.prepare('SELECT 1 FROM characters WHERE name = ?');
+      return stmt.get(name) !== undefined;
+    } catch (error) {
+      console.error(`[Storage] characterExists failed for ${name}:`, error);
+      return false;
+    }
   }
 
   /**
@@ -278,217 +342,292 @@ export class SQLiteStorageService implements IStorageService {
    * Returns true if password matches, false otherwise
    */
   verifyPassword(name: string, password: string): boolean {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db) {
+      console.error('[Storage] verifyPassword: Database not initialized');
+      return false;
+    }
 
-    const stmt = this.db.prepare('SELECT password_hash FROM characters WHERE name = ?');
-    const row = stmt.get(name) as any;
-    if (!row) return false;
+    try {
+      const stmt = this.db.prepare('SELECT password_hash FROM characters WHERE name = ?');
+      const row = stmt.get(name) as any;
+      if (!row) return false;
 
-    return this.checkPassword(password, row.password_hash);
+      return this.checkPassword(password, row.password_hash);
+    } catch (error) {
+      console.error(`[Storage] verifyPassword failed for ${name}:`, error);
+      return false;
+    }
   }
 
   // ============ Inventory Methods ============
 
   getInventory(characterId: string): (SerializedInventorySlot | null)[] {
-    if (!this.db) throw new Error('Database not initialized');
-
-    const stmt = this.db.prepare(`
-      SELECT slot, item_kind, count, properties
-      FROM inventory WHERE character_id = ?
-      ORDER BY slot
-    `);
-
-    const rows = stmt.all(characterId) as any[];
-
-    // Create 20-slot array
-    const inventory: (SerializedInventorySlot | null)[] = new Array(20).fill(null);
-
-    for (const row of rows) {
-      if (row.slot >= 0 && row.slot < 20) {
-        inventory[row.slot] = {
-          k: row.item_kind,
-          c: row.count,
-          p: row.properties ? JSON.parse(row.properties) : null
-        };
-      }
+    if (!this.db) {
+      console.error('[Storage] getInventory: Database not initialized');
+      return new Array(20).fill(null);
     }
 
-    return inventory;
-  }
+    try {
+      const stmt = this.db.prepare(`
+        SELECT slot, item_kind, count, properties
+        FROM inventory WHERE character_id = ?
+        ORDER BY slot
+      `);
 
-  saveInventory(characterId: string, slots: (SerializedInventorySlot | null)[]): void {
-    if (!this.db) throw new Error('Database not initialized');
+      const rows = stmt.all(characterId) as any[];
 
-    // Delete existing inventory
-    const deleteStmt = this.db.prepare('DELETE FROM inventory WHERE character_id = ?');
-    deleteStmt.run(characterId);
+      // Create 20-slot array
+      const inventory: (SerializedInventorySlot | null)[] = new Array(20).fill(null);
 
-    // Insert new inventory
-    const insertStmt = this.db.prepare(`
-      INSERT INTO inventory (character_id, slot, item_kind, count, properties)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
-    const insertMany = this.db.transaction((slots: (SerializedInventorySlot | null)[]) => {
-      for (let i = 0; i < slots.length; i++) {
-        const slot = slots[i];
-        if (slot) {
-          insertStmt.run(
-            characterId,
-            i,
-            slot.k,
-            slot.c || 1,
-            slot.p ? JSON.stringify(slot.p) : null
-          );
+      for (const row of rows) {
+        if (row.slot >= 0 && row.slot < 20) {
+          inventory[row.slot] = {
+            k: row.item_kind,
+            c: row.count,
+            p: row.properties ? JSON.parse(row.properties) : null
+          };
         }
       }
-    });
 
-    insertMany(slots);
+      return inventory;
+    } catch (error) {
+      console.error(`[Storage] getInventory failed for ${characterId}:`, error);
+      return new Array(20).fill(null);
+    }
+  }
+
+  saveInventory(characterId: string, slots: (SerializedInventorySlot | null)[]): boolean {
+    if (!this.db) {
+      console.error('[Storage] saveInventory: Database not initialized');
+      return false;
+    }
+
+    try {
+      // Delete existing inventory
+      const deleteStmt = this.db.prepare('DELETE FROM inventory WHERE character_id = ?');
+      deleteStmt.run(characterId);
+
+      // Insert new inventory
+      const insertStmt = this.db.prepare(`
+        INSERT INTO inventory (character_id, slot, item_kind, count, properties)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      const insertMany = this.db.transaction((slots: (SerializedInventorySlot | null)[]) => {
+        for (let i = 0; i < slots.length; i++) {
+          const slot = slots[i];
+          if (slot) {
+            insertStmt.run(
+              characterId,
+              i,
+              slot.k,
+              slot.c || 1,
+              slot.p ? JSON.stringify(slot.p) : null
+            );
+          }
+        }
+      });
+
+      insertMany(slots);
+      return true;
+    } catch (error) {
+      console.error(`[Storage] saveInventory failed for ${characterId}:`, error);
+      return false;
+    }
   }
 
   // ============ Achievements Methods ============
 
   getAchievements(characterId: string): PlayerAchievements {
-    if (!this.db) throw new Error('Database not initialized');
-
-    // Get unlocked achievements
-    const achievementStmt = this.db.prepare(`
-      SELECT achievement_id, progress, unlocked_at
-      FROM achievements WHERE character_id = ?
-    `);
-    const rows = achievementStmt.all(characterId) as any[];
-
-    // Get selected title
-    const titleStmt = this.db.prepare(`
-      SELECT selected_title FROM character_titles WHERE character_id = ?
-    `);
-    const titleRow = titleStmt.get(characterId) as any;
-
-    const unlocked: string[] = [];
-    const progress: Record<string, number> = {};
-
-    for (const row of rows) {
-      if (row.unlocked_at) {
-        unlocked.push(row.achievement_id);
-      }
-      if (row.progress > 0) {
-        progress[row.achievement_id] = row.progress;
-      }
+    if (!this.db) {
+      console.error('[Storage] getAchievements: Database not initialized');
+      return createEmptyPlayerAchievements();
     }
 
-    return {
-      unlocked,
-      progress,
-      selectedTitle: titleRow?.selected_title || null
-    };
-  }
+    try {
+      // Get unlocked achievements
+      const achievementStmt = this.db.prepare(`
+        SELECT achievement_id, progress, unlocked_at
+        FROM achievements WHERE character_id = ?
+      `);
+      const rows = achievementStmt.all(characterId) as any[];
 
-  saveAchievements(characterId: string, data: PlayerAchievements): void {
-    if (!this.db) throw new Error('Database not initialized');
+      // Get selected title
+      const titleStmt = this.db.prepare(`
+        SELECT selected_title FROM character_titles WHERE character_id = ?
+      `);
+      const titleRow = titleStmt.get(characterId) as any;
 
-    // Save selected title
-    const titleStmt = this.db.prepare(`
-      INSERT INTO character_titles (character_id, selected_title)
-      VALUES (?, ?)
-      ON CONFLICT(character_id) DO UPDATE SET selected_title = excluded.selected_title
-    `);
-    titleStmt.run(characterId, data.selectedTitle);
+      const unlocked: string[] = [];
+      const progress: Record<string, number> = {};
 
-    // Save achievements (upsert)
-    const upsertStmt = this.db.prepare(`
-      INSERT INTO achievements (character_id, achievement_id, progress, unlocked_at)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(character_id, achievement_id) DO UPDATE SET
-        progress = excluded.progress,
-        unlocked_at = COALESCE(achievements.unlocked_at, excluded.unlocked_at)
-    `);
-
-    const saveMany = this.db.transaction((achievements: PlayerAchievements) => {
-      // Save unlocked achievements
-      for (const achievementId of achievements.unlocked) {
-        const progress = achievements.progress[achievementId] || 0;
-        upsertStmt.run(characterId, achievementId, progress, new Date().toISOString());
-      }
-
-      // Save progress for non-unlocked achievements
-      for (const [achievementId, progressValue] of Object.entries(achievements.progress)) {
-        if (!achievements.unlocked.includes(achievementId)) {
-          upsertStmt.run(characterId, achievementId, progressValue, null);
+      for (const row of rows) {
+        if (row.unlocked_at) {
+          unlocked.push(row.achievement_id);
+        }
+        if (row.progress > 0) {
+          progress[row.achievement_id] = row.progress;
         }
       }
-    });
 
-    saveMany(data);
+      return {
+        unlocked,
+        progress,
+        selectedTitle: titleRow?.selected_title || null
+      };
+    } catch (error) {
+      console.error(`[Storage] getAchievements failed for ${characterId}:`, error);
+      return createEmptyPlayerAchievements();
+    }
+  }
+
+  saveAchievements(characterId: string, data: PlayerAchievements): boolean {
+    if (!this.db) {
+      console.error('[Storage] saveAchievements: Database not initialized');
+      return false;
+    }
+
+    try {
+      // Save selected title
+      const titleStmt = this.db.prepare(`
+        INSERT INTO character_titles (character_id, selected_title)
+        VALUES (?, ?)
+        ON CONFLICT(character_id) DO UPDATE SET selected_title = excluded.selected_title
+      `);
+      titleStmt.run(characterId, data.selectedTitle);
+
+      // Save achievements (upsert)
+      const upsertStmt = this.db.prepare(`
+        INSERT INTO achievements (character_id, achievement_id, progress, unlocked_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(character_id, achievement_id) DO UPDATE SET
+          progress = excluded.progress,
+          unlocked_at = COALESCE(achievements.unlocked_at, excluded.unlocked_at)
+      `);
+
+      const saveMany = this.db.transaction((achievements: PlayerAchievements) => {
+        // Save unlocked achievements
+        for (const achievementId of achievements.unlocked) {
+          const progress = achievements.progress[achievementId] || 0;
+          upsertStmt.run(characterId, achievementId, progress, new Date().toISOString());
+        }
+
+        // Save progress for non-unlocked achievements
+        for (const [achievementId, progressValue] of Object.entries(achievements.progress)) {
+          if (!achievements.unlocked.includes(achievementId)) {
+            upsertStmt.run(characterId, achievementId, progressValue, null);
+          }
+        }
+      });
+
+      saveMany(data);
+      return true;
+    } catch (error) {
+      console.error(`[Storage] saveAchievements failed for ${characterId}:`, error);
+      return false;
+    }
   }
 
   // ============ Daily Login Methods ============
 
   getDailyData(characterId: string): DailyData | null {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db) {
+      console.error('[Storage] getDailyData: Database not initialized');
+      return null;
+    }
 
-    const stmt = this.db.prepare(`
-      SELECT last_login, current_streak, longest_streak, total_logins
-      FROM daily_logins WHERE character_id = ?
-    `);
+    try {
+      const stmt = this.db.prepare(`
+        SELECT last_login, current_streak, longest_streak, total_logins
+        FROM daily_logins WHERE character_id = ?
+      `);
 
-    const row = stmt.get(characterId) as any;
-    if (!row) return null;
+      const row = stmt.get(characterId) as any;
+      if (!row) return null;
 
-    return {
-      lastLogin: row.last_login,
-      currentStreak: row.current_streak,
-      longestStreak: row.longest_streak,
-      totalLogins: row.total_logins
-    };
+      return {
+        lastLogin: row.last_login,
+        currentStreak: row.current_streak,
+        longestStreak: row.longest_streak,
+        totalLogins: row.total_logins
+      };
+    } catch (error) {
+      console.error(`[Storage] getDailyData failed for ${characterId}:`, error);
+      return null;
+    }
   }
 
-  saveDailyData(characterId: string, data: DailyData): void {
-    if (!this.db) throw new Error('Database not initialized');
+  saveDailyData(characterId: string, data: DailyData): boolean {
+    if (!this.db) {
+      console.error('[Storage] saveDailyData: Database not initialized');
+      return false;
+    }
 
-    const stmt = this.db.prepare(`
-      INSERT INTO daily_logins (character_id, last_login, current_streak, longest_streak, total_logins)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(character_id) DO UPDATE SET
-        last_login = excluded.last_login,
-        current_streak = excluded.current_streak,
-        longest_streak = excluded.longest_streak,
-        total_logins = excluded.total_logins
-    `);
+    try {
+      const stmt = this.db.prepare(`
+        INSERT INTO daily_logins (character_id, last_login, current_streak, longest_streak, total_logins)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(character_id) DO UPDATE SET
+          last_login = excluded.last_login,
+          current_streak = excluded.current_streak,
+          longest_streak = excluded.longest_streak,
+          total_logins = excluded.total_logins
+      `);
 
-    stmt.run(
-      characterId,
-      data.lastLogin,
-      data.currentStreak,
-      data.longestStreak,
-      data.totalLogins
-    );
+      stmt.run(
+        characterId,
+        data.lastLogin,
+        data.currentStreak,
+        data.longestStreak,
+        data.totalLogins
+      );
+      return true;
+    } catch (error) {
+      console.error(`[Storage] saveDailyData failed for ${characterId}:`, error);
+      return false;
+    }
   }
 
   // ============ Convenience Methods ============
 
-  savePlayerState(state: PlayerSaveState): void {
-    this.saveCharacter(state.character);
-    this.saveInventory(state.character.id, state.inventory);
-    this.saveAchievements(state.character.id, state.achievements);
-    this.saveDailyData(state.character.id, state.daily);
+  savePlayerState(state: PlayerSaveState): boolean {
+    try {
+      const charSuccess = this.saveCharacter(state.character);
+      const invSuccess = this.saveInventory(state.character.id, state.inventory);
+      const achSuccess = this.saveAchievements(state.character.id, state.achievements);
+      const dailySuccess = this.saveDailyData(state.character.id, state.daily);
+
+      if (!charSuccess || !invSuccess || !achSuccess || !dailySuccess) {
+        console.warn(`[Storage] Partial save failure for ${state.character.name}: char=${charSuccess}, inv=${invSuccess}, ach=${achSuccess}, daily=${dailySuccess}`);
+      }
+
+      return charSuccess && invSuccess && achSuccess && dailySuccess;
+    } catch (error) {
+      console.error(`[Storage] savePlayerState failed for ${state.character.name}:`, error);
+      return false;
+    }
   }
 
   loadPlayerState(characterName: string): PlayerSaveState | null {
-    const character = this.getCharacter(characterName);
-    if (!character) return null;
+    try {
+      const character = this.getCharacter(characterName);
+      if (!character) return null;
 
-    return {
-      character,
-      inventory: this.getInventory(character.id),
-      achievements: this.getAchievements(character.id),
-      daily: this.getDailyData(character.id) || {
-        lastLogin: '',
-        currentStreak: 0,
-        longestStreak: 0,
-        totalLogins: 0
-      }
-    };
+      return {
+        character,
+        inventory: this.getInventory(character.id),
+        achievements: this.getAchievements(character.id),
+        daily: this.getDailyData(character.id) || {
+          lastLogin: '',
+          currentStreak: 0,
+          longestStreak: 0,
+          totalLogins: 0
+        }
+      };
+    } catch (error) {
+      console.error(`[Storage] loadPlayerState failed for ${characterName}:`, error);
+      return null;
+    }
   }
 }
 

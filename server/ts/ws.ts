@@ -141,7 +141,11 @@ export class Server {
 
   broadcast(message: MessagePayload): void {
     this.forEachConnection(function (connection: Connection) {
-      connection.send(message);
+      try {
+        connection.send(message);
+      } catch (error) {
+        console.error(`[WS] Failed to broadcast to connection ${connection.id}:`, error);
+      }
     });
   }
 
@@ -149,22 +153,35 @@ export class Server {
    * Broadcast to all connections in a specific zone
    */
   broadcastToZone(zoneId: string, message: MessagePayload): void {
-    this.io.to(`zone:${zoneId}`).emit('message', message);
+    try {
+      this.io.to(`zone:${zoneId}`).emit('message', message);
+    } catch (error) {
+      console.error(`[WS] Failed to broadcast to zone ${zoneId}:`, error);
+    }
   }
 
   /**
    * Broadcast to all connections in a specific party
    */
   broadcastToParty(partyId: string, message: MessagePayload): void {
-    this.io.to(`party:${partyId}`).emit('message', message);
+    try {
+      this.io.to(`party:${partyId}`).emit('message', message);
+    } catch (error) {
+      console.error(`[WS] Failed to broadcast to party ${partyId}:`, error);
+    }
   }
 
   /**
    * Get count of connections in a zone
    */
   async getZonePlayerCount(zoneId: string): Promise<number> {
-    const sockets = await this.io.in(`zone:${zoneId}`).fetchSockets();
-    return sockets.length;
+    try {
+      const sockets = await this.io.in(`zone:${zoneId}`).fetchSockets();
+      return sockets.length;
+    } catch (error) {
+      console.error(`[WS] Failed to get zone player count for ${zoneId}:`, error);
+      return 0;
+    }
   }
 
   onRequestStatus(status_callback: () => string): void {
@@ -246,11 +263,19 @@ export class Connection {
   }
 
   send(message: MessagePayload): void {
-    this._connection.emit('message', message);
+    try {
+      this._connection.emit('message', message);
+    } catch (error) {
+      console.error(`[WS] Failed to send to connection ${this.id}:`, error);
+    }
   }
 
   sendUTF8(data: string): void {
-    this._connection.emit('message', data);
+    try {
+      this._connection.emit('message', data);
+    } catch (error) {
+      console.error(`[WS] Failed to sendUTF8 to connection ${this.id}:`, error);
+    }
   }
 
   /**
@@ -260,11 +285,15 @@ export class Connection {
   joinZone(zoneId: string): void {
     if (this._currentZone === zoneId) return;
 
-    if (this._currentZone) {
-      this._connection.leave(`zone:${this._currentZone}`);
+    try {
+      if (this._currentZone) {
+        this._connection.leave(`zone:${this._currentZone}`);
+      }
+      this._connection.join(`zone:${zoneId}`);
+      this._currentZone = zoneId;
+    } catch (error) {
+      console.error(`[WS] Failed to join zone ${zoneId} for connection ${this.id}:`, error);
     }
-    this._connection.join(`zone:${zoneId}`);
-    this._currentZone = zoneId;
   }
 
   /**
@@ -272,8 +301,13 @@ export class Connection {
    */
   leaveZone(): void {
     if (this._currentZone) {
-      this._connection.leave(`zone:${this._currentZone}`);
-      this._currentZone = null;
+      try {
+        this._connection.leave(`zone:${this._currentZone}`);
+        this._currentZone = null;
+      } catch (error) {
+        console.error(`[WS] Failed to leave zone for connection ${this.id}:`, error);
+        this._currentZone = null; // Reset state even on error
+      }
     }
   }
 
@@ -289,7 +323,11 @@ export class Connection {
    */
   broadcastToZone(message: MessagePayload): void {
     if (this._currentZone) {
-      this._connection.to(`zone:${this._currentZone}`).emit('message', message);
+      try {
+        this._connection.to(`zone:${this._currentZone}`).emit('message', message);
+      } catch (error) {
+        console.error(`[WS] Failed to broadcast to zone for connection ${this.id}:`, error);
+      }
     }
   }
 
@@ -297,25 +335,41 @@ export class Connection {
    * Join a party room for party chat
    */
   joinParty(partyId: string): void {
-    this._connection.join(`party:${partyId}`);
+    try {
+      this._connection.join(`party:${partyId}`);
+    } catch (error) {
+      console.error(`[WS] Failed to join party ${partyId} for connection ${this.id}:`, error);
+    }
   }
 
   /**
    * Leave a party room
    */
   leaveParty(partyId: string): void {
-    this._connection.leave(`party:${partyId}`);
+    try {
+      this._connection.leave(`party:${partyId}`);
+    } catch (error) {
+      console.error(`[WS] Failed to leave party ${partyId} for connection ${this.id}:`, error);
+    }
   }
 
   /**
    * Broadcast to party members
    */
   broadcastToParty(partyId: string, message: MessagePayload): void {
-    this._connection.to(`party:${partyId}`).emit('message', message);
+    try {
+      this._connection.to(`party:${partyId}`).emit('message', message);
+    } catch (error) {
+      console.error(`[WS] Failed to broadcast to party ${partyId} for connection ${this.id}:`, error);
+    }
   }
 
   close(logError?: string): void {
-    console.info('Closing connection to player ' + this.id + '. Error: ' + logError);
-    this._connection.disconnect();
+    console.info(`[WS] Closing connection ${this.id}${logError ? ': ' + logError : ''}`);
+    try {
+      this._connection.disconnect();
+    } catch (error) {
+      console.error(`[WS] Failed to disconnect connection ${this.id}:`, error);
+    }
   }
 }

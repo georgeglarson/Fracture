@@ -73,83 +73,127 @@ export class EntityManager {
   // ========== Entity CRUD ==========
 
   addEntity(entity: Entity): void {
-    this.entities[entity.id] = entity;
-    this.groupContext?.handleEntityGroupMembership(entity);
+    try {
+      if (!entity || entity.id === undefined) {
+        console.error('[EntityManager] Cannot add invalid entity');
+        return;
+      }
+      this.entities[entity.id] = entity;
+      this.groupContext?.handleEntityGroupMembership(entity);
+    } catch (error) {
+      console.error(`[EntityManager] Failed to add entity ${entity?.id}:`, error);
+    }
   }
 
   removeEntity(entity: Entity): void {
-    if (entity.id in this.entities) {
-      delete this.entities[entity.id];
-    }
-    if (entity.id in this.mobs) {
-      delete this.mobs[entity.id];
-    }
-    if (entity.id in this.items) {
-      delete this.items[entity.id];
-    }
+    try {
+      if (!entity || entity.id === undefined) {
+        console.error('[EntityManager] Cannot remove invalid entity');
+        return;
+      }
 
-    if (entity.type === 'mob') {
-      this.combatSystem?.clearMobAggroLink(entity);
-      this.combatSystem?.clearMobHateLinks(entity);
-    }
+      if (entity.id in this.entities) {
+        delete this.entities[entity.id];
+      }
+      if (entity.id in this.mobs) {
+        delete this.mobs[entity.id];
+      }
+      if (entity.id in this.items) {
+        delete this.items[entity.id];
+      }
 
-    entity.destroy();
-    this.groupContext?.removeFromGroups(entity);
-    console.debug('Removed ' + Types.getKindAsString(entity.kind) + ' : ' + entity.id);
+      if (entity.type === 'mob') {
+        this.combatSystem?.clearMobAggroLink(entity);
+        this.combatSystem?.clearMobHateLinks(entity);
+      }
+
+      entity.destroy();
+      this.groupContext?.removeFromGroups(entity);
+      console.debug('Removed ' + Types.getKindAsString(entity.kind) + ' : ' + entity.id);
+    } catch (error) {
+      console.error(`[EntityManager] Failed to remove entity ${entity?.id}:`, error);
+    }
   }
 
   // ========== Player Management ==========
 
   addPlayer(player: Player): void {
-    this.addEntity(player);
-    this.players[player.id] = player;
-    this.broadcaster?.createQueue(player.id);
+    try {
+      this.addEntity(player);
+      this.players[player.id] = player;
+      this.broadcaster?.createQueue(player.id);
+    } catch (error) {
+      console.error(`[EntityManager] Failed to add player ${player?.id}:`, error);
+    }
   }
 
   removePlayer(player: Player): void {
-    player.broadcast(player.despawn?.());
-    this.removeEntity(player);
-    delete this.players[player.id];
-    this.broadcaster?.removeQueue(player.id);
+    try {
+      player.broadcast(player.despawn?.());
+      this.removeEntity(player);
+      delete this.players[player.id];
+      this.broadcaster?.removeQueue(player.id);
+    } catch (error) {
+      console.error(`[EntityManager] Failed to remove player ${player?.id}:`, error);
+    }
   }
 
   // ========== Mob Management ==========
 
   addMob(mob: Mob): void {
-    this.addEntity(mob);
-    this.mobs[mob.id] = mob;
+    try {
+      this.addEntity(mob);
+      this.mobs[mob.id] = mob;
+    } catch (error) {
+      console.error(`[EntityManager] Failed to add mob ${mob?.id}:`, error);
+    }
   }
 
   // ========== NPC Management ==========
 
-  addNpc(kind: number, x: number, y: number): Npc {
-    const npc = new Npc('8' + x + '' + y, kind, x, y);
-    this.addEntity(npc);
-    this.npcs[npc.id] = npc;
-    return npc;
+  addNpc(kind: number, x: number, y: number): Npc | null {
+    try {
+      const npc = new Npc('8' + x + '' + y, kind, x, y);
+      this.addEntity(npc);
+      this.npcs[npc.id] = npc;
+      return npc;
+    } catch (error) {
+      console.error(`[EntityManager] Failed to add NPC kind=${kind} at (${x}, ${y}):`, error);
+      return null;
+    }
   }
 
   // ========== Item Management ==========
 
   addItem(item: Item): Item {
-    this.addEntity(item);
-    this.items[item.id] = item;
-    return item;
+    try {
+      this.addEntity(item);
+      this.items[item.id] = item;
+      return item;
+    } catch (error) {
+      console.error(`[EntityManager] Failed to add item ${item?.id}:`, error);
+      return item; // Return item anyway, entity may still be usable
+    }
   }
 
-  createItem(kind: number, x: number, y: number): Item | Chest {
-    const id = '9' + this.itemCount++;
+  createItem(kind: number, x: number, y: number): Item | Chest | null {
+    try {
+      const id = '9' + this.itemCount++;
 
-    if (Types.isChest(kind)) {
-      // Get zone-appropriate chest kind if generic CHEST was requested
-      let chestKind = kind;
-      if (kind === Types.Entities.CHEST) {
-        const zone = getZoneAtPosition(x, y);
-        chestKind = zone ? Types.getChestKindForZone(zone.id) : Types.Entities.CHEST;
+      if (Types.isChest(kind)) {
+        // Get zone-appropriate chest kind if generic CHEST was requested
+        let chestKind = kind;
+        if (kind === Types.Entities.CHEST) {
+          const zone = getZoneAtPosition(x, y);
+          chestKind = zone ? Types.getChestKindForZone(zone.id) : Types.Entities.CHEST;
+        }
+        return new Chest(id, x, y, chestKind);
+      } else {
+        return new Item(id, kind, x, y);
       }
-      return new Chest(id, x, y, chestKind);
-    } else {
-      return new Item(id, kind, x, y);
+    } catch (error) {
+      console.error(`[EntityManager] Failed to create item kind=${kind} at (${x}, ${y}):`, error);
+      return null;
     }
   }
 
@@ -160,50 +204,72 @@ export class EntityManager {
    * @param y - Y position
    * @param existingPropertiesOrZone - Optional pre-existing properties (for dropped items) or zone for rarity bonus
    */
-  createItemWithProperties(kind: number, x: number, y: number, existingPropertiesOrZone?: any): Item | Chest {
-    const id = '9' + this.itemCount++;
+  createItemWithProperties(kind: number, x: number, y: number, existingPropertiesOrZone?: any): Item | Chest | null {
+    try {
+      const id = '9' + this.itemCount++;
 
-    if (Types.isChest(kind)) {
-      // Get zone-appropriate chest kind if generic CHEST was requested
-      let chestKind = kind;
-      if (kind === Types.Entities.CHEST) {
-        const zone = getZoneAtPosition(x, y);
-        chestKind = zone ? Types.getChestKindForZone(zone.id) : Types.Entities.CHEST;
-      }
-      return new Chest(id, x, y, chestKind);
-    } else {
-      // Check if we got a zone (has rarityBonus) or existing properties
-      let properties;
-      if (existingPropertiesOrZone && typeof existingPropertiesOrZone.rarityBonus === 'number') {
-        // It's a zone object - generate with rarity bonus
-        properties = generateItem(kind, existingPropertiesOrZone.rarityBonus);
-      } else if (existingPropertiesOrZone) {
-        // It's existing properties - use directly
-        properties = existingPropertiesOrZone;
+      if (Types.isChest(kind)) {
+        // Get zone-appropriate chest kind if generic CHEST was requested
+        let chestKind = kind;
+        if (kind === Types.Entities.CHEST) {
+          const zone = getZoneAtPosition(x, y);
+          chestKind = zone ? Types.getChestKindForZone(zone.id) : Types.Entities.CHEST;
+        }
+        return new Chest(id, x, y, chestKind);
       } else {
-        // No properties or zone - generate default
-        properties = generateItem(kind);
+        // Check if we got a zone (has rarityBonus) or existing properties
+        let properties;
+        if (existingPropertiesOrZone && typeof existingPropertiesOrZone.rarityBonus === 'number') {
+          // It's a zone object - generate with rarity bonus
+          properties = generateItem(kind, existingPropertiesOrZone.rarityBonus);
+        } else if (existingPropertiesOrZone) {
+          // It's existing properties - use directly
+          properties = existingPropertiesOrZone;
+        } else {
+          // No properties or zone - generate default
+          properties = generateItem(kind);
+        }
+        return new Item(id, kind, x, y, properties);
       }
-      return new Item(id, kind, x, y, properties);
+    } catch (error) {
+      console.error(`[EntityManager] Failed to create item with properties kind=${kind} at (${x}, ${y}):`, error);
+      return null;
     }
   }
 
-  createChest(x: number, y: number, items: number[]): Chest {
-    const chest = this.createItem(Types.Entities.CHEST, x, y) as Chest;
-    chest.setItems(items);
-    return chest;
+  createChest(x: number, y: number, items: number[]): Chest | null {
+    try {
+      const chest = this.createItem(Types.Entities.CHEST, x, y) as Chest;
+      if (!chest) return null;
+      chest.setItems(items);
+      return chest;
+    } catch (error) {
+      console.error(`[EntityManager] Failed to create chest at (${x}, ${y}):`, error);
+      return null;
+    }
   }
 
-  addStaticItem(item: Item): Item {
-    item.isStatic = true;
-    item.onRespawn(this.addStaticItem.bind(this, item));
-    return this.addItem(item);
+  addStaticItem(item: Item): Item | null {
+    try {
+      item.isStatic = true;
+      item.onRespawn(this.addStaticItem.bind(this, item));
+      return this.addItem(item);
+    } catch (error) {
+      console.error(`[EntityManager] Failed to add static item ${item?.id}:`, error);
+      return null;
+    }
   }
 
-  addItemFromChest(kind: number, x: number, y: number): Item {
-    const item = this.createItem(kind, x, y) as Item;
-    item.isFromChest = true;
-    return this.addItem(item);
+  addItemFromChest(kind: number, x: number, y: number): Item | null {
+    try {
+      const item = this.createItem(kind, x, y) as Item;
+      if (!item) return null;
+      item.isFromChest = true;
+      return this.addItem(item);
+    } catch (error) {
+      console.error(`[EntityManager] Failed to add item from chest kind=${kind} at (${x}, ${y}):`, error);
+      return null;
+    }
   }
 
   // ========== Entity Iteration ==========
