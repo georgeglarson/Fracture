@@ -50,6 +50,37 @@ export const WeaponStats: Record<number, WeaponBaseStats> = {
     damageMin: 24,
     damageMax: 40,
     displayName: 'Golden Sword'
+  },
+  // Dimension Weapons - from fractured realities
+  [Types.Entities.MP5]: {
+    damageMin: 12,
+    damageMax: 20,
+    displayName: 'MP5'
+  },
+  [Types.Entities.RAYGUN]: {
+    damageMin: 14,
+    damageMax: 24,
+    displayName: 'Ray Gun'
+  },
+  [Types.Entities.TENTACLE]: {
+    damageMin: 16,
+    damageMax: 26,
+    displayName: 'Void Tentacle'
+  },
+  [Types.Entities.CRYSTALSTAFF]: {
+    damageMin: 20,
+    damageMax: 34,
+    displayName: 'Crystal Staff'
+  },
+  [Types.Entities.VOIDBLADE]: {
+    damageMin: 22,
+    damageMax: 36,
+    displayName: 'Void Blade'
+  },
+  [Types.Entities.PLASMAHELIX]: {
+    damageMin: 26,
+    damageMax: 42,
+    displayName: 'Plasma Helix'
   }
 };
 
@@ -85,6 +116,23 @@ export const ArmorStats: Record<number, ArmorBaseStats> = {
   [Types.Entities.GOLDENARMOR]: {
     defense: 10,
     displayName: 'Golden Armor'
+  },
+  // Dimension Armor - from fractured realities
+  [Types.Entities.VOIDCLOAK]: {
+    defense: 5,
+    displayName: 'Void Cloak'
+  },
+  [Types.Entities.SHIELDBUBBLE]: {
+    defense: 7,
+    displayName: 'Shield Bubble'
+  },
+  [Types.Entities.CRYSTALSHELL]: {
+    defense: 9,
+    displayName: 'Crystal Shell'
+  },
+  [Types.Entities.MECHARMOR]: {
+    defense: 11,
+    displayName: 'Mech Armor'
   }
 };
 

@@ -44,6 +44,17 @@ const itemRedarmor = require('../sprites/item-redarmor.json');
 const itemRedsword = require('../sprites/item-redsword.json');
 const itemSword1 = require('../sprites/item-sword1.json');
 const itemSword2 = require('../sprites/item-sword2.json');
+// Dimension items - from fractured realities
+const itemRaygun = require('../sprites/item-raygun.json');
+const itemMp5 = require('../sprites/item-mp5.json');
+const itemPlasmahelix = require('../sprites/item-plasmahelix.json');
+const itemTentacle = require('../sprites/item-tentacle.json');
+const itemVoidblade = require('../sprites/item-voidblade.json');
+const itemCrystalstaff = require('../sprites/item-crystalstaff.json');
+const itemMecharmor = require('../sprites/item-mecharmor.json');
+const itemShieldbubble = require('../sprites/item-shieldbubble.json');
+const itemVoidcloak = require('../sprites/item-voidcloak.json');
+const itemCrystalshell = require('../sprites/item-crystalshell.json');
 const king = require('../sprites/king.json');
 const lavanpc = require('../sprites/lavanpc.json');
 const leatherarmor = require('../sprites/leatherarmor.json');
@@ -160,5 +171,16 @@ export const sprites = {
   'item-redsword': itemRedsword,
   'item-sword1': itemSword1,
   'item-sword2': itemSword2,
+  // Dimension items - from fractured realities
+  'item-raygun': itemRaygun,
+  'item-mp5': itemMp5,
+  'item-plasmahelix': itemPlasmahelix,
+  'item-tentacle': itemTentacle,
+  'item-voidblade': itemVoidblade,
+  'item-crystalstaff': itemCrystalstaff,
+  'item-mecharmor': itemMecharmor,
+  'item-shieldbubble': itemShieldbubble,
+  'item-voidcloak': itemVoidcloak,
+  'item-crystalshell': itemCrystalshell,
 
 };

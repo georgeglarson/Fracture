@@ -86,7 +86,10 @@ export const Properties = {
       axe: 10,
       morningstar: 15,  // Primary morningstar source
       mailarmor: 18,    // Primary mail source
-      firepotion: 5
+      firepotion: 5,
+      // Void dimension items (fractured reality)
+      tentacle: 4,      // Rare void weapon
+      voidcloak: 3      // Rare void armor
     },
     hp: 110,
     armor: 2,
@@ -101,7 +104,10 @@ export const Properties = {
       morningstar: 12,
       mailarmor: 15,
       bluesword: 8,     // Rare early bluesword
-      firepotion: 8     // Wizards drop more potions
+      firepotion: 8,    // Wizards drop more potions
+      // Mystic dimension items (fractured reality)
+      crystalstaff: 5,  // Wizards can drop arcane weapons
+      crystalshell: 3   // Rare mystic armor
     },
     hp: 100,
     armor: 2,
@@ -115,7 +121,10 @@ export const Properties = {
       morningstar: 12,
       mailarmor: 12,
       platearmor: 8,    // Rare plate drop
-      firepotion: 6
+      firepotion: 6,
+      // Tech dimension items (fractured reality)
+      raygun: 4,        // Desert snakes guard tech relics
+      mp5: 5            // More common tech weapon
     },
     hp: 150,
     armor: 3,
@@ -180,7 +189,11 @@ export const Properties = {
       morningstar: 8,
       platearmor: 20,   // Primary plate source
       bluesword: 15,    // Good bluesword source
-      firepotion: 6
+      firepotion: 6,
+      // Tech/Modern dimension items (fractured reality)
+      mp5: 8,           // Tech weapons from fractured dimension
+      raygun: 6,
+      mecharmor: 4      // Rare tech armor
     },
     hp: 200,
     armor: 3,
@@ -194,7 +207,11 @@ export const Properties = {
       platearmor: 18,
       bluesword: 20,    // Primary bluesword source
       redsword: 6,      // Rare red drop
-      firepotion: 6
+      firepotion: 6,
+      // Void dimension items (fractured reality)
+      tentacle: 8,      // Elite undead embrace the void
+      voidblade: 5,     // Rare void weapon
+      voidcloak: 6      // Void armor
     },
     hp: 200,
     armor: 3,
@@ -209,7 +226,10 @@ export const Properties = {
       bluesword: 15,
       redarmor: 10,     // Rare red armor
       redsword: 8,      // Rare red sword
-      firepotion: 7
+      firepotion: 7,
+      // Energy dimension items (fractured reality)
+      plasmahelix: 6,   // Energy beings carry plasma
+      shieldbubble: 8   // Force field armor
     },
     hp: 200,
     armor: 3,
@@ -227,7 +247,12 @@ export const Properties = {
       redarmor: 25,     // Primary red armor source
       redsword: 20,     // Primary red sword source
       goldenarmor: 5,   // Rare golden drop
-      firepotion: 10
+      firepotion: 10,
+      // Void + Energy dimension items (spectres span dimensions)
+      voidblade: 10,    // Void blade primary source
+      plasmahelix: 8,   // Energy weapons
+      voidcloak: 12,    // Primary voidcloak source
+      shieldbubble: 6   // Force field armor
     },
     hp: 250,
     armor: 2,
@@ -243,7 +268,13 @@ export const Properties = {
       redsword: 25,     // Best red sword source
       goldenarmor: 8,   // Rare golden armor
       goldensword: 6,   // Rare golden sword
-      firepotion: 12
+      firepotion: 12,
+      // All dimensions - deathknights command fractured reality
+      voidblade: 12,    // Best voidblade source
+      plasmahelix: 10,  // Best plasma source
+      crystalstaff: 8,  // Mystic weapons
+      mecharmor: 10,    // Best mecharmor source
+      crystalshell: 8   // Best crystal armor source
     },
     hp: 250,
     armor: 3,
@@ -259,7 +290,12 @@ export const Properties = {
       goldensword: 100, // Guaranteed golden sword
       goldenarmor: 80,  // High chance golden armor
       firepotion: 50,   // Bonus potion
-      burger: 100       // Victory feast!
+      burger: 100,      // Victory feast!
+      // Guaranteed dimension loot from boss!
+      plasmahelix: 60,  // High chance plasma
+      voidblade: 50,    // Good voidblade chance
+      mecharmor: 40,    // Rare mech armor
+      crystalshell: 35  // Rare crystal armor
     },
     hp: 700,
     armor: 6,

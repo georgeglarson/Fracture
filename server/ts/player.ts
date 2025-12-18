@@ -552,26 +552,32 @@ export class Player extends Character {
 
   handleInventoryPickup(itemId: number) {
     InventoryHandler.handleInventoryPickup(this, itemId);
+    this.persistInventory();
   }
 
   handleInventoryUse(slotIndex: number) {
     InventoryHandler.handleInventoryUse(this, slotIndex);
+    this.persistInventory();
   }
 
   handleInventoryEquip(slotIndex: number) {
     InventoryHandler.handleInventoryEquip(this, slotIndex);
+    this.persistInventory();
   }
 
   handleInventoryDrop(slotIndex: number) {
     InventoryHandler.handleInventoryDrop(this, slotIndex);
+    this.persistInventory();
   }
 
   handleInventorySwap(fromSlot: number, toSlot: number) {
     InventoryHandler.handleInventorySwap(this, fromSlot, toSlot);
+    this.persistInventory();
   }
 
   handleUnequipToInventory(slot: string) {
     InventoryHandler.handleUnequipToInventory(this, slot);
+    this.persistInventory();
   }
 
   getInventoryState(): (SerializedInventorySlot | null)[] {
@@ -580,6 +586,19 @@ export class Player extends Character {
 
   loadInventory(data: (SerializedInventorySlot | null)[]) {
     InventoryHandler.loadInventory(this, data);
+  }
+
+  /**
+   * Persist inventory to storage immediately (prevents data loss on reload)
+   */
+  private persistInventory(): void {
+    if (!this.characterId) return;
+    try {
+      const storage = this.world.getStorageService();
+      storage.saveInventory(this.characterId, this.inventory.getSerializedSlots());
+    } catch (e) {
+      console.error(`[Inventory] Failed to persist inventory for ${this.name}:`, e);
+    }
   }
 
   // ============================================================================

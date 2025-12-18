@@ -181,6 +181,7 @@ export class App {
         // Game is now running and ready to be displayed
         console.log('[App] Game ready, signaling intro sequence');
         self.introSequence.signalGameReady();
+        self.initPauseOverlay();
 
         if (firstTimePlaying) {
           self.toggleInstructions();
@@ -222,6 +223,7 @@ export class App {
       this.center();
       this.game.run(function () {
         $('body').addClass('started');
+        self.initPauseOverlay();
         if (firstTimePlaying) {
           self.toggleInstructions();
         }
@@ -667,5 +669,86 @@ export class App {
         this.game.renderer.rescale(newScale);
       }
     }
+  }
+
+  // ============================================================================
+  // PAUSE OVERLAY - Shows when window loses focus
+  // ============================================================================
+
+  private pauseOverlay: HTMLElement | null = null;
+  private isPaused: boolean = false;
+
+  /**
+   * Initialize the pause overlay and focus handlers
+   * Call this after the game has started
+   */
+  initPauseOverlay(): void {
+    // Create overlay element
+    this.pauseOverlay = document.createElement('div');
+    this.pauseOverlay.id = 'pause-overlay';
+    this.pauseOverlay.innerHTML = `
+      <div style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 99999;
+        cursor: pointer;
+      ">
+        <div style="
+          color: #ccc;
+          font-family: 'Press Start 2P', monospace;
+          font-size: 32px;
+          text-shadow: 2px 2px 4px #000;
+          margin-bottom: 20px;
+        ">PAUSED</div>
+        <div style="
+          color: #888;
+          font-family: 'Press Start 2P', monospace;
+          font-size: 14px;
+        ">Click to Resume</div>
+      </div>
+    `;
+    this.pauseOverlay.style.display = 'none';
+    document.body.appendChild(this.pauseOverlay);
+
+    // Click to resume
+    this.pauseOverlay.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.resumeGame();
+    });
+
+    // Window focus/blur handlers
+    window.addEventListener('blur', () => {
+      if (this.game && this.game.started && !this.isPaused) {
+        this.pauseGame();
+      }
+    });
+
+    // Also handle visibility change (for tab switching)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.game && this.game.started && !this.isPaused) {
+        this.pauseGame();
+      }
+    });
+  }
+
+  pauseGame(): void {
+    if (!this.pauseOverlay || this.isPaused) return;
+    this.isPaused = true;
+    this.pauseOverlay.style.display = 'block';
+  }
+
+  resumeGame(): void {
+    if (!this.pauseOverlay || !this.isPaused) return;
+    this.isPaused = false;
+    this.pauseOverlay.style.display = 'none';
   }
 }

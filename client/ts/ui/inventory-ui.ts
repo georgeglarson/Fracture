@@ -276,10 +276,18 @@ export class InventoryUI {
   private attachEventHandlers(): void {
     if (!this.panel) return;
 
+    // Stop all clicks on the panel from propagating to the game canvas
+    this.panel.addEventListener('click', (e) => e.stopPropagation());
+    this.panel.addEventListener('mousedown', (e) => e.stopPropagation());
+    this.panel.addEventListener('mouseup', (e) => e.stopPropagation());
+
     // Close button
     const closeBtn = this.panel.querySelector('#inventory-close');
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.hide());
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.hide();
+      });
     }
 
     // Equipment slot handlers

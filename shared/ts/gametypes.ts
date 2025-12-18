@@ -188,7 +188,28 @@ export const Types: any = {
     CHEST_STONE: 72,    // Cave - stone coffer
     CHEST_URN: 73,      // Desert - clay urn
     CHEST_OBSIDIAN: 74, // Lavaland - obsidian chest
-    CHEST_GLITCH: 75    // Boss - reality-glitched container
+    CHEST_GLITCH: 75,   // Boss - reality-glitched container
+
+    // Dimension Weapons - Tech/Cyber (from fractured realities)
+    RAYGUN: 80,         // Tech dimension - energy pistol
+    LASERGUN: 81,       // Tech dimension - laser rifle
+    MP5: 82,            // Modern dimension - submachine gun
+    TEC9: 83,           // Modern dimension - machine pistol
+    PLASMAHELIX: 84,    // Energy dimension - plasma weapon
+
+    // Dimension Weapons - Cosmic/Void
+    TENTACLE: 85,       // Void dimension - eldritch appendage
+    VOIDBLADE: 86,      // Void dimension - darkness-infused blade
+    CRYSTALSTAFF: 87,   // Mystic dimension - arcane focus
+
+    // Dimension Armor - Tech/Cyber
+    HAZMATSUIT: 90,     // Tech dimension - hazardous material protection
+    MECHARMOR: 91,      // Tech dimension - mechanical exosuit
+    SHIELDBUBBLE: 92,   // Energy dimension - force field generator
+
+    // Dimension Armor - Cosmic/Void
+    VOIDCLOAK: 93,      // Void dimension - shadow wrappings
+    CRYSTALSHELL: 94    // Mystic dimension - crystalline carapace
   },
 
   Orientations: {
@@ -227,6 +248,18 @@ var kinds: Record<string, any[]> = {
   goldensword: [Types.Entities.GOLDENSWORD, 'weapon'],
   morningstar: [Types.Entities.MORNINGSTAR, 'weapon'],
 
+  // Dimension weapons - tech/cyber
+  raygun: [Types.Entities.RAYGUN, 'weapon'],
+  lasergun: [Types.Entities.LASERGUN, 'weapon'],
+  mp5: [Types.Entities.MP5, 'weapon'],
+  tec9: [Types.Entities.TEC9, 'weapon'],
+  plasmahelix: [Types.Entities.PLASMAHELIX, 'weapon'],
+
+  // Dimension weapons - cosmic/void
+  tentacle: [Types.Entities.TENTACLE, 'weapon'],
+  voidblade: [Types.Entities.VOIDBLADE, 'weapon'],
+  crystalstaff: [Types.Entities.CRYSTALSTAFF, 'weapon'],
+
   firefox: [Types.Entities.FIREFOX, 'armor'],
   clotharmor: [Types.Entities.CLOTHARMOR, 'armor'],
   leatherarmor: [Types.Entities.LEATHERARMOR, 'armor'],
@@ -234,6 +267,15 @@ var kinds: Record<string, any[]> = {
   platearmor: [Types.Entities.PLATEARMOR, 'armor'],
   redarmor: [Types.Entities.REDARMOR, 'armor'],
   goldenarmor: [Types.Entities.GOLDENARMOR, 'armor'],
+
+  // Dimension armor - tech/cyber
+  hazmatsuit: [Types.Entities.HAZMATSUIT, 'armor'],
+  mecharmor: [Types.Entities.MECHARMOR, 'armor'],
+  shieldbubble: [Types.Entities.SHIELDBUBBLE, 'armor'],
+
+  // Dimension armor - cosmic/void
+  voidcloak: [Types.Entities.VOIDCLOAK, 'armor'],
+  crystalshell: [Types.Entities.CRYSTALSHELL, 'armor'],
 
   flask: [Types.Entities.FLASK, 'object'],
   cake: [Types.Entities.CAKE, 'object'],
@@ -273,23 +315,41 @@ function getTypeFromKind(kind: number): string | undefined {
   return kindStr && kinds[kindStr] ? kinds[kindStr][1] : undefined;
 }
 
+// Weapons ranked by power tier (fantasy → dimension)
+// Tier 1-3: Fantasy basics
+// Tier 4-5: Mid-tier (fantasy + early dimension)
+// Tier 6-8: High-tier (dimension weapons)
 Types.rankedWeapons = [
-  Types.Entities.SWORD1,
-  Types.Entities.SWORD2,
-  Types.Entities.AXE,
-  Types.Entities.MORNINGSTAR,
-  Types.Entities.BLUESWORD,
-  Types.Entities.REDSWORD,
-  Types.Entities.GOLDENSWORD
+  Types.Entities.SWORD1,        // Tier 1: Starter
+  Types.Entities.SWORD2,        // Tier 2: Basic upgrade
+  Types.Entities.AXE,           // Tier 3: Early mid
+  Types.Entities.TEC9,          // Tier 3.5: Modern dimension entry
+  Types.Entities.MORNINGSTAR,   // Tier 4: Mid-tier fantasy
+  Types.Entities.MP5,           // Tier 4.5: Modern dimension mid
+  Types.Entities.RAYGUN,        // Tier 5: Tech dimension entry
+  Types.Entities.BLUESWORD,     // Tier 5: Mid-high fantasy
+  Types.Entities.TENTACLE,      // Tier 5.5: Void dimension
+  Types.Entities.LASERGUN,      // Tier 6: Tech dimension high
+  Types.Entities.REDSWORD,      // Tier 6: High fantasy
+  Types.Entities.CRYSTALSTAFF,  // Tier 6.5: Mystic dimension
+  Types.Entities.VOIDBLADE,     // Tier 7: Void dimension high
+  Types.Entities.PLASMAHELIX,   // Tier 7.5: Energy dimension
+  Types.Entities.GOLDENSWORD    // Tier 8: Legendary
 ];
 
+// Armor ranked by defense tier
 Types.rankedArmors = [
-  Types.Entities.CLOTHARMOR,
-  Types.Entities.LEATHERARMOR,
-  Types.Entities.MAILARMOR,
-  Types.Entities.PLATEARMOR,
-  Types.Entities.REDARMOR,
-  Types.Entities.GOLDENARMOR
+  Types.Entities.CLOTHARMOR,    // Tier 1: Starter
+  Types.Entities.LEATHERARMOR,  // Tier 2: Basic
+  Types.Entities.HAZMATSUIT,    // Tier 3: Tech dimension entry
+  Types.Entities.MAILARMOR,     // Tier 3: Mid fantasy
+  Types.Entities.VOIDCLOAK,     // Tier 4: Void dimension
+  Types.Entities.PLATEARMOR,    // Tier 4: Mid-high fantasy
+  Types.Entities.SHIELDBUBBLE,  // Tier 5: Energy dimension
+  Types.Entities.REDARMOR,      // Tier 5: High fantasy
+  Types.Entities.CRYSTALSHELL,  // Tier 6: Mystic dimension
+  Types.Entities.MECHARMOR,     // Tier 6.5: Tech dimension high
+  Types.Entities.GOLDENARMOR    // Tier 7: Legendary
 ];
 
 Types.getWeaponRank = function (weaponKind: number): number {
