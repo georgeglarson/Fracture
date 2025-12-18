@@ -57,6 +57,7 @@ export class InventoryUI {
   private contextMenu: HTMLDivElement | null = null;
   private tooltip: HTMLDivElement | null = null;
   private equipped: EquippedItems = { weapon: null, armor: null };
+  private isShopOpenFn: (() => boolean) | null = null;
 
   constructor(eventBus?: EventBus) {
     this.eventBus = eventBus || null;
@@ -80,6 +81,23 @@ export class InventoryUI {
    */
   setEventBus(eventBus: EventBus): void {
     this.eventBus = eventBus;
+  }
+
+  /**
+   * Set isShopOpen callback for EventBus mode
+   */
+  setIsShopOpen(fn: () => boolean): void {
+    this.isShopOpenFn = fn;
+  }
+
+  /**
+   * Check if shop is open (supports both modes)
+   */
+  private isShopOpen(): boolean {
+    if (this.isShopOpenFn) {
+      return this.isShopOpenFn();
+    }
+    return this.callbacks?.isShopOpen?.() ?? false;
   }
 
   /**
@@ -131,17 +149,6 @@ export class InventoryUI {
     }
   }
 
-  /**
-   * Check if shop is open (for context menu sell option)
-   */
-  private isShopCurrentlyOpen(): boolean {
-    if (this.callbacks?.isShopOpen) {
-      return this.callbacks.isShopOpen();
-    }
-    // In EventBus mode, shop state should be tracked elsewhere
-    // For now, return false as default
-    return false;
-  }
 
   /**
    * Update equipped items display
@@ -548,7 +555,7 @@ export class InventoryUI {
     }
 
     // Show Sell option when shop is open
-    if (this.isShopCurrentlyOpen()) {
+    if (this.isShopOpen()) {
       html += `
         <div class="ctx-option" data-action="sell" style="
           padding: 8px 12px;

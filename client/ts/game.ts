@@ -34,6 +34,8 @@ import {PlayerInspect} from './ui/player-inspect';
 import {ContextMenu} from './ui/context-menu';
 import {InventoryUI} from './ui/inventory-ui';
 import {ShopUI} from './ui/shop-ui';
+import {InventoryController} from './controllers/inventory.controller';
+import {ShopController} from './controllers/shop.controller';
 import {MinimapUI} from './ui/minimap-ui';
 import {AchievementUI} from './ui/achievement-ui';
 import {InventoryManager} from './inventory/inventory-manager';
@@ -85,7 +87,9 @@ export class Game {
   contextMenu: ContextMenu | null = null;
   inventoryManager: InventoryManager | null = null;
   inventoryUI: InventoryUI | null = null;
+  inventoryController: InventoryController | null = null;
   shopUI: ShopUI | null = null;
+  shopController: ShopController | null = null;
   minimapUI: MinimapUI | null = null;
   achievementUI: AchievementUI | null = null;
   zoningManager: ZoningManager | null = null;
@@ -1747,7 +1751,9 @@ export class Game {
 
   // Shop system - Delegated to ShopHandler
   initShop() {
-    this.shopUI = ShopHandler.initShop(this);
+    const result = ShopHandler.initShop(this);
+    this.shopUI = result.ui;
+    this.shopController = result.controller;
   }
 
   showShop(npcKind: number, shopName: string, items: Array<{ itemKind: number; price: number; stock: number }>) {
@@ -1815,6 +1821,7 @@ export class Game {
     const result = InventoryHandler.initInventory(this);
     this.inventoryManager = result.manager;
     this.inventoryUI = result.ui;
+    this.inventoryController = result.controller;
   }
 
   toggleInventory() {

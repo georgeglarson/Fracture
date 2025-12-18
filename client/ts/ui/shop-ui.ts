@@ -1,9 +1,14 @@
 /**
  * ShopUI - Handles shop popup display and interaction
  * Single Responsibility: Manage shop-related UI elements
+ *
+ * Supports two modes:
+ * 1. EventBus mode (preferred) - emits events for actions
+ * 2. Callback mode (legacy) - calls callback functions directly
  */
 
 import { Types } from '../../../shared/ts/gametypes';
+import { EventBus } from '../../../shared/ts/events/event-bus';
 
 export interface ShopItem {
   itemKind: number;
@@ -24,8 +29,64 @@ export class ShopUI {
   private currentNpcKind: number | null = null;
   private items: ShopItem[] = [];
   private callbacks: ShopCallbacks | null = null;
+  private eventBus: EventBus | null = null;
+  private goldGetter: (() => number) | null = null;
 
-  constructor() {}
+  constructor(eventBus?: EventBus) {
+    this.eventBus = eventBus || null;
+  }
+
+  /**
+   * Set EventBus for event-driven mode
+   */
+  setEventBus(eventBus: EventBus): void {
+    this.eventBus = eventBus;
+  }
+
+  /**
+   * Set gold getter for EventBus mode
+   */
+  setGoldGetter(getter: () => number): void {
+    this.goldGetter = getter;
+  }
+
+  /**
+   * Get player gold (supports both modes)
+   */
+  private getPlayerGold(): number {
+    if (this.goldGetter) {
+      return this.goldGetter();
+    }
+    return this.callbacks?.getPlayerGold() ?? 0;
+  }
+
+  /**
+   * Emit action via EventBus or call callback (backward compat)
+   */
+  private emitAction(action: string, data: any): void {
+    if (this.eventBus) {
+      switch (action) {
+        case 'buy':
+          this.eventBus.emit('ui:shop:buy', { npcKind: data.npcKind, itemKind: data.itemKind });
+          break;
+        case 'sell':
+          this.eventBus.emit('ui:shop:sell', { slotIndex: data.slotIndex });
+          break;
+        case 'close':
+          this.eventBus.emit('ui:shop:close', {});
+          break;
+      }
+    } else if (this.callbacks) {
+      switch (action) {
+        case 'buy':
+          this.callbacks.onBuy(data.npcKind, data.itemKind);
+          break;
+        case 'sell':
+          this.callbacks.onSell(data.slotIndex);
+          break;
+      }
+    }
+  }
 
   /**
    * Set callback handlers
@@ -55,7 +116,7 @@ export class ShopUI {
     const itemsList = document.getElementById('shop-items-list');
     if (itemsList) {
       itemsList.innerHTML = '';
-      const playerGold = this.callbacks?.getPlayerGold() ?? 0;
+      const playerGold = this.getPlayerGold();
 
       items.forEach(item => {
         const itemName = Types.getKindAsString(item.itemKind);
@@ -91,8 +152,8 @@ export class ShopUI {
         btn.addEventListener('click', (e) => {
           const target = e.target as HTMLButtonElement;
           const itemKind = parseInt(target.dataset.item || '0', 10);
-          if (itemKind && this.currentNpcKind !== null && this.callbacks) {
-            this.callbacks.onBuy(this.currentNpcKind, itemKind);
+          if (itemKind && this.currentNpcKind !== null) {
+            this.emitAction('buy', { npcKind: this.currentNpcKind, itemKind });
           }
         });
       });
@@ -178,8 +239,8 @@ export class ShopUI {
    */
   private updateGoldDisplay(): void {
     const goldEl = document.getElementById('shop-player-gold');
-    if (goldEl && this.callbacks) {
-      goldEl.textContent = this.callbacks.getPlayerGold().toString();
+    if (goldEl) {
+      goldEl.textContent = this.getPlayerGold().toString();
     }
   }
 
@@ -188,9 +249,9 @@ export class ShopUI {
    */
   private updateButtons(): void {
     const itemsList = document.getElementById('shop-items-list');
-    if (!itemsList || !this.callbacks) return;
+    if (!itemsList) return;
 
-    const playerGold = this.callbacks.getPlayerGold();
+    const playerGold = this.getPlayerGold();
 
     itemsList.querySelectorAll('.shop-item').forEach((itemEl, index) => {
       const item = this.items[index];

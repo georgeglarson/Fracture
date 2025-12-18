@@ -3,9 +3,14 @@
  *
  * Single Responsibility: Shop init, buy/sell results
  * Extracted from Game.ts to reduce its size.
+ *
+ * Now uses EventBus-based ShopController for decoupled architecture.
  */
 
 import { ShopUI } from '../ui/shop-ui';
+import { ShopController, createShopController } from '../controllers/shop.controller';
+import { createNetworkAdapter } from '../adapters/network.adapter';
+import { getClientEventBus } from '../../../shared/ts/events/event-bus';
 import { AudioManager } from '../audio';
 import { GameClient } from '../network/gameclient';
 
@@ -15,6 +20,7 @@ import { GameClient } from '../network/gameclient';
 export interface ShopGameContext {
   client: GameClient | null;
   shopUI: ShopUI | null;
+  shopController: ShopController | null;
   audioManager: AudioManager | null;
   playerGold: number;
   storage: any; // Storage class with saveGold method
@@ -22,34 +28,41 @@ export interface ShopGameContext {
 }
 
 /**
- * Initialize shop UI with callbacks
+ * Initialize shop with EventBus controller
  */
-export function initShop(ctx: ShopGameContext): ShopUI {
-  const shopUI = new ShopUI();
-  shopUI.setCallbacks({
-    onBuy: (npcKind: number, itemKind: number) => {
-      ctx.client?.sendShopBuy(npcKind, itemKind);
-    },
-    getPlayerGold: () => ctx.playerGold,
-    onGoldChange: (newGold: number) => {
-      ctx.playerGold = newGold;
+export function initShop(ctx: ShopGameContext): { ui: ShopUI; controller: ShopController } {
+  const eventBus = getClientEventBus();
+  const shopUI = new ShopUI(eventBus);
+
+  // Create network adapter
+  const networkAdapter = createNetworkAdapter(ctx.client);
+
+  // Set up gold getter for EventBus mode
+  shopUI.setGoldGetter(() => ctx.playerGold);
+
+  // Create controller - handles all event wiring
+  const controller = createShopController({
+    networkAdapter,
+    shopUI,
+    getGold: () => ctx.playerGold,
+    setGold: (gold: number) => {
+      ctx.playerGold = gold;
       if (ctx.playergold_callback) {
-        ctx.playergold_callback(newGold);
+        ctx.playergold_callback(gold);
       }
     },
     saveGold: (gold: number) => {
-      ctx.storage.saveGold(gold);
+      ctx.storage?.saveGold(gold);
     },
     playSound: (sound: string) => {
       if (ctx.audioManager) {
         ctx.audioManager.playSound(sound);
       }
-    },
-    onSell: (slotIndex: number) => {
-      ctx.client?.sendShopSell(slotIndex);
     }
   });
-  return shopUI;
+
+  console.info('[Shop] Initialized with EventBus controller');
+  return { ui: shopUI, controller };
 }
 
 /**
@@ -61,14 +74,22 @@ export function showShop(
   shopName: string,
   items: Array<{ itemKind: number; price: number; stock: number }>
 ): void {
-  ctx.shopUI?.show(npcKind, shopName, items);
+  if (ctx.shopController) {
+    ctx.shopController.openShop(npcKind, shopName, items);
+  } else {
+    ctx.shopUI?.show(npcKind, shopName, items);
+  }
 }
 
 /**
  * Hide shop UI
  */
 export function hideShop(ctx: ShopGameContext): void {
-  ctx.shopUI?.hide();
+  if (ctx.shopController) {
+    ctx.shopController.close();
+  } else {
+    ctx.shopUI?.hide();
+  }
 }
 
 /**
@@ -81,7 +102,11 @@ export function handleShopBuyResult(
   newGold: number,
   message: string
 ): void {
-  ctx.shopUI?.handleBuyResult(success, itemKind, newGold, message);
+  if (ctx.shopController) {
+    ctx.shopController.handleBuyResult(success, itemKind, newGold, message);
+  } else {
+    ctx.shopUI?.handleBuyResult(success, itemKind, newGold, message);
+  }
 }
 
 /**
@@ -94,5 +119,9 @@ export function handleShopSellResult(
   newGold: number,
   message: string
 ): void {
-  ctx.shopUI?.handleSellResult(success, goldGained, newGold, message);
+  if (ctx.shopController) {
+    ctx.shopController.handleSellResult(success, goldGained, newGold, message);
+  } else {
+    ctx.shopUI?.handleSellResult(success, goldGained, newGold, message);
+  }
 }
