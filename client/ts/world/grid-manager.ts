@@ -34,16 +34,25 @@ export class GridManager {
   }
 
   /**
+   * Generic grid initialization helper
+   * Reduces code duplication across all grid init methods
+   */
+  private initGrid<T>(initializer: (row: number, col: number) => T): T[][] {
+    const grid: T[][] = [];
+    for (let i = 0; i < this.map.height; i += 1) {
+      grid[i] = [];
+      for (let j = 0; j < this.map.width; j += 1) {
+        grid[i][j] = initializer(i, j);
+      }
+    }
+    return grid;
+  }
+
+  /**
    * Initialize the pathing grid from the map's collision data
    */
   initPathingGrid(): void {
-    this.pathingGrid = [];
-    for (let i = 0; i < this.map.height; i += 1) {
-      this.pathingGrid[i] = [];
-      for (let j = 0; j < this.map.width; j += 1) {
-        this.pathingGrid[i][j] = this.map.grid[i][j];
-      }
-    }
+    this.pathingGrid = this.initGrid((row, col) => this.map.grid[row][col]);
     console.info('Initialized the pathing grid with static colliding cells.');
   }
 
@@ -51,13 +60,7 @@ export class GridManager {
    * Initialize an empty entity grid
    */
   initEntityGrid(): void {
-    this.entityGrid = [];
-    for (let i = 0; i < this.map.height; i += 1) {
-      this.entityGrid[i] = [];
-      for (let j = 0; j < this.map.width; j += 1) {
-        this.entityGrid[i][j] = {};
-      }
-    }
+    this.entityGrid = this.initGrid(() => ({}));
     console.info('Initialized the entity grid.');
   }
 
@@ -65,13 +68,7 @@ export class GridManager {
    * Initialize an empty rendering grid
    */
   initRenderingGrid(): void {
-    this.renderingGrid = [];
-    for (let i = 0; i < this.map.height; i += 1) {
-      this.renderingGrid[i] = [];
-      for (let j = 0; j < this.map.width; j += 1) {
-        this.renderingGrid[i][j] = {};
-      }
-    }
+    this.renderingGrid = this.initGrid(() => ({}));
     console.info('Initialized the rendering grid.');
   }
 
@@ -79,13 +76,7 @@ export class GridManager {
    * Initialize an empty item grid
    */
   initItemGrid(): void {
-    this.itemGrid = [];
-    for (let i = 0; i < this.map.height; i += 1) {
-      this.itemGrid[i] = [];
-      for (let j = 0; j < this.map.width; j += 1) {
-        this.itemGrid[i][j] = {};
-      }
-    }
+    this.itemGrid = this.initGrid(() => ({}));
     console.info('Initialized the item grid.');
   }
 

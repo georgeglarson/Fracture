@@ -1,16 +1,6 @@
-import {Item} from './item';
-import {Types} from '../../../../shared/ts/gametypes';
-
-// Map chest entity kinds to sprite names
-const CHEST_SPRITES: Record<number, string> = {
-  [Types.Entities.CHEST]: 'chest',
-  [Types.Entities.CHEST_CRATE]: 'chestcrate',
-  [Types.Entities.CHEST_LOG]: 'chestlog',
-  [Types.Entities.CHEST_STONE]: 'cheststone',
-  [Types.Entities.CHEST_URN]: 'chesturn',
-  [Types.Entities.CHEST_OBSIDIAN]: 'chestobsidian',
-  [Types.Entities.CHEST_GLITCH]: 'chestglitch',
-};
+import { Item } from './item';
+import { Types } from '../../../../shared/ts/gametypes';
+import { getChestSpriteName } from '../../../../shared/ts/entities/chest-config';
 
 export class Chest extends Item {
 
@@ -21,7 +11,7 @@ export class Chest extends Item {
   }
 
   getSpriteName() {
-    return CHEST_SPRITES[this.kind] || 'chest';
+    return getChestSpriteName(this.kind);
   }
 
   isMoving() {

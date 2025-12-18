@@ -4,6 +4,7 @@ import {Mobs} from './character/mob/mobs';
 import {Items} from './objects/items';
 import {NPCs} from './character/npc/npcs';
 import {Chest} from './objects/chest';
+import {CHEST_KINDS} from '../../../shared/ts/entities/chest-config';
 
 import * as _ from 'lodash';
 
@@ -156,34 +157,10 @@ EntityFactory.builders[Types.Entities.CAKE] = function (id) {
   return new Items.Cake(id);
 };
 
-EntityFactory.builders[Types.Entities.CHEST] = function (id) {
-  return new Chest(id, Types.Entities.CHEST);
-};
-
-// Zone-themed chests
-EntityFactory.builders[Types.Entities.CHEST_CRATE] = function (id) {
-  return new Chest(id, Types.Entities.CHEST_CRATE);
-};
-
-EntityFactory.builders[Types.Entities.CHEST_LOG] = function (id) {
-  return new Chest(id, Types.Entities.CHEST_LOG);
-};
-
-EntityFactory.builders[Types.Entities.CHEST_STONE] = function (id) {
-  return new Chest(id, Types.Entities.CHEST_STONE);
-};
-
-EntityFactory.builders[Types.Entities.CHEST_URN] = function (id) {
-  return new Chest(id, Types.Entities.CHEST_URN);
-};
-
-EntityFactory.builders[Types.Entities.CHEST_OBSIDIAN] = function (id) {
-  return new Chest(id, Types.Entities.CHEST_OBSIDIAN);
-};
-
-EntityFactory.builders[Types.Entities.CHEST_GLITCH] = function (id) {
-  return new Chest(id, Types.Entities.CHEST_GLITCH);
-};
+// Register all chest types from shared config
+CHEST_KINDS.forEach(chestKind => {
+  EntityFactory.builders[chestKind] = (id) => new Chest(id, chestKind);
+});
 
 //====== NPCs ======
 
