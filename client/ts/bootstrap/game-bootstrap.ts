@@ -70,6 +70,7 @@ export interface BootstrapContext {
 
   // Zone operations
   enqueueZoningFrom: (x: number, y: number) => void;
+  endZoning: () => void;
   resetZone: () => void;
   updatePlateauMode: () => void;
   updatePlayerCheckpoint: () => void;
@@ -236,6 +237,7 @@ export function initializeManagers(ctx: BootstrapContext): BootstrapResult {
     checkOtherDirtyRects: ctx.checkOtherDirtyRects,
 
     enqueueZoningFrom: ctx.enqueueZoningFrom,
+    endZoning: ctx.endZoning,
     resetZone: ctx.resetZone,
     updatePlateauMode: ctx.updatePlateauMode,
     updatePlayerCheckpoint: ctx.updatePlayerCheckpoint,

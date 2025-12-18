@@ -24,39 +24,40 @@ export interface ShopNetworkAdapter {
 }
 
 /**
- * Create network adapter from GameClient
+ * Create network adapter from GameClient accessor
+ * Uses lazy evaluation to support late binding (client is created after inventory init)
  */
-export function createNetworkAdapter(client: any): NetworkAdapter {
+export function createNetworkAdapter(getClient: () => any): NetworkAdapter {
   return {
     // Connection
-    isConnected: () => client?.isConnected?.() ?? false,
+    isConnected: () => getClient()?.isConnected?.() ?? false,
 
     // Inventory operations
     sendInventoryUse: (slotIndex: number) => {
-      client?.sendInventoryUse?.(slotIndex);
+      getClient()?.sendInventoryUse?.(slotIndex);
     },
     sendInventoryEquip: (slotIndex: number) => {
-      client?.sendInventoryEquip?.(slotIndex);
+      getClient()?.sendInventoryEquip?.(slotIndex);
     },
     sendInventoryDrop: (slotIndex: number) => {
-      client?.sendInventoryDrop?.(slotIndex);
+      getClient()?.sendInventoryDrop?.(slotIndex);
     },
     sendShopSell: (slotIndex: number) => {
-      client?.sendShopSell?.(slotIndex);
+      getClient()?.sendShopSell?.(slotIndex);
     },
     sendDropItem: (slot: 'weapon' | 'armor') => {
-      client?.sendDropItem?.(slot);
+      getClient()?.sendDropItem?.(slot);
     },
     sendUnequipToInventory: (slot: 'weapon' | 'armor') => {
-      client?.sendUnequipToInventory?.(slot);
+      getClient()?.sendUnequipToInventory?.(slot);
     },
     sendInventoryPickup: (itemId: number) => {
-      client?.sendInventoryPickup?.(itemId);
+      getClient()?.sendInventoryPickup?.(itemId);
     },
 
     // Shop operations
     sendShopBuy: (npcKind: number, itemKind: number) => {
-      client?.sendShopBuy?.(npcKind, itemKind);
+      getClient()?.sendShopBuy?.(npcKind, itemKind);
     },
   };
 }

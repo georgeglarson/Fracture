@@ -538,6 +538,7 @@ export class Game {
 
       // Zone operations
       enqueueZoningFrom: (x, y) => self.enqueueZoningFrom(x, y),
+      endZoning: () => self.endZoning(),
       resetZone: () => self.resetZone(),
       updatePlateauMode: () => self.updatePlateauMode(),
       updatePlayerCheckpoint: () => self.updatePlayerCheckpoint(),
@@ -803,9 +804,8 @@ export class Game {
         self.playergold_callback(self.playerGold);
       }
 
-      // Send daily check to server (still uses localStorage for streak continuity)
-      var dailyData = self.storage.getDailyData();
-      self.client.sendDailyCheck(dailyData.lastLoginDate || '', dailyData.currentStreak);
+      // Request daily check from server (server uses SQLite as source of truth)
+      self.client.sendDailyCheck();
 
       // Setup player behavior callbacks via PlayerController
       self.playerController.setupCallbacks(self.player);
@@ -1543,6 +1543,15 @@ export class Game {
     this.renderer.rescale(newScale);
     this.camera = this.renderer.camera;
     this.camera.setPosition(x, y);
+
+    // Notify zoning system of viewport change - it will recalculate targets
+    // This allows transitions to continue smoothly instead of cancelling
+    this.zoningManager?.onViewportResize();
+
+    // Re-center camera on player after resize (only if not currently zoning)
+    if (this.player && !this.camera.indoorMode && !this.isZoning()) {
+      this.camera.lookAt(this.player);
+    }
 
     this.renderer.renderStaticCanvases();
   }

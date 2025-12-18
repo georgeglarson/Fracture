@@ -48,6 +48,7 @@ export interface PlayerControllerDeps {
 
   // Zone operations
   enqueueZoningFrom: (x: number, y: number) => void;
+  endZoning: () => void;
   resetZone: () => void;
   updatePlateauMode: () => void;
   updatePlayerCheckpoint: () => void;
@@ -247,8 +248,10 @@ export class PlayerController {
     this.selectedCellVisible = false;
 
     // Item pickup - sound is played when server confirms via INVENTORY_ADD
+    console.log(`[PlayerController] handleStopPathing at (${x}, ${y}), isItemAt: ${this.deps.isItemAt(x, y)}`);
     if (this.deps.isItemAt(x, y)) {
       const item = this.deps.getItemAt(x, y);
+      console.log(`[PlayerController] Found item:`, item?.id, item?.kind);
       this.deps.pickupItemToInventory(item);
       // Note: loot sound moved to inventory add handler so it only plays on success
     }
@@ -292,6 +295,10 @@ export class PlayerController {
     this.player.nextGridY = dest.y;
     this.player.turnTo(dest.orientation);
     this.deps.client.sendTeleport(dest.x, dest.y);
+
+    // Cancel any in-progress camera zone transition before door transition
+    // This prevents isZoning() from being stuck true when entering indoor mode
+    this.deps.endZoning();
 
     // Zone-based interior/outdoor handling
     const transition = this.deps.unifiedZoneManager.handleDoorTransition(

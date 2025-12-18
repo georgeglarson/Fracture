@@ -283,8 +283,11 @@ export class GameClient extends EventEmitter {
       }
       else if (Types.isMob(kind)) {
         orientation = data[5];
-        if (data.length > 6) {
-          target = data[6];
+        // Mob spawn format: [id, kind, x, y, orientation, hitPoints, maxHitPoints, target?]
+        var hitPoints = data[6];
+        var maxHitPoints = data[7];
+        if (data.length > 8) {
+          target = data[8];
         }
       }
 
@@ -293,6 +296,12 @@ export class GameClient extends EventEmitter {
       if (character instanceof Player) {
         character.weaponName = Types.getKindAsString(weapon);
         character.spriteName = Types.getKindAsString(armor);
+      }
+
+      // Set mob HP from spawn message for health bar display
+      if (Types.isMob(kind) && hitPoints !== undefined && maxHitPoints !== undefined) {
+        character.hitPoints = hitPoints;
+        character.maxHitPoints = maxHitPoints;
       }
 
       this.emit(ClientEvents.SPAWN_CHARACTER, character, x, y, orientation, target);
@@ -722,8 +731,9 @@ export class GameClient extends EventEmitter {
     this.sendMessage([Types.Messages.UNEQUIP_TO_INVENTORY, slot]);
   }
 
-  sendDailyCheck(lastLoginDate: string, currentStreak: number) {
-    this.sendMessage([Types.Messages.DAILY_CHECK, lastLoginDate, currentStreak]);
+  sendDailyCheck() {
+    // Server uses SQLite as source of truth - no client data needed
+    this.sendMessage([Types.Messages.DAILY_CHECK, '', 0]);
   }
 
   sendShopBuy(npcKind: number, itemKind: number) {

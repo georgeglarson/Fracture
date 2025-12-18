@@ -48,6 +48,9 @@ export class InventoryController {
   private storage: { saveInventory: (slots: any[]) => void } | null;
   private isShopOpen: () => boolean;
   private subscriptions: Subscription[] = [];
+  // Pending equip properties - captured before sending to server
+  private pendingWeaponProps: any = null;
+  private pendingArmorProps: any = null;
 
   constructor(deps: InventoryControllerDeps) {
     this.eventBus = deps.eventBus;
@@ -76,11 +79,22 @@ export class InventoryController {
       })
     );
 
-    // Equip item
+    // Equip item - capture properties BEFORE sending to server
     this.subscriptions.push(
       this.eventBus.on('ui:inventory:equip', ({ slotIndex }) => {
         console.log('[InventoryController] Equip slot', slotIndex);
+        const slot = this.manager.getSlot(slotIndex);
         const itemName = this.manager.getItemName(slotIndex);
+
+        // Capture properties before they're removed from inventory
+        if (slot) {
+          if (this.manager.isSlotWeapon(slotIndex)) {
+            this.pendingWeaponProps = slot.properties;
+          } else if (this.manager.isSlotArmor(slotIndex)) {
+            this.pendingArmorProps = slot.properties;
+          }
+        }
+
         this.network.sendInventoryEquip(slotIndex);
         this.eventBus.emit('ui:notification', { message: `Equipped ${itemName}` });
       })
@@ -205,10 +219,20 @@ export class InventoryController {
   }
 
   /**
-   * Update equipped display
+   * Update equipped display with properties for accurate comparison
    */
   updateEquippedDisplay(weaponKind: number | null, armorKind: number | null): void {
-    this.eventBus.emit('state:equipment', { weapon: weaponKind, armor: armorKind });
+    // Include pending properties captured during equip
+    this.eventBus.emit('state:equipment', {
+      weapon: weaponKind,
+      armor: armorKind,
+      weaponProps: this.pendingWeaponProps,
+      armorProps: this.pendingArmorProps
+    });
+
+    // Clear pending props after applying
+    this.pendingWeaponProps = null;
+    this.pendingArmorProps = null;
   }
 
   /**

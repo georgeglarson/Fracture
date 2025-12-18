@@ -263,6 +263,8 @@ export interface InventoryStateEvent {
 export interface EquipmentStateEvent {
   weapon: number | null;
   armor: number | null;
+  weaponProps?: any;
+  armorProps?: any;
 }
 
 // ============ Shop UI Events ============

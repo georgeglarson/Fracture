@@ -41,8 +41,8 @@ export function initInventory(ctx: InventoryGameContext): {
   const manager = new InventoryManager();
   const ui = new InventoryUI(eventBus);
 
-  // Create network adapter
-  const networkAdapter = createNetworkAdapter(ctx.client);
+  // Create network adapter with lazy client lookup (client is created after inventory init)
+  const networkAdapter = createNetworkAdapter(() => ctx.client);
 
   // Set up isShopOpen callback for UI context menu
   ui.setIsShopOpen(() => ctx.shopUI?.isOpen() ?? false);

@@ -28,8 +28,8 @@ export interface InventoryPlayerContext {
   send: (message: any) => void;
   broadcast: (message: any, ignoreSelf?: boolean) => void;
   equip: (kind: number) => any;
-  equipWeapon: (kind: number) => void;
-  equipArmor: (kind: number) => void;
+  equipWeapon: (kind: number, properties?: any) => void;
+  equipArmor: (kind: number, properties?: any) => void;
   updateHitPoints: () => void;
   hasFullHealth: () => boolean;
   regenHealthBy: (amount: number) => void;
@@ -41,6 +41,7 @@ export interface InventoryPlayerContext {
   // Equipment management
   getEquipment: () => {
     getEquipped: (slot: EquipmentSlot) => number;
+    getProperties: (slot: EquipmentSlot) => any;
   };
 
   // World access
@@ -190,22 +191,26 @@ export function handleInventoryEquip(ctx: InventoryPlayerContext, slotIndex: num
   }
 
   const newItemKind = slot.kind;
+  const newItemProperties = slot.properties;
   const isWeapon = Types.isWeapon(newItemKind);
   const isArmor = Types.isArmor(newItemKind);
 
-  // Get currently equipped item
+  // Get currently equipped item AND its properties
+  const equipment = ctx.getEquipment();
+  const equipSlot: EquipmentSlot = isWeapon ? 'weapon' : 'armor';
   const currentKind = isWeapon ? ctx.weapon : ctx.armor;
+  const currentProperties = equipment.getProperties(equipSlot);
   const isDefaultItem = (isWeapon && currentKind === Types.Entities.SWORD1) ||
                         (isArmor && currentKind === Types.Entities.CLOTHARMOR);
 
   // Remove new item from inventory
   inventory.removeItem(slotIndex, 1);
 
-  // Put old equipped item in inventory (if not default)
+  // Put old equipped item in inventory (if not default) - WITH its properties!
   if (!isDefaultItem) {
     inventory.setSlot(slotIndex, {
       kind: currentKind,
-      properties: null,
+      properties: currentProperties,
       count: 1
     });
     const serializedOldSlot = serializeSlot(inventory.getSlot(slotIndex));
@@ -220,11 +225,11 @@ export function handleInventoryEquip(ctx: InventoryPlayerContext, slotIndex: num
     ctx.send([Types.Messages.INVENTORY_REMOVE, slotIndex]);
   }
 
-  // Equip new item
+  // Equip new item WITH its properties
   if (isWeapon) {
-    ctx.equipWeapon(newItemKind);
+    ctx.equipWeapon(newItemKind, newItemProperties);
   } else {
-    ctx.equipArmor(newItemKind);
+    ctx.equipArmor(newItemKind, newItemProperties);
     ctx.updateHitPoints();
     ctx.send(new Messages.HitPoints(ctx.maxHitPoints).serialize());
   }

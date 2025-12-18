@@ -521,4 +521,27 @@ export class AudioManager {
       this.exitCombat();
     }
   }
+
+  // Backgrounded state - store volume before muting
+  private savedMasterVolume: number = 1.0;
+  private isMuted: boolean = false;
+
+  /**
+   * Mute all audio (for when window loses focus)
+   */
+  muteAll(): void {
+    if (this.isMuted) return;
+    this.isMuted = true;
+    this.savedMasterVolume = this.masterVolume;
+    this.setMasterVolume(0);
+  }
+
+  /**
+   * Unmute all audio (for when window regains focus)
+   */
+  unmuteAll(): void {
+    if (!this.isMuted) return;
+    this.isMuted = false;
+    this.setMasterVolume(this.savedMasterVolume);
+  }
 }

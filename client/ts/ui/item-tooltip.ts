@@ -127,25 +127,24 @@ export class ItemTooltip {
   }
 
   private buildComparison(newProps: ItemProperties, equippedKind: number): string {
-    // Simple comparison: show if damage is higher/lower
-    // For now, just show equipped weapon name
+    // Compare against equipped weapon's BASE stats
+    // Note: This doesn't account for equipped weapon's bonuses (properties not tracked)
     const equippedName = Types.getKindAsString(equippedKind);
 
     if (!newProps.damageMin || !newProps.damageMax) return '';
 
-    // Get base damage for equipped weapon (approximate from rank)
-    const equippedRank = Types.getWeaponRank(equippedKind);
+    // Base damage stats by weapon kind - matches inventory-ui.ts WEAPON_BASE_STATS
     const baseDamages: Record<number, [number, number]> = {
-      0: [1, 3],   // sword1
-      1: [3, 6],   // sword2
-      2: [6, 10],  // axe
-      3: [10, 15], // morningstar
-      4: [12, 18], // bluesword
-      5: [15, 22], // redsword
-      6: [20, 30], // goldensword
+      [Types.Entities.SWORD1]: [3, 6],
+      [Types.Entities.SWORD2]: [6, 12],
+      [Types.Entities.AXE]: [10, 18],
+      [Types.Entities.MORNINGSTAR]: [15, 25],
+      [Types.Entities.BLUESWORD]: [20, 35],
+      [Types.Entities.REDSWORD]: [28, 45],
+      [Types.Entities.GOLDENSWORD]: [35, 55],
     };
 
-    const equipped = baseDamages[equippedRank] || [1, 3];
+    const equipped = baseDamages[equippedKind] || [3, 6];
     const avgNew = (newProps.damageMin + newProps.damageMax) / 2;
     const avgEquipped = (equipped[0] + equipped[1]) / 2;
     const diff = avgNew - avgEquipped;

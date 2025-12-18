@@ -54,15 +54,15 @@ export interface EquipmentPlayerContext {
 /**
  * Equip armor to a player
  */
-export function equipArmor(ctx: EquipmentPlayerContext, kind: number): void {
-  ctx.getEquipment().equipToSlot('armor', kind);
+export function equipArmor(ctx: EquipmentPlayerContext, kind: number, properties?: any): void {
+  ctx.getEquipment().equipToSlot('armor', kind, properties);
 }
 
 /**
  * Equip weapon to a player
  */
-export function equipWeapon(ctx: EquipmentPlayerContext, kind: number): void {
-  ctx.getEquipment().equipToSlot('weapon', kind);
+export function equipWeapon(ctx: EquipmentPlayerContext, kind: number, properties?: any): void {
+  ctx.getEquipment().equipToSlot('weapon', kind, properties);
 }
 
 /**
@@ -74,7 +74,8 @@ export function equipItem(ctx: EquipmentPlayerContext, item: EquippableItem | nu
   console.debug(`${ctx.name} equips ${Types.getKindAsString(item.kind)}`);
 
   const equipment = ctx.getEquipment();
-  const slot = equipment.equip(item.kind);
+  // Pass item properties to equipment manager
+  const slot = equipment.equip(item.kind, (item as any).properties || null);
 
   if (slot && slot === 'armor') {
     updateHitPoints(ctx);
@@ -107,19 +108,20 @@ export function handleDropItem(ctx: EquipmentPlayerContext, itemType: string): v
   console.log(`[Drop] ${ctx.name} dropping ${slot}`);
 
   // Use unified drop - handles default check internally
-  const droppedKind = equipment.drop(slot);
-  if (!droppedKind) {
+  // Returns { kind, properties } or null if can't drop
+  const dropped = equipment.drop(slot);
+  if (!dropped) {
     console.log(`[Drop] Cannot drop default ${slot}`);
     return;
   }
 
-  // Create item at player's position
+  // Create item at player's position with its original properties
   const world = ctx.getWorld();
-  const item = world.createItemWithProperties(droppedKind, ctx.x, ctx.y);
+  const item = world.createItemWithProperties(dropped.kind, ctx.x, ctx.y, dropped.properties);
   if (item) {
     world.addItem(item);
     ctx.broadcast(new Messages.Spawn(item), false);
-    console.log(`[Drop] Created item ${Types.getKindAsString(droppedKind)} at (${ctx.x}, ${ctx.y})`);
+    console.log(`[Drop] Created item ${Types.getKindAsString(dropped.kind)} at (${ctx.x}, ${ctx.y})`);
   }
 
   // Get the new default item that was auto-equipped

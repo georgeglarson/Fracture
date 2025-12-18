@@ -11,6 +11,16 @@ import { Inventory } from '../inventory/inventory';
 import { ProgressionService } from './progression.service';
 
 /**
+ * Daily data loaded from storage
+ */
+export interface LoadedDailyData {
+  lastLogin: string;
+  currentStreak: number;
+  longestStreak: number;
+  totalLogins: number;
+}
+
+/**
  * Player context for persistence operations
  */
 export interface PersistencePlayerContext {
@@ -25,12 +35,14 @@ export interface PersistencePlayerContext {
   armor: number;
   weapon: number;
   title: string | null;
+  dailyData: LoadedDailyData | null;
 
   // Methods
   equipArmor: (kind: number) => void;
   equipWeapon: (kind: number) => void;
   setCharacterId: (id: string) => void;
   setTitle: (title: string | null) => void;
+  setDailyData: (data: LoadedDailyData) => void;
 
   // Service access
   getProgression: () => ProgressionService;
@@ -73,7 +85,17 @@ export function loadFromStorage(ctx: PersistencePlayerContext, storage: IStorage
   achievementService.initPlayer(String(ctx.id), state.achievements);
   ctx.setTitle(state.achievements.selectedTitle || null);
 
-  console.log(`[Storage] Loaded character ${ctx.name} (${ctx.characterId}): Level ${ctx.level}, Gold ${ctx.gold}`);
+  // Restore daily login data
+  if (state.daily) {
+    ctx.setDailyData({
+      lastLogin: state.daily.lastLogin,
+      currentStreak: state.daily.currentStreak,
+      longestStreak: state.daily.longestStreak,
+      totalLogins: state.daily.totalLogins
+    });
+  }
+
+  console.log(`[Storage] Loaded character ${ctx.name} (${ctx.characterId}): Level ${ctx.level}, Gold ${ctx.gold}, Streak ${state.daily?.currentStreak || 0}`);
 
   return true;
 }
@@ -104,8 +126,8 @@ export function saveToStorage(ctx: PersistencePlayerContext, storage: IStorageSe
     },
     inventory: ctx.getInventory().getSerializedSlots(),
     achievements: achievements || { unlocked: [], progress: {}, selectedTitle: null },
-    daily: {
-      lastLogin: new Date().toISOString().split('T')[0],
+    daily: ctx.dailyData || {
+      lastLogin: '',
       currentStreak: 0,
       longestStreak: 0,
       totalLogins: 0

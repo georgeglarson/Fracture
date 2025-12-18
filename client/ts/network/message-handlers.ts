@@ -285,6 +285,15 @@ function setupEntityHandlers(game: Game, client: GameClient): void {
           }
         });
         entity.die();
+
+        // Failsafe: ensure entity is removed even if death animation fails
+        setTimeout(function () {
+          if (game.getEntityById(entityId)) {
+            console.warn('[Despawn] Failsafe removing ghost entity:', entityId);
+            game.removeEntity(entity);
+            game.removeFromRenderingGrid(entity, entity.gridX, entity.gridY);
+          }
+        }, 2000);
       } else if (entity instanceof Chest) {
         entity.open();
       }
@@ -370,6 +379,26 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
           game.audioManager.playSound('glitch1');
           game.showNotification('Health critical!');
         }
+
+        // Auto-retaliate: fight back when hurt if not already attacking
+        if (!player.isAttacking()) {
+          let nearestAttacker: any = null;
+          let nearestDist = Infinity;
+          player.forEachAttacker((attacker: any) => {
+            if (attacker && !attacker.isDead) {
+              const dist = player.getDistanceToEntity(attacker);
+              if (dist < nearestDist) {
+                nearestDist = dist;
+                nearestAttacker = attacker;
+              }
+            }
+          });
+          if (nearestAttacker) {
+            console.debug('[Auto-retaliate] Fighting back against', nearestAttacker.id);
+            game.makePlayerAttack(nearestAttacker);
+          }
+        }
+
         if (game.playerhurt_callback) {
           game.playerhurt_callback();
         }
@@ -467,6 +496,12 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
       game.audioManager.enterCombat();
     }
 
+    // Auto-retaliate: if player is attacked while idle, fight back
+    if (targetId === game.playerId && attacker && game.player && !game.player.target) {
+      console.debug('[Auto-retaliate] Player attacked by ' + attacker.id + ', fighting back');
+      game.makePlayerAttack(attacker);
+    }
+
     if (attacker && target && attacker.id !== game.playerId) {
       console.debug(attacker.id + ' attacks ' + target.id);
 
@@ -493,9 +528,26 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
         // before DESPAWN message arrives (fixes "immortal mob" race condition)
         if (hp <= 0 && !mob.isDying) {
           mob.isDying = true;
-          // If player is targeting this mob, disengage
+          // If player is targeting this mob, disengage and retarget next attacker
           if (game.player && game.player.target && game.player.target.id === mob.id) {
             game.player.disengage();
+
+            // Auto-retarget: attack next nearest attacker
+            let nextTarget: any = null;
+            let nearestDist = Infinity;
+            game.player.forEachAttacker((attacker: any) => {
+              if (attacker && !attacker.isDead && !attacker.isDying && attacker.id !== mob.id) {
+                const dist = game.player.getDistanceToEntity(attacker);
+                if (dist < nearestDist) {
+                  nearestDist = dist;
+                  nextTarget = attacker;
+                }
+              }
+            });
+            if (nextTarget) {
+              console.debug('[Auto-retarget] Switching to next attacker:', nextTarget.id);
+              game.makePlayerAttack(nextTarget);
+            }
           }
         }
       }

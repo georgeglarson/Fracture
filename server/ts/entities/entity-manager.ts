@@ -237,11 +237,20 @@ export class EntityManager {
     }
   }
 
-  createChest(x: number, y: number, items: number[]): Chest | null {
+  createChest(x: number, y: number, items: number[], chestKind?: number): Chest | null {
     try {
-      const chest = this.createItem(Types.Entities.CHEST, x, y) as Chest;
+      // Use zone-based chest type if not explicitly specified
+      let kind = chestKind;
+      if (!kind) {
+        const zone = getZoneAtPosition(x, y);
+        kind = zone ? Types.getChestKindForZone(zone.id) : Types.Entities.CHEST;
+      }
+
+      const chest = this.createItem(kind, x, y) as Chest;
       if (!chest) return null;
       chest.setItems(items);
+
+      console.log(`[EntityManager] Created ${Types.getKindAsString(kind)} at (${x}, ${y})`);
       return chest;
     } catch (error) {
       console.error(`[EntityManager] Failed to create chest at (${x}, ${y}):`, error);

@@ -1,7 +1,7 @@
 import {Game} from '../game';
 import {Timer} from '../utils/timer';
 import {Character} from '../entity/character/character';
-import {Types} from '../../../shared/ts/gametypes';
+import {Types} from '../../../shared/ts/gametypes'; // Still used for character movement
 
 export class Updater {
 
@@ -68,9 +68,9 @@ export class Updater {
 
   updateTransitions() {
     var self = this,
-      m = null,
-      z = this.game.currentZoning;
+      m = null;
 
+    // Update entity movement transitions
     this.game.forEachEntity(function (entity) {
       if (!entity) return;
       m = entity.movement;
@@ -80,58 +80,18 @@ export class Updater {
         }
       }
     });
-
-    if (z) {
-      if (z.inProgress) {
-        z.step(this.game.currentTime);
-      }
-    }
   }
 
+  /**
+   * Update camera zone transitions using the state machine
+   * Clean, tick-based approach that handles resize naturally
+   */
   updateZoning() {
-    var g = this.game,
-      c = g.camera,
-      z = g.currentZoning,
-      s = 3,
-      ts = 16,
-      speed = 500;
+    // Calculate delta time (assume ~16ms if not available)
+    const deltaTime = 16; // Could be calculated from game.currentTime if needed
 
-    if (z && z.inProgress === false) {
-      var orientation = this.game.zoningOrientation,
-        startValue = 0, endValue = 0, offset = 0,
-        updateFunc = null,
-        endFunc = null;
-
-      if (orientation === Types.Orientations.LEFT || orientation === Types.Orientations.RIGHT) {
-        offset = (c.gridW - 2) * ts;
-        startValue = (orientation === Types.Orientations.LEFT) ? c.x - ts : c.x + ts;
-        endValue = (orientation === Types.Orientations.LEFT) ? c.x - offset : c.x + offset;
-        updateFunc = function (x) {
-          c.setPosition(x, c.y);
-          g.initAnimatedTiles();
-          g.renderer.renderStaticCanvases();
-        }
-        endFunc = function () {
-          c.setPosition(z.endValue, c.y);
-          g.endZoning();
-        }
-      } else if (orientation === Types.Orientations.UP || orientation === Types.Orientations.DOWN) {
-        offset = (c.gridH - 2) * ts;
-        startValue = (orientation === Types.Orientations.UP) ? c.y - ts : c.y + ts;
-        endValue = (orientation === Types.Orientations.UP) ? c.y - offset : c.y + offset;
-        updateFunc = function (y) {
-          c.setPosition(c.x, y);
-          g.initAnimatedTiles();
-          g.renderer.renderStaticCanvases();
-        }
-        endFunc = function () {
-          c.setPosition(c.x, z.endValue);
-          g.endZoning();
-        }
-      }
-
-      z.start(this.game.currentTime, updateFunc, endFunc, startValue, endValue, speed);
-    }
+    // Tick the zoning manager's state machine
+    this.game.zoningManager?.tick(deltaTime);
   }
 
   updateCharacter(c) {

@@ -90,6 +90,9 @@ export class Player extends Character {
   // Database character ID (for persistence)
   characterId: string | null = null;
 
+  // Daily login data (loaded from SQLite)
+  dailyData: PersistenceHandler.LoadedDailyData | null = null;
+
   zone_callback: ((zoneId: number) => void) | null = null;
   move_callback: ((x: number, y: number) => void) | null = null;
   lootmove_callback: ((x: number, y: number) => void) | null = null;
@@ -211,6 +214,10 @@ export class Player extends Character {
     this.characterId = id;
   }
 
+  setDailyData(data: PersistenceHandler.LoadedDailyData) {
+    this.dailyData = data;
+  }
+
   getProgression() {
     return this.progression;
   }
@@ -291,12 +298,12 @@ export class Player extends Character {
   // EQUIPMENT - Delegated to EquipmentHandler
   // ============================================================================
 
-  equipArmor(kind: number) {
-    EquipmentHandler.equipArmor(this, kind);
+  equipArmor(kind: number, properties?: any) {
+    EquipmentHandler.equipArmor(this, kind, properties);
   }
 
-  equipWeapon(kind: number) {
-    EquipmentHandler.equipWeapon(this, kind);
+  equipWeapon(kind: number, properties?: any) {
+    EquipmentHandler.equipWeapon(this, kind, properties);
   }
 
   equipItem(item: Item) {
@@ -360,18 +367,40 @@ export class Player extends Character {
 
   /**
    * Handle daily reward check from client
+   * Uses SQLite data as source of truth, ignores client-sent data
    */
-  handleDailyCheck(lastLoginDate: string | null, clientStreak: number) {
+  handleDailyCheck(_lastLoginDate: string | null, _clientStreak: number) {
+    // Use SQLite data as source of truth (loaded via loadFromStorage)
+    const storedLastLogin = this.dailyData?.lastLogin || null;
+    const storedStreak = this.dailyData?.currentStreak || 0;
+
     const dailyService = getDailyRewardService();
-    const result = dailyService.checkDailyReward(lastLoginDate, clientStreak);
+    const result = dailyService.checkDailyReward(storedLastLogin, storedStreak);
 
     if (result.isNewDay) {
       console.log(`[Daily] Granting ${this.name} day ${result.streak} reward: +${result.gold} gold, +${result.xp} XP`);
       this.grantGold(result.gold);
       this.grantXP(result.xp);
       this.checkStreakAchievements(result.streak);
+
+      // Update daily data for persistence
+      const today = new Date().toISOString().split('T')[0];
+      const longestStreak = Math.max(result.streak, this.dailyData?.longestStreak || 0);
+      const totalLogins = (this.dailyData?.totalLogins || 0) + 1;
+      this.dailyData = {
+        lastLogin: today,
+        currentStreak: result.streak,
+        longestStreak,
+        totalLogins
+      };
+
+      // Save to storage immediately
+      const storage = this.world.getStorageService();
+      if (storage && this.characterId) {
+        storage.saveDailyData(this.characterId, this.dailyData);
+      }
     } else {
-      console.log(`[Daily] ${this.name} already claimed today`);
+      console.log(`[Daily] ${this.name} already claimed today (streak: ${result.streak})`);
     }
 
     // Send daily reward notification for popup

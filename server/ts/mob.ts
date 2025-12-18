@@ -183,4 +183,24 @@ export class Mob extends Character {
   distanceToSpawningPoint(x: number, y: number): number {
     return Utils.distanceTo(x, y, this.spawningX, this.spawningY);
   }
+
+  /**
+   * Override getState to include HP for health bar display
+   * Mob spawns: [id, kind, x, y, orientation, hitPoints, maxHitPoints, target?]
+   */
+  getState(): unknown[] {
+    const basestate = this._getBaseState();
+    const state: unknown[] = [];
+
+    state.push(this.orientation);
+    // Add HP info at fixed positions for client parsing
+    state.push(this.hitPoints);
+    state.push(this.maxHitPoints);
+    // Target is optional, always last
+    if (this.target) {
+      state.push(this.target);
+    }
+
+    return basestate.concat(state);
+  }
 }

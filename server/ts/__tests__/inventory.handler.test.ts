@@ -62,6 +62,7 @@ describe('InventoryHandler', () => {
       getInventory: () => mockInventory,
       getEquipment: () => ({
         getEquipped: vi.fn(() => 0),
+        getProperties: vi.fn(() => null),
       }),
       getWorld: () => mockWorld,
       firepotionTimeout: null,

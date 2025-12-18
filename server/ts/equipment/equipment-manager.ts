@@ -15,6 +15,7 @@ import {
   slotAffectsHP
 } from '../../../shared/ts/equipment/equipment-types';
 import { Types } from '../../../shared/ts/gametypes';
+import { ItemProperties } from '../../../shared/ts/items/item-types';
 
 export interface EquipmentCallbacks {
   onHPUpdate?: () => void;
@@ -22,15 +23,17 @@ export interface EquipmentCallbacks {
 
 export class EquipmentManager {
   private equipped: Map<EquipmentSlot, number> = new Map();
+  private properties: Map<EquipmentSlot, ItemProperties | null> = new Map();
   private levels: Map<EquipmentSlot, number> = new Map();
   private callbacks: EquipmentCallbacks = {};
 
   constructor() {
-    // Initialize with default items
+    // Initialize with default items (no properties for defaults)
     for (const slot of EQUIPMENT_SLOTS) {
       const defaultItem = getDefaultItem(slot);
       if (defaultItem) {
         this.equipped.set(slot, defaultItem);
+        this.properties.set(slot, null);
         this.levels.set(slot, getLevel(slot, defaultItem));
       }
     }
@@ -47,11 +50,12 @@ export class EquipmentManager {
    * Equip an item to the appropriate slot
    * @returns The slot the item was equipped to, or null if invalid
    */
-  equip(kind: number): EquipmentSlot | null {
+  equip(kind: number, properties?: ItemProperties | null): EquipmentSlot | null {
     const slot = getSlotForKind(kind);
     if (!slot) return null;
 
     this.equipped.set(slot, kind);
+    this.properties.set(slot, properties || null);
     this.levels.set(slot, getLevel(slot, kind));
 
     if (slotAffectsHP(slot) && this.callbacks.onHPUpdate) {
@@ -64,8 +68,9 @@ export class EquipmentManager {
   /**
    * Equip an item to a specific slot
    */
-  equipToSlot(slot: EquipmentSlot, kind: number): void {
+  equipToSlot(slot: EquipmentSlot, kind: number, properties?: ItemProperties | null): void {
     this.equipped.set(slot, kind);
+    this.properties.set(slot, properties || null);
     this.levels.set(slot, getLevel(slot, kind));
 
     if (slotAffectsHP(slot) && this.callbacks.onHPUpdate) {
@@ -75,9 +80,9 @@ export class EquipmentManager {
 
   /**
    * Drop the item in a slot, reverting to default
-   * @returns The dropped item kind, or null if can't drop
+   * @returns Object with dropped item kind and properties, or null if can't drop
    */
-  drop(slot: EquipmentSlot): number | null {
+  drop(slot: EquipmentSlot): { kind: number; properties: ItemProperties | null } | null {
     const current = this.equipped.get(slot);
     if (!current) return null;
 
@@ -87,17 +92,19 @@ export class EquipmentManager {
     }
 
     const droppedKind = current;
+    const droppedProperties = this.properties.get(slot) || null;
     const defaultItem = getDefaultItem(slot);
 
     // Revert to default
     this.equipped.set(slot, defaultItem);
+    this.properties.set(slot, null);
     this.levels.set(slot, getLevel(slot, defaultItem));
 
     if (slotAffectsHP(slot) && this.callbacks.onHPUpdate) {
       this.callbacks.onHPUpdate();
     }
 
-    return droppedKind;
+    return { kind: droppedKind, properties: droppedProperties };
   }
 
   /**
@@ -105,6 +112,13 @@ export class EquipmentManager {
    */
   getEquipped(slot: EquipmentSlot): number {
     return this.equipped.get(slot) || getDefaultItem(slot);
+  }
+
+  /**
+   * Get the properties of the equipped item in a slot
+   */
+  getProperties(slot: EquipmentSlot): ItemProperties | null {
+    return this.properties.get(slot) || null;
   }
 
   /**

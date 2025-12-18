@@ -167,12 +167,14 @@ export class App {
     if (username && !this.game.started) {
       var config = this.config;
 
-      // Use current hostname for production (HTTPS) to support multiple domains
-      var host = window.location.protocol === 'https:'
-        ? window.location.hostname
-        : config.host;
+      // Always use current hostname to support direct IP access and multiple domains
+      var host = window.location.hostname;
+      // Use 443 for HTTPS (via nginx proxy), otherwise use current port or fallback to config
+      var port = window.location.protocol === 'https:'
+        ? 443
+        : (parseInt(window.location.port) || config.port);
 
-      this.game.setServerOptions(host, config.port, username, password);
+      this.game.setServerOptions(host, port, username, password);
 
       this.center();
 
@@ -181,7 +183,7 @@ export class App {
         // Game is now running and ready to be displayed
         console.log('[App] Game ready, signaling intro sequence');
         self.introSequence.signalGameReady();
-        self.initPauseOverlay();
+        self.initFocusHandlers();
 
         if (firstTimePlaying) {
           self.toggleInstructions();
@@ -213,17 +215,19 @@ export class App {
     if (username && !this.game.started) {
       var config = this.config;
 
-      // Use current hostname for production (HTTPS) to support multiple domains
-      var host = window.location.protocol === 'https:'
-        ? window.location.hostname
-        : config.host;
+      // Always use current hostname to support direct IP access and multiple domains
+      var host = window.location.hostname;
+      // Use 443 for HTTPS (via nginx proxy), otherwise use current port or fallback to config
+      var port = window.location.protocol === 'https:'
+        ? 443
+        : (parseInt(window.location.port) || config.port);
 
-      this.game.setServerOptions(host, config.port, username, password);
+      this.game.setServerOptions(host, port, username, password);
 
       this.center();
       this.game.run(function () {
         $('body').addClass('started');
-        self.initPauseOverlay();
+        self.initFocusHandlers();
         if (firstTimePlaying) {
           self.toggleInstructions();
         }
@@ -672,83 +676,78 @@ export class App {
   }
 
   // ============================================================================
-  // PAUSE OVERLAY - Shows when window loses focus
+  // FOCUS HANDLERS - Dim and mute when window loses focus (MMO keeps running)
   // ============================================================================
 
-  private pauseOverlay: HTMLElement | null = null;
-  private isPaused: boolean = false;
+  private dimOverlay: HTMLElement | null = null;
+  private isBackgrounded: boolean = false;
 
   /**
-   * Initialize the pause overlay and focus handlers
-   * Call this after the game has started
+   * Initialize focus handlers for dim/mute on blur
+   * Note: This is an MMO - the game keeps running server-side, we just dim/mute locally
    */
-  initPauseOverlay(): void {
-    // Create overlay element
-    this.pauseOverlay = document.createElement('div');
-    this.pauseOverlay.id = 'pause-overlay';
-    this.pauseOverlay.innerHTML = `
-      <div style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.7);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        z-index: 99999;
-        cursor: pointer;
-      ">
-        <div style="
-          color: #ccc;
-          font-family: 'Press Start 2P', monospace;
-          font-size: 32px;
-          text-shadow: 2px 2px 4px #000;
-          margin-bottom: 20px;
-        ">PAUSED</div>
-        <div style="
-          color: #888;
-          font-family: 'Press Start 2P', monospace;
-          font-size: 14px;
-        ">Click to Resume</div>
-      </div>
-    `;
-    this.pauseOverlay.style.display = 'none';
-    document.body.appendChild(this.pauseOverlay);
+  initFocusHandlers(): void {
+    // Guard against duplicate initialization
+    if (this.dimOverlay) return;
 
-    // Click to resume
-    this.pauseOverlay.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      this.resumeGame();
-    });
+    // Create dim overlay (no text - game isn't paused)
+    this.dimOverlay = document.createElement('div');
+    this.dimOverlay.id = 'dim-overlay';
+    this.dimOverlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 99999;
+      pointer-events: none;
+      display: none;
+    `;
+    document.body.appendChild(this.dimOverlay);
 
     // Window focus/blur handlers
     window.addEventListener('blur', () => {
-      if (this.game && this.game.started && !this.isPaused) {
-        this.pauseGame();
+      if (this.game && this.game.started && !this.isBackgrounded) {
+        this.onBackgrounded();
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      if (this.isBackgrounded) {
+        this.onForegrounded();
       }
     });
 
     // Also handle visibility change (for tab switching)
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.game && this.game.started && !this.isPaused) {
-        this.pauseGame();
+      if (document.hidden && this.game && this.game.started && !this.isBackgrounded) {
+        this.onBackgrounded();
+      } else if (!document.hidden && this.isBackgrounded) {
+        this.onForegrounded();
       }
     });
   }
 
-  pauseGame(): void {
-    if (!this.pauseOverlay || this.isPaused) return;
-    this.isPaused = true;
-    this.pauseOverlay.style.display = 'block';
+  private onBackgrounded(): void {
+    this.isBackgrounded = true;
+    if (this.dimOverlay) {
+      this.dimOverlay.style.display = 'block';
+    }
+    // Mute audio
+    if (this.game?.audioManager) {
+      this.game.audioManager.muteAll();
+    }
   }
 
-  resumeGame(): void {
-    if (!this.pauseOverlay || !this.isPaused) return;
-    this.isPaused = false;
-    this.pauseOverlay.style.display = 'none';
+  private onForegrounded(): void {
+    this.isBackgrounded = false;
+    if (this.dimOverlay) {
+      this.dimOverlay.style.display = 'none';
+    }
+    // Restore audio
+    if (this.game?.audioManager) {
+      this.game.audioManager.unmuteAll();
+    }
   }
 }

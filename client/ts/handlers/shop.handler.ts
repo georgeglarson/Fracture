@@ -34,8 +34,8 @@ export function initShop(ctx: ShopGameContext): { ui: ShopUI; controller: ShopCo
   const eventBus = getClientEventBus();
   const shopUI = new ShopUI(eventBus);
 
-  // Create network adapter
-  const networkAdapter = createNetworkAdapter(ctx.client);
+  // Create network adapter with lazy client lookup (client is created after shop init)
+  const networkAdapter = createNetworkAdapter(() => ctx.client);
 
   // Set up gold getter for EventBus mode
   shopUI.setGoldGetter(() => ctx.playerGold);

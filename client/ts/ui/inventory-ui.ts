@@ -46,6 +46,8 @@ export interface InventoryCallbacks {
 export interface EquippedItems {
   weapon: number | null;  // Entity kind
   armor: number | null;   // Entity kind
+  weaponProps: ItemProperties | null;  // Weapon properties (for accurate comparison)
+  armorProps: ItemProperties | null;   // Armor properties (for accurate comparison)
 }
 
 export class InventoryUI {
@@ -56,7 +58,7 @@ export class InventoryUI {
   private panel: HTMLDivElement | null = null;
   private contextMenu: HTMLDivElement | null = null;
   private tooltip: HTMLDivElement | null = null;
-  private equipped: EquippedItems = { weapon: null, armor: null };
+  private equipped: EquippedItems = { weapon: null, armor: null, weaponProps: null, armorProps: null };
   private isShopOpenFn: (() => boolean) | null = null;
 
   constructor(eventBus?: EventBus) {
@@ -70,8 +72,8 @@ export class InventoryUI {
       this.eventBus.on('state:inventory', ({ slots }) => {
         this.updateSlots(slots);
       });
-      this.eventBus.on('state:equipment', ({ weapon, armor }) => {
-        this.updateEquipped(weapon, armor);
+      this.eventBus.on('state:equipment', ({ weapon, armor, weaponProps, armorProps }) => {
+        this.updateEquipped(weapon, armor, weaponProps, armorProps);
       });
     }
   }
@@ -153,11 +155,35 @@ export class InventoryUI {
   /**
    * Update equipped items display
    */
-  updateEquipped(weapon: number | null, armor: number | null): void {
-    this.equipped = { weapon, armor };
+  updateEquipped(
+    weapon: number | null,
+    armor: number | null,
+    weaponProps?: ItemProperties | null,
+    armorProps?: ItemProperties | null
+  ): void {
+    this.equipped = {
+      weapon,
+      armor,
+      weaponProps: weaponProps ?? this.equipped.weaponProps,
+      armorProps: armorProps ?? this.equipped.armorProps
+    };
     if (this.visible) {
       this.render();
     }
+  }
+
+  /**
+   * Get equipped weapon properties for comparison
+   */
+  getEquippedWeaponProps(): ItemProperties | null {
+    return this.equipped.weaponProps;
+  }
+
+  /**
+   * Get equipped armor properties for comparison
+   */
+  getEquippedArmorProps(): ItemProperties | null {
+    return this.equipped.armorProps;
   }
 
   /**
@@ -727,6 +753,7 @@ export class InventoryUI {
 
   /**
    * Get comparison HTML between inventory item and equipped item
+   * Now uses actual equipped properties for accurate comparison
    */
   private getComparisonHtml(slot: InventorySlot, equippedKind: number, type: 'weapon' | 'armor'): string {
     // Get item stats (use properties if available, otherwise base stats)
@@ -734,6 +761,7 @@ export class InventoryUI {
     let equippedStat = 0;
 
     if (type === 'weapon') {
+      // New item stats
       if (slot.properties && (slot.properties as ItemProperties).damageMin !== undefined) {
         const props = slot.properties as ItemProperties;
         itemStat = ((props.damageMin || 0) + (props.damageMax || 0)) / 2;
@@ -742,18 +770,27 @@ export class InventoryUI {
         itemStat = (stats.min + stats.max) / 2;
       }
 
-      if (WEAPON_BASE_STATS[equippedKind]) {
+      // Equipped weapon stats - use ACTUAL properties if available
+      const equippedProps = this.equipped.weaponProps;
+      if (equippedProps && equippedProps.damageMin !== undefined) {
+        equippedStat = ((equippedProps.damageMin || 0) + (equippedProps.damageMax || 0)) / 2;
+      } else if (WEAPON_BASE_STATS[equippedKind]) {
         const stats = WEAPON_BASE_STATS[equippedKind];
         equippedStat = (stats.min + stats.max) / 2;
       }
     } else {
+      // New armor stats
       if (slot.properties && (slot.properties as ItemProperties).defense !== undefined) {
         itemStat = (slot.properties as ItemProperties).defense || 0;
       } else if (ARMOR_BASE_STATS[slot.kind]) {
         itemStat = ARMOR_BASE_STATS[slot.kind];
       }
 
-      if (ARMOR_BASE_STATS[equippedKind]) {
+      // Equipped armor stats - use ACTUAL properties if available
+      const equippedProps = this.equipped.armorProps;
+      if (equippedProps && equippedProps.defense !== undefined) {
+        equippedStat = equippedProps.defense || 0;
+      } else if (ARMOR_BASE_STATS[equippedKind]) {
         equippedStat = ARMOR_BASE_STATS[equippedKind];
       }
     }

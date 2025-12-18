@@ -97,6 +97,22 @@ export class InventoryManager {
   }
 
   /**
+   * Check if slot contains a weapon
+   */
+  isSlotWeapon(index: number): boolean {
+    const slot = this.getSlot(index);
+    return slot !== null && Types.isWeapon(slot.kind);
+  }
+
+  /**
+   * Check if slot contains armor
+   */
+  isSlotArmor(index: number): boolean {
+    const slot = this.getSlot(index);
+    return slot !== null && Types.isArmor(slot.kind);
+  }
+
+  /**
    * Get item name for display
    */
   getItemName(index: number): string {

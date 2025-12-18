@@ -97,6 +97,10 @@ EntityFactory.builders[Types.Entities.ZOMAGENT] = function (id) {
 
 //===== items ======
 
+EntityFactory.builders[Types.Entities.SWORD1] = function (id) {
+  return new Items.Sword1(id);
+};
+
 EntityFactory.builders[Types.Entities.SWORD2] = function (id) {
   return new Items.Sword2(id);
 };
@@ -155,6 +159,56 @@ EntityFactory.builders[Types.Entities.BURGER] = function (id) {
 
 EntityFactory.builders[Types.Entities.CAKE] = function (id) {
   return new Items.Cake(id);
+};
+
+// New weapons
+EntityFactory.builders[Types.Entities.RAYGUN] = function (id) {
+  return new Items.Raygun(id);
+};
+
+EntityFactory.builders[Types.Entities.LASERGUN] = function (id) {
+  return new Items.Lasergun(id);
+};
+
+EntityFactory.builders[Types.Entities.MP5] = function (id) {
+  return new Items.MP5(id);
+};
+
+EntityFactory.builders[Types.Entities.TEC9] = function (id) {
+  return new Items.Tec9(id);
+};
+
+EntityFactory.builders[Types.Entities.PLASMAHELIX] = function (id) {
+  return new Items.PlasmaHelix(id);
+};
+
+EntityFactory.builders[Types.Entities.TENTACLE] = function (id) {
+  return new Items.Tentacle(id);
+};
+
+EntityFactory.builders[Types.Entities.VOIDBLADE] = function (id) {
+  return new Items.VoidBlade(id);
+};
+
+EntityFactory.builders[Types.Entities.CRYSTALSTAFF] = function (id) {
+  return new Items.CrystalStaff(id);
+};
+
+// New armors
+EntityFactory.builders[Types.Entities.MECHARMOR] = function (id) {
+  return new Items.MechArmor(id);
+};
+
+EntityFactory.builders[Types.Entities.VOIDCLOAK] = function (id) {
+  return new Items.VoidCloak(id);
+};
+
+EntityFactory.builders[Types.Entities.CRYSTALSHELL] = function (id) {
+  return new Items.CrystalShell(id);
+};
+
+EntityFactory.builders[Types.Entities.SHIELDBUBBLE] = function (id) {
+  return new Items.ShieldBubble(id);
 };
 
 // Register all chest types from shared config

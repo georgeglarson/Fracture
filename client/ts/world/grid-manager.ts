@@ -180,6 +180,7 @@ export class GridManager {
       // because the Chest was also in itemGrid and getItemAt() returned it instead
       if (entity instanceof Item && !(entity instanceof Chest)) {
         this.itemGrid[y][x][entity.id] = entity;
+        console.log(`[GridManager] Added item ${entity.id} to itemGrid at (${x}, ${y})`);
       }
 
       this.addToRenderingGrid(entity, x, y);

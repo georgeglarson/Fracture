@@ -34,7 +34,6 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - **Fullscreen responsive UI** with status bar (011 ✅)
 
 **What's missing for a "real game":**
-- Client-side storage integration (server-side done, client still uses localStorage)
 - More content (areas, mobs, bosses)
 
 ---
@@ -74,8 +73,8 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - [x] Config-driven boss stats (HP, damage, armor, aggro range, respawn time)
 - [x] Dynamic difficulty scaling (+20% HP / +10% damage per player)
 
-### P2: Storage/Persistence ✅ (Phase 1)
-**Status:** SQLite MVP Complete
+### P2: Storage/Persistence ✅
+**Status:** Complete - Server authoritative, cross-device ready
 **Goal:** Replace localStorage with server-side persistence
 - [x] Design storage architecture (see spec 016)
 - [x] Implement SQLite storage layer (better-sqlite3)
@@ -84,8 +83,8 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - [x] Achievement persistence (progress + unlocks)
 - [x] Daily login streak persistence
 - [x] Password hashing (SHA-256 + salt)
-- [ ] Client-side integration (Phase 2)
-- [ ] Enable cross-device play (Phase 2)
+- [x] Client-side integration (server as source of truth)
+- [x] Cross-device play enabled (all data from server)
 
 ### P3: Voice Acting (Fish Audio) ✅
 **Status:** Complete
