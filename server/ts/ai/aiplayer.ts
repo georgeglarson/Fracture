@@ -191,7 +191,7 @@ export class AIPlayer extends Character {
 
   private equipRandomGear(): void {
     // Random armor (not the best - that would be suspicious for a "new" player)
-    const armors = [
+    const armors: number[] = [
       Types.Entities.CLOTHARMOR,
       Types.Entities.LEATHERARMOR,
       Types.Entities.MAILARMOR,
@@ -201,7 +201,7 @@ export class AIPlayer extends Character {
       armors.push(Types.Entities.PLATEARMOR);
     }
 
-    const weapons = [
+    const weapons: number[] = [
       Types.Entities.SWORD1,
       Types.Entities.SWORD2,
       Types.Entities.AXE,

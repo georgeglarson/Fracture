@@ -214,7 +214,7 @@ describe('InventoryHandler', () => {
 
     it('should swap equipped item to inventory when equipping', () => {
       mockInventory.getSlot.mockReturnValue({
-        kind: Types.Entities.GOLDARMOR,
+        kind: Types.Entities.GOLDENARMOR,
         properties: null,
         count: 1,
       });

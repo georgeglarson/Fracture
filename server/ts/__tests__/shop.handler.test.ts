@@ -76,7 +76,7 @@ describe('ShopHandler', () => {
 
   describe('handleShopBuy - Equipment', () => {
     it('should add weapon to inventory instead of auto-equipping', () => {
-      handleShopBuy(mockCtx, Types.Entities.ARMORSELLER, Types.Entities.SWORD2);
+      handleShopBuy(mockCtx, Types.Entities.GUARD, Types.Entities.SWORD2);
 
       expect(mockInventory.addItem).toHaveBeenCalledWith(Types.Entities.SWORD2, null, 1);
       expect(mockCtx.equipWeapon).not.toHaveBeenCalled();
@@ -84,7 +84,7 @@ describe('ShopHandler', () => {
     });
 
     it('should add armor to inventory instead of auto-equipping', () => {
-      handleShopBuy(mockCtx, Types.Entities.ARMORSELLER, Types.Entities.LEATHERARMOR);
+      handleShopBuy(mockCtx, Types.Entities.GUARD, Types.Entities.LEATHERARMOR);
 
       expect(mockInventory.addItem).toHaveBeenCalledWith(Types.Entities.LEATHERARMOR, null, 1);
       expect(mockCtx.equipArmor).not.toHaveBeenCalled();
@@ -93,7 +93,7 @@ describe('ShopHandler', () => {
     it('should reject purchase when inventory is full', () => {
       mockInventory.hasRoom.mockReturnValue(false);
 
-      handleShopBuy(mockCtx, Types.Entities.ARMORSELLER, Types.Entities.SWORD2);
+      handleShopBuy(mockCtx, Types.Entities.GUARD, Types.Entities.SWORD2);
 
       expect(mockInventory.addItem).not.toHaveBeenCalled();
       expect(mockCtx.setGold).not.toHaveBeenCalled();
@@ -102,7 +102,7 @@ describe('ShopHandler', () => {
 
   describe('handleShopBuy - Consumables', () => {
     it('should add consumables to inventory instead of using immediately', () => {
-      handleShopBuy(mockCtx, Types.Entities.ARMORSELLER, Types.Entities.FLASK);
+      handleShopBuy(mockCtx, Types.Entities.GUARD, Types.Entities.FLASK);
 
       expect(mockInventory.addItem).toHaveBeenCalledWith(Types.Entities.FLASK, null, 1);
       expect(mockCtx.regenHealthBy).not.toHaveBeenCalled(); // Should NOT heal immediately
@@ -111,14 +111,14 @@ describe('ShopHandler', () => {
     it('should reject consumable purchase when inventory is full', () => {
       mockInventory.hasRoom.mockReturnValue(false);
 
-      handleShopBuy(mockCtx, Types.Entities.ARMORSELLER, Types.Entities.FLASK);
+      handleShopBuy(mockCtx, Types.Entities.GUARD, Types.Entities.FLASK);
 
       expect(mockInventory.addItem).not.toHaveBeenCalled();
     });
 
     it('should deduct gold on successful purchase', () => {
       const originalGold = mockCtx.gold;
-      handleShopBuy(mockCtx, Types.Entities.ARMORSELLER, Types.Entities.FLASK);
+      handleShopBuy(mockCtx, Types.Entities.GUARD, Types.Entities.FLASK);
 
       expect(mockCtx.setGold).toHaveBeenCalledWith(originalGold - 100);
     });
@@ -128,7 +128,7 @@ describe('ShopHandler', () => {
     it('should not purchase when gold is insufficient', () => {
       mockCtx.gold = 50; // Less than 100
 
-      handleShopBuy(mockCtx, Types.Entities.ARMORSELLER, Types.Entities.SWORD2);
+      handleShopBuy(mockCtx, Types.Entities.GUARD, Types.Entities.SWORD2);
 
       expect(mockInventory.addItem).not.toHaveBeenCalled();
     });
