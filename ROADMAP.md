@@ -51,8 +51,8 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - [x] Structured logging (Pino)
 - [x] Rate limiting (security)
 - [x] TypeScript strict mode
-- [ ] Player class decomposition (1,552 → <400 lines)
-- [ ] Game class decomposition (2,627 → <600 lines)
+- [x] Player class decomposition (1,552 → 630 lines via SRP handlers)
+- [x] Game class decomposition (2,627 → 1,966 lines via controllers)
 - [ ] Error handling coverage (10% → 90%)
 
 **Why Now:** Technical debt is blocking velocity. Every new feature risks regression without tests.
