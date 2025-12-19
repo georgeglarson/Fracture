@@ -6,6 +6,7 @@ import { Item } from '../entity/objects/item';
 import { ItemProperties, Rarity, RarityColors, RarityNames, formatItemStats } from '../../../shared/ts/items/index';
 import { Types } from '../../../shared/ts/gametypes';
 import { getWeaponStats, getArmorStats, compareWeapons } from '../../../shared/ts/equipment/equipment-stats';
+import { getItemSet, getSetDefinition, formatSetBonus, SetId } from '../../../shared/ts/equipment/set-data';
 
 export class ItemTooltip {
   private element: HTMLDivElement | null = null;
@@ -136,6 +137,9 @@ export class ItemTooltip {
     }
     html += `</div>`;
 
+    // Set info
+    html += this.buildSetInfo(item.kind);
+
     // Comparison with equipped (for weapons) using shared compareWeapons
     if (Types.isWeapon(item.kind) && equippedWeaponKind) {
       html += this.buildComparison(item.kind, props, equippedWeaponKind, equippedWeaponProps);
@@ -178,6 +182,38 @@ export class ItemTooltip {
     }
     html += `</div>`;
 
+    return html;
+  }
+
+  /**
+   * Build set info section for items that belong to equipment sets
+   */
+  private buildSetInfo(itemKind: number): string {
+    const setId = getItemSet(itemKind);
+    if (!setId) return '';
+
+    const set = getSetDefinition(setId);
+    if (!set) return '';
+
+    let html = `<div style="border-top: 1px solid ${set.color}40; margin-top: 6px; padding-top: 6px;">`;
+
+    // Set name
+    html += `<div style="color: ${set.color}; font-weight: bold; font-size: 11px;">`;
+    html += `${set.name}</div>`;
+
+    // Required pieces
+    html += `<div style="color: #888; font-size: 10px;">`;
+    html += `(${set.requiredPieces}) Set Bonus:</div>`;
+
+    // Bonus effects
+    const bonusLines = formatSetBonus(set.bonus);
+    for (const line of bonusLines) {
+      const isNegative = line.includes('-') && !line.includes('+');
+      const color = isNegative ? '#f88' : '#8f8';
+      html += `<div style="color: ${color}; font-size: 10px; padding-left: 8px;">${line}</div>`;
+    }
+
+    html += `</div>`;
     return html;
   }
 

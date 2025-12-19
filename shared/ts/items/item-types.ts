@@ -64,6 +64,9 @@ export interface ItemProperties {
   bonusHealth?: number;
   bonusStrength?: number;
   bonusCritChance?: number;
+
+  // Equipment set (if part of a set)
+  setId?: string;
 }
 
 /**
@@ -94,6 +97,7 @@ export function serializeProperties(props: ItemProperties): Record<string, unkno
   if (props.bonusHealth !== undefined) result.bHp = props.bonusHealth;
   if (props.bonusStrength !== undefined) result.bStr = props.bonusStrength;
   if (props.bonusCritChance !== undefined) result.bCrit = props.bonusCritChance;
+  if (props.setId !== undefined) result.set = props.setId;
 
   return result;
 }
@@ -115,6 +119,7 @@ export function deserializeProperties(data: Record<string, unknown>): ItemProper
   if (data.bHp !== undefined) props.bonusHealth = data.bHp as number;
   if (data.bStr !== undefined) props.bonusStrength = data.bStr as number;
   if (data.bCrit !== undefined) props.bonusCritChance = data.bCrit as number;
+  if (data.set !== undefined) props.setId = data.set as string;
 
   return props;
 }

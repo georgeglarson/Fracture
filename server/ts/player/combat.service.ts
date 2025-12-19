@@ -9,6 +9,7 @@
  */
 
 import {Formulas} from '../formulas';
+import { SetBonus } from '../../../shared/ts/equipment/set-data';
 
 /**
  * Result of player attacking a mob
@@ -16,6 +17,7 @@ import {Formulas} from '../formulas';
 export interface PlayerAttackResult {
   damage: number;
   targetDied: boolean;
+  isCritical?: boolean;
 }
 
 /**
@@ -46,10 +48,24 @@ export class CombatService {
    *
    * @param playerWeaponLevel - Player's weapon level
    * @param mobArmorLevel - Mob's armor level
-   * @returns Damage amount (0 if miss)
+   * @param playerLevel - Player's character level
+   * @param setBonus - Optional set bonus modifiers
+   * @returns Damage result with amount and crit status
    */
-  calculatePlayerDamage(playerWeaponLevel: number, mobArmorLevel: number): number {
-    return Formulas.dmg(playerWeaponLevel, mobArmorLevel);
+  calculatePlayerDamage(
+    playerWeaponLevel: number,
+    mobArmorLevel: number,
+    playerLevel: number = 1,
+    setBonus?: SetBonus
+  ): { damage: number; isCritical: boolean } {
+    let damage = Formulas.dmg(playerWeaponLevel, mobArmorLevel, playerLevel, setBonus);
+    const isCritical = Formulas.isCriticalHit(setBonus);
+
+    if (isCritical) {
+      damage = Formulas.criticalDamage(damage);
+    }
+
+    return { damage, isCritical };
   }
 
   /**
@@ -58,14 +74,17 @@ export class CombatService {
    * @param currentHitPoints - Player's current HP
    * @param mobWeaponLevel - Mob's weapon level
    * @param playerArmorLevel - Player's armor level
+   * @param playerSetBonus - Optional player set bonus for defense
    * @returns Damage result with new HP and death status
    */
   calculateMobDamageToPlayer(
     currentHitPoints: number,
     mobWeaponLevel: number,
-    playerArmorLevel: number
+    playerArmorLevel: number,
+    playerSetBonus?: SetBonus
   ): PlayerDamageResult {
-    const damage = Formulas.dmg(mobWeaponLevel, playerArmorLevel);
+    // Mob attacking player: mob has no set bonus, player has defense set bonus
+    const damage = Formulas.dmg(mobWeaponLevel, playerArmorLevel, 1, undefined, playerSetBonus);
     const newHitPoints = Math.max(0, currentHitPoints - damage);
     const died = newHitPoints <= 0;
 
@@ -131,11 +150,10 @@ export class CombatService {
 
   /**
    * Determine if an attack is a critical hit
-   * (Future enhancement - currently always returns false)
+   * @param setBonus - Optional set bonus with critBonus
    */
-  isCriticalHit(): boolean {
-    // Could add crit chance based on weapon, level, etc.
-    return false;
+  isCriticalHit(setBonus?: SetBonus): boolean {
+    return Formulas.isCriticalHit(setBonus);
   }
 
   /**

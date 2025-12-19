@@ -16,6 +16,7 @@ import {
 } from '../../../shared/ts/equipment/equipment-types';
 import { Types } from '../../../shared/ts/gametypes';
 import { ItemProperties } from '../../../shared/ts/items/item-types';
+import { SetId, SetBonus, calculateSetBonuses } from '../../../shared/ts/equipment/set-data';
 
 export interface EquipmentCallbacks {
   onHPUpdate?: () => void;
@@ -26,6 +27,10 @@ export class EquipmentManager {
   private properties: Map<EquipmentSlot, ItemProperties | null> = new Map();
   private levels: Map<EquipmentSlot, number> = new Map();
   private callbacks: EquipmentCallbacks = {};
+
+  // Set bonus tracking
+  private activeSets: Map<SetId, number> = new Map();
+  private setBonus: SetBonus = {};
 
   constructor() {
     // Initialize with default items (no properties for defaults)
@@ -47,6 +52,40 @@ export class EquipmentManager {
   }
 
   /**
+   * Update set bonuses based on currently equipped items
+   */
+  private updateSetBonuses(): void {
+    const equippedKinds = Array.from(this.equipped.values());
+    const result = calculateSetBonuses(equippedKinds);
+    this.activeSets = result.activeSets;
+    this.setBonus = result.combinedBonus;
+  }
+
+  /**
+   * Get the current set bonus
+   */
+  getSetBonus(): SetBonus {
+    return this.setBonus;
+  }
+
+  /**
+   * Get active sets (set ID -> piece count)
+   */
+  getActiveSets(): Map<SetId, number> {
+    return this.activeSets;
+  }
+
+  /**
+   * Check if any set bonus is active
+   */
+  hasActiveSetBonus(): boolean {
+    for (const [setId, count] of this.activeSets) {
+      if (count >= 2) return true;
+    }
+    return false;
+  }
+
+  /**
    * Equip an item to the appropriate slot
    * @returns The slot the item was equipped to, or null if invalid
    */
@@ -57,6 +96,9 @@ export class EquipmentManager {
     this.equipped.set(slot, kind);
     this.properties.set(slot, properties || null);
     this.levels.set(slot, getLevel(slot, kind));
+
+    // Update set bonuses
+    this.updateSetBonuses();
 
     if (slotAffectsHP(slot) && this.callbacks.onHPUpdate) {
       this.callbacks.onHPUpdate();
@@ -72,6 +114,9 @@ export class EquipmentManager {
     this.equipped.set(slot, kind);
     this.properties.set(slot, properties || null);
     this.levels.set(slot, getLevel(slot, kind));
+
+    // Update set bonuses
+    this.updateSetBonuses();
 
     if (slotAffectsHP(slot) && this.callbacks.onHPUpdate) {
       this.callbacks.onHPUpdate();
@@ -99,6 +144,9 @@ export class EquipmentManager {
     this.equipped.set(slot, defaultItem);
     this.properties.set(slot, null);
     this.levels.set(slot, getLevel(slot, defaultItem));
+
+    // Update set bonuses
+    this.updateSetBonuses();
 
     if (slotAffectsHP(slot) && this.callbacks.onHPUpdate) {
       this.callbacks.onHPUpdate();

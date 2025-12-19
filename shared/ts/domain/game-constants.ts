@@ -213,6 +213,18 @@ export interface EntityTypes {
   // Dimension Armor - Cosmic/Void
   readonly VOIDCLOAK: 93;
   readonly CRYSTALSHELL: 94;
+
+  // Equipment Set Items - Weapons
+  readonly BERSERKER_BLADE: 100;
+  readonly GUARDIAN_HAMMER: 101;
+  readonly SHADOW_DAGGER: 102;
+  readonly DRAGON_SWORD: 103;
+
+  // Equipment Set Items - Armor
+  readonly BERSERKER_MAIL: 110;
+  readonly GUARDIAN_PLATE: 111;
+  readonly SHADOW_CLOAK: 112;
+  readonly DRAGON_SCALE: 113;
 }
 
 /** All valid entity kind values */

@@ -81,6 +81,28 @@ export const WeaponStats: Record<number, WeaponBaseStats> = {
     damageMin: 26,
     damageMax: 42,
     displayName: 'Plasma Helix'
+  },
+
+  // Equipment Set Weapons
+  [Types.Entities.BERSERKER_BLADE]: {
+    damageMin: 28,
+    damageMax: 45,
+    displayName: "Berserker's Blade"
+  },
+  [Types.Entities.GUARDIAN_HAMMER]: {
+    damageMin: 20,
+    damageMax: 35,
+    displayName: "Guardian's Hammer"
+  },
+  [Types.Entities.SHADOW_DAGGER]: {
+    damageMin: 22,
+    damageMax: 38,
+    displayName: 'Shadow Dagger'
+  },
+  [Types.Entities.DRAGON_SWORD]: {
+    damageMin: 25,
+    damageMax: 42,
+    displayName: 'Dragon Sword'
   }
 };
 
@@ -133,6 +155,24 @@ export const ArmorStats: Record<number, ArmorBaseStats> = {
   [Types.Entities.MECHARMOR]: {
     defense: 11,
     displayName: 'Mech Armor'
+  },
+
+  // Equipment Set Armors
+  [Types.Entities.BERSERKER_MAIL]: {
+    defense: 8,
+    displayName: "Berserker's Mail"
+  },
+  [Types.Entities.GUARDIAN_PLATE]: {
+    defense: 14,
+    displayName: "Guardian's Plate"
+  },
+  [Types.Entities.SHADOW_CLOAK]: {
+    defense: 9,
+    displayName: 'Shadow Cloak'
+  },
+  [Types.Entities.DRAGON_SCALE]: {
+    defense: 12,
+    displayName: 'Dragon Scale'
   }
 };
 

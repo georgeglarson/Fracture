@@ -84,11 +84,12 @@ export function equipItem(ctx: EquipmentPlayerContext, item: EquippableItem | nu
 }
 
 /**
- * Update player's hit points based on armor and level
+ * Update player's hit points based on armor, level, and set bonuses
  */
 export function updateHitPoints(ctx: EquipmentPlayerContext): void {
   const equipment = ctx.getEquipment();
-  ctx.resetHitPoints(Formulas.hp(equipment.armorLevel, ctx.level));
+  const setBonus = equipment.getSetBonus();
+  ctx.resetHitPoints(Formulas.hp(equipment.armorLevel, ctx.level, setBonus));
 }
 
 /**

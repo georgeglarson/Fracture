@@ -223,7 +223,19 @@ const Entities = {
 
   // Dimension Armor - Cosmic/Void
   VOIDCLOAK: 93,
-  CRYSTALSHELL: 94
+  CRYSTALSHELL: 94,
+
+  // Equipment Set Items - Weapons
+  BERSERKER_BLADE: 100,
+  GUARDIAN_HAMMER: 101,
+  SHADOW_DAGGER: 102,
+  DRAGON_SWORD: 103,
+
+  // Equipment Set Items - Armor
+  BERSERKER_MAIL: 110,
+  GUARDIAN_PLATE: 111,
+  SHADOW_CLOAK: 112,
+  DRAGON_SCALE: 113
 } as const;
 
 // ============================================================================
@@ -279,6 +291,11 @@ const kinds: KindsRegistry = {
   voidblade: [Entities.VOIDBLADE, 'weapon'],
   crystalstaff: [Entities.CRYSTALSTAFF, 'weapon'],
 
+  berserkerblade: [Entities.BERSERKER_BLADE, 'weapon'],
+  guardianhammer: [Entities.GUARDIAN_HAMMER, 'weapon'],
+  shadowdagger: [Entities.SHADOW_DAGGER, 'weapon'],
+  dragonsword: [Entities.DRAGON_SWORD, 'weapon'],
+
   firefox: [Entities.FIREFOX, 'armor'],
   clotharmor: [Entities.CLOTHARMOR, 'armor'],
   leatherarmor: [Entities.LEATHERARMOR, 'armor'],
@@ -293,6 +310,11 @@ const kinds: KindsRegistry = {
 
   voidcloak: [Entities.VOIDCLOAK, 'armor'],
   crystalshell: [Entities.CRYSTALSHELL, 'armor'],
+
+  berserkermail: [Entities.BERSERKER_MAIL, 'armor'],
+  guardianplate: [Entities.GUARDIAN_PLATE, 'armor'],
+  shadowcloak: [Entities.SHADOW_CLOAK, 'armor'],
+  dragonscale: [Entities.DRAGON_SCALE, 'armor'],
 
   flask: [Entities.FLASK, 'object'],
   cake: [Entities.CAKE, 'object'],
@@ -344,7 +366,12 @@ const rankedWeapons = [
   Entities.CRYSTALSTAFF,
   Entities.VOIDBLADE,
   Entities.PLASMAHELIX,
-  Entities.GOLDENSWORD
+  Entities.GOLDENSWORD,
+  // Set Weapons (high tier)
+  Entities.BERSERKER_BLADE,
+  Entities.GUARDIAN_HAMMER,
+  Entities.SHADOW_DAGGER,
+  Entities.DRAGON_SWORD
 ] as const;
 
 const rankedArmors = [
@@ -358,7 +385,12 @@ const rankedArmors = [
   Entities.REDARMOR,
   Entities.CRYSTALSHELL,
   Entities.MECHARMOR,
-  Entities.GOLDENARMOR
+  Entities.GOLDENARMOR,
+  // Set Armors (high tier)
+  Entities.BERSERKER_MAIL,
+  Entities.GUARDIAN_PLATE,
+  Entities.SHADOW_CLOAK,
+  Entities.DRAGON_SCALE
 ] as const;
 
 // ============================================================================
