@@ -78,6 +78,7 @@ export function setupNetworkHandlers(game: Game, client: GameClient): void {
   setupInventoryHandlers(game, client);
   setupZoneHandlers(game, client);
   setupBossHandlers(game, client);
+  setupSkillHandlers(game, client);
 }
 
 function setupSpawnHandlers(game: Game, client: GameClient): void {
@@ -891,5 +892,27 @@ function setupBossHandlers(game: Game, client: GameClient): void {
   // Nemesis killed - show when a nemesis is slain (possibly revenge)
   client.on(ClientEvents.NEMESIS_KILLED, function (mobId, nemesisName, title, kills, killerName, isRevenge) {
     game.handleNemesisKilled(mobId, nemesisName, title, kills, killerName, isRevenge);
+  });
+}
+
+function setupSkillHandlers(game: Game, client: GameClient): void {
+  // Skill init - receive unlocked skills on login
+  client.on(ClientEvents.SKILL_INIT, function (skills) {
+    game.handleSkillInit(skills);
+  });
+
+  // Skill effect - visual feedback for skill usage
+  client.on(ClientEvents.SKILL_EFFECT, function (playerId, skillId, x, y, orientation) {
+    game.handleSkillEffect(playerId, skillId, x, y, orientation);
+  });
+
+  // Skill cooldown - start cooldown timer
+  client.on(ClientEvents.SKILL_COOLDOWN, function (skillId, duration) {
+    game.handleSkillCooldown(skillId, duration);
+  });
+
+  // Skill unlock - new skill available
+  client.on(ClientEvents.SKILL_UNLOCK, function (skill) {
+    game.handleSkillUnlock(skill);
   });
 }

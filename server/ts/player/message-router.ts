@@ -137,6 +137,9 @@ export interface MessageHandlerContext {
   // Boss leaderboard
   handleLeaderboardRequest(): void;
 
+  // Skill system
+  handleSkillUse(skillId: string): void;
+
   // Storage persistence
   characterId: string | null;
   loadFromStorage(storage: any): boolean;
@@ -618,6 +621,15 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.LEADERBOARD_REQUEST, {
     handler: (ctx, msg) => {
       ctx.handleLeaderboardRequest();
+    }
+  });
+
+  // Skill Use
+  handlers.set(Types.Messages.SKILL_USE, {
+    rateLimit: 'combat',
+    requiresAlive: true,
+    handler: (ctx, msg) => {
+      ctx.handleSkillUse(msg[1]); // msg[1] is skillId
     }
   });
 

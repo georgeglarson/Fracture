@@ -111,7 +111,14 @@ const Messages = {
   NEMESIS_POWER_UP: 84,
   NEMESIS_KILLED: 85,
   AUTH_FAIL: 86,
-  UNEQUIP_TO_INVENTORY: 87
+  UNEQUIP_TO_INVENTORY: 87,
+
+  // Skill messages
+  SKILL_USE: 88,           // Client -> Server: Player uses a skill
+  SKILL_EFFECT: 89,        // Server -> Client: Skill visual effect for all players
+  SKILL_COOLDOWN: 90,      // Server -> Client: Cooldown update
+  SKILL_UNLOCK: 91,        // Server -> Client: New skill unlocked
+  SKILL_INIT: 92           // Server -> Client: Initial skill state on login
 } as const;
 
 // ============================================================================

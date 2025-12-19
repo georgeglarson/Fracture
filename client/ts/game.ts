@@ -38,6 +38,8 @@ import {InventoryController} from './controllers/inventory.controller';
 import {ShopController} from './controllers/shop.controller';
 import {MinimapUI} from './ui/minimap-ui';
 import {AchievementUI} from './ui/achievement-ui';
+import {SkillBarUI} from './ui/skill-bar-ui';
+import {SkillId} from '../../shared/ts/skills';
 import {InventoryManager} from './inventory/inventory-manager';
 import {deserializeInventory, InventorySlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
 import {setupNetworkHandlers} from './network/message-handlers';
@@ -92,6 +94,7 @@ export class Game {
   shopController: ShopController | null = null;
   minimapUI: MinimapUI | null = null;
   achievementUI: AchievementUI | null = null;
+  skillBarUI: SkillBarUI | null = null;
   zoningManager: ZoningManager | null = null;
   interiorManager: InteriorManager | null = null;
   spriteLoader: SpriteLoader | null = null;
@@ -1952,6 +1955,52 @@ export class Game {
 
   handleNemesisKilled(mobId: number, nemesisName: string, title: string, kills: number, killerName: string, isRevenge: boolean) {
     GameEventHandler.handleNemesisKilled(this, mobId, nemesisName, title, kills, killerName, isRevenge);
+  }
+
+  // ============================================================================
+  // SKILL SYSTEM
+  // ============================================================================
+
+  initSkillBar() {
+    if (this.skillBarUI) return;
+
+    this.skillBarUI = new SkillBarUI();
+    this.skillBarUI.setCallbacks({
+      onSkillUse: (skillId: SkillId) => {
+        if (this.client) {
+          this.client.sendSkillUse(skillId);
+        }
+      }
+    });
+
+    console.info('[Skills] Skill bar initialized');
+  }
+
+  handleSkillInit(skills: Array<{ id: string; name: string; description: string; cooldown: number; hotkey: number; icon: string; remainingCooldown: number }>) {
+    if (!this.skillBarUI) {
+      this.initSkillBar();
+    }
+    this.skillBarUI?.initSkills(skills as any);
+    this.skillBarUI?.setVisible(true);
+  }
+
+  handleSkillEffect(playerId: number, skillId: string, x: number, y: number, orientation: number) {
+    // Visual feedback for skill usage - could add particles here
+    const entity = this.entityManager?.getEntityById(playerId);
+    if (entity) {
+      // Flash the entity or add particle effects
+      console.log(`[Skills] Visual effect for ${skillId} at ${x},${y}`);
+    }
+  }
+
+  handleSkillCooldown(skillId: string, duration: number) {
+    this.skillBarUI?.startCooldown(skillId as SkillId, duration);
+  }
+
+  handleSkillUnlock(skill: { id: string; name: string; description: string; cooldown: number; hotkey: number; icon: string }) {
+    this.skillBarUI?.unlockSkill(skill as any);
+    // Play unlock sound
+    this.audioManager?.playSound('loot');
   }
 
   // Achievement Panel UI

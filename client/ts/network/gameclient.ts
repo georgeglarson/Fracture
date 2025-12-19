@@ -113,6 +113,12 @@ export class GameClient extends EventEmitter {
     // Authentication handlers
     this.handlers[Types.Messages.AUTH_FAIL] = this.receiveAuthFail;
 
+    // Skill system handlers
+    this.handlers[Types.Messages.SKILL_INIT] = this.receiveSkillInit;
+    this.handlers[Types.Messages.SKILL_EFFECT] = this.receiveSkillEffect;
+    this.handlers[Types.Messages.SKILL_COOLDOWN] = this.receiveSkillCooldown;
+    this.handlers[Types.Messages.SKILL_UNLOCK] = this.receiveSkillUnlock;
+
     this.enable();
   }
 
@@ -646,6 +652,36 @@ export class GameClient extends EventEmitter {
     this.emit(ClientEvents.AUTH_FAIL, reason);
   }
 
+  // Skill system receive methods
+  receiveSkillInit(data) {
+    const skills = data[1];
+    console.log('[Skills] Received skill init:', skills);
+    this.emit(ClientEvents.SKILL_INIT, skills);
+  }
+
+  receiveSkillEffect(data) {
+    const playerId = data[1];
+    const skillId = data[2];
+    const x = data[3];
+    const y = data[4];
+    const orientation = data[5];
+    console.log('[Skills] Skill effect:', skillId, 'from player', playerId);
+    this.emit(ClientEvents.SKILL_EFFECT, playerId, skillId, x, y, orientation);
+  }
+
+  receiveSkillCooldown(data) {
+    const skillId = data[1];
+    const duration = data[2];
+    console.log('[Skills] Skill cooldown:', skillId, duration + 's');
+    this.emit(ClientEvents.SKILL_COOLDOWN, skillId, duration);
+  }
+
+  receiveSkillUnlock(data) {
+    const skill = data[1];
+    console.log('[Skills] New skill unlocked:', skill.name);
+    this.emit(ClientEvents.SKILL_UNLOCK, skill);
+  }
+
   // ========== Send Methods ==========
 
   sendNewsRequest() {
@@ -729,6 +765,10 @@ export class GameClient extends EventEmitter {
 
   sendUnequipToInventory(slot: string) {
     this.sendMessage([Types.Messages.UNEQUIP_TO_INVENTORY, slot]);
+  }
+
+  sendSkillUse(skillId: string) {
+    this.sendMessage([Types.Messages.SKILL_USE, skillId]);
   }
 
   sendDailyCheck() {

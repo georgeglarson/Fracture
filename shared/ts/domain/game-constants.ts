@@ -98,6 +98,13 @@ export interface MessageTypes {
   readonly NEMESIS_KILLED: 85;
   readonly AUTH_FAIL: 86;
   readonly UNEQUIP_TO_INVENTORY: 87;
+
+  // Skill messages
+  readonly SKILL_USE: 88;
+  readonly SKILL_EFFECT: 89;
+  readonly SKILL_COOLDOWN: 90;
+  readonly SKILL_UNLOCK: 91;
+  readonly SKILL_INIT: 92;
 }
 
 /** All valid message type values */

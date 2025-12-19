@@ -36,6 +36,8 @@ import * as ShopHandler from './player/shop.handler';
 import * as PersistenceHandler from './player/persistence.handler';
 import * as EquipmentHandler from './player/equipment.handler';
 import * as ZoneHandler from './player/zone.handler';
+import * as SkillHandler from './player/skill.handler';
+import { PlayerSkillState, createInitialSkillState, SkillId } from '../../shared/ts/skills';
 
 export class Player extends Character {
   // Shared message router instance (singleton pattern)
@@ -62,6 +64,9 @@ export class Player extends Character {
 
   // Inventory management
   private inventory: Inventory = new Inventory();
+
+  // Skill system state
+  private skillState: PlayerSkillState = createInitialSkillState();
 
   // Progression service (handles XP, leveling, gold)
   private progression!: ProgressionService;
@@ -639,6 +644,56 @@ export class Player extends Character {
     } catch (e) {
       console.error(`[Inventory] Failed to persist inventory for ${this.name}:`, e);
     }
+  }
+
+  // ============================================================================
+  // SKILL SYSTEM - Delegated to SkillHandler
+  // ============================================================================
+
+  sendSkillInit() {
+    SkillHandler.sendSkillInit(this);
+  }
+
+  handleSkillUse(skillId: string) {
+    SkillHandler.handleSkillUse(this, skillId);
+  }
+
+  getSkillState(): PlayerSkillState {
+    return this.skillState;
+  }
+
+  /**
+   * Called when player levels up to check for new skill unlocks
+   */
+  checkSkillUnlocks(oldLevel: number, newLevel: number) {
+    SkillHandler.checkSkillUnlock(this, oldLevel, newLevel);
+  }
+
+  /**
+   * Set power strike buff state (called by skill handler)
+   */
+  setPowerStrikeBuff(active: boolean, expires: number) {
+    this.skillState.powerStrikeActive = active;
+    this.skillState.powerStrikeExpires = expires;
+  }
+
+  /**
+   * Get weapon damage range for skill calculations
+   */
+  getWeaponDamage(): { min: number; max: number } {
+    const weaponLevel = this.weaponLevel;
+    // Base formula: level * 3 to level * 6
+    return {
+      min: weaponLevel * 3,
+      max: weaponLevel * 6
+    };
+  }
+
+  /**
+   * Consume power strike buff on attack and return damage multiplier
+   */
+  consumePowerStrike(): number {
+    return SkillHandler.consumePowerStrikeBuff(this);
   }
 
   // ============================================================================

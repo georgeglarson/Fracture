@@ -106,6 +106,12 @@ export const ClientEvents = {
 
   // Authentication
   AUTH_FAIL: 'authFail',
+
+  // Skills
+  SKILL_INIT: 'skillInit',
+  SKILL_EFFECT: 'skillEffect',
+  SKILL_COOLDOWN: 'skillCooldown',
+  SKILL_UNLOCK: 'skillUnlock',
 } as const;
 
 // Type for event names
@@ -210,6 +216,12 @@ export interface ClientEventPayloads {
 
   // Authentication
   [ClientEvents.AUTH_FAIL]: [reason: string];
+
+  // Skills
+  [ClientEvents.SKILL_INIT]: [skills: Array<{ id: string; name: string; description: string; cooldown: number; hotkey: number; icon: string; remainingCooldown: number }>];
+  [ClientEvents.SKILL_EFFECT]: [playerId: number, skillId: string, x: number, y: number, orientation: number];
+  [ClientEvents.SKILL_COOLDOWN]: [skillId: string, duration: number];
+  [ClientEvents.SKILL_UNLOCK]: [skill: { id: string; name: string; description: string; cooldown: number; hotkey: number; icon: string }];
 }
 
 // Typed EventEmitter interface
