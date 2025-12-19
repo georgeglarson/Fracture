@@ -1992,12 +1992,11 @@ export class Game {
     const entity = this.entityManager?.getEntityById(playerId);
     if (!entity) return;
 
+    const isLocalPlayer = playerId === this.playerId;
     console.log(`[Skills] Visual effect for ${skillId} at ${x},${y}`);
 
     // Handle Phase Shift - make player translucent and mark as phased
     if (skillId === 'phase_shift') {
-      const isLocalPlayer = playerId === this.playerId;
-
       // Set entity as phased (for visual translucency)
       (entity as any).isPhased = true;
       (entity as any).phaseExpires = Date.now() + 2000; // 2 seconds
@@ -2016,8 +2015,41 @@ export class Game {
         if (this.player?.hasTarget()) {
           this.player.removeTarget();
         }
-        console.log('[Skills] Phase Shift active - invisible and can pass through enemies');
+        this.showNotification('Phase Shift active!');
+        this.audioManager?.playSound('glitch1');
       }
+    }
+
+    // Handle Power Strike - visual buff indicator
+    if (skillId === 'power_strike') {
+      if (isLocalPlayer) {
+        this.showNotification('Power Strike ready! Next attack deals 2x damage');
+        this.audioManager?.playSound('equip');
+      }
+      // Flash the entity
+      this.renderer?.particles.spawnHitParticles(entity.x, entity.y - 8, 8, '#ff8800');
+    }
+
+    // Handle War Cry - visual stun effect
+    if (skillId === 'war_cry') {
+      if (isLocalPlayer) {
+        this.showNotification('War Cry! Enemies stunned');
+        this.audioManager?.playSound('hurt');
+      }
+      // Spawn particles in a ring around player
+      this.renderer?.particles.spawnHitParticles(entity.x, entity.y - 8, 12, '#ffff00');
+      this.renderer?.camera.shake(5, 150);
+    }
+
+    // Handle Whirlwind - visual spin/damage effect
+    if (skillId === 'whirlwind') {
+      if (isLocalPlayer) {
+        this.showNotification('Whirlwind!');
+        this.audioManager?.playSound('hurt');
+      }
+      // Spawn particles around player
+      this.renderer?.particles.spawnHitParticles(entity.x, entity.y - 8, 16, '#ff4444');
+      this.renderer?.camera.shake(6, 200);
     }
   }
 
