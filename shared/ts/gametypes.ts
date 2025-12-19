@@ -124,7 +124,17 @@ const Messages = {
   PROGRESSION_INIT: 93,    // Server -> Client: Progression state on login
   PROGRESSION_ASCEND: 94,  // Server -> Client: Player ascended
   PROGRESSION_UPDATE: 95,  // Server -> Client: Efficiency/rested update
-  ASCEND_REQUEST: 96       // Client -> Server: Player requests ascension
+  ASCEND_REQUEST: 96,      // Client -> Server: Player requests ascension
+
+  // Fracture Rift messages
+  RIFT_ENTER: 97,          // Client -> Server: Enter a rift
+  RIFT_START: 98,          // Server -> Client: Rift run started with modifiers
+  RIFT_PROGRESS: 99,       // Server -> Client: Kill count/floor progress update
+  RIFT_ADVANCE: 100,       // Server -> Client: Advanced to next depth
+  RIFT_END: 101,           // Server -> Client: Run ended (death/exit/complete)
+  RIFT_EXIT: 102,          // Client -> Server: Leave rift early
+  RIFT_LEADERBOARD: 103,   // Server -> Client: Leaderboard data
+  RIFT_LEADERBOARD_REQ: 104 // Client -> Server: Request leaderboard
 } as const;
 
 // ============================================================================
@@ -245,7 +255,10 @@ const Entities = {
 
   // Legendary Items - Armor
   CROWN_UNDYING: 130,
-  HELLFIRE_MANTLE: 131
+  HELLFIRE_MANTLE: 131,
+
+  // Special Objects
+  RIFT_PORTAL: 140         // Fracture Rift entrance portal
 } as const;
 
 // ============================================================================
@@ -333,6 +346,9 @@ const kinds: KindsRegistry = {
 
   crownundying: [Entities.CROWN_UNDYING, 'armor'],
   hellfiremantle: [Entities.HELLFIRE_MANTLE, 'armor'],
+
+  // Special Objects
+  riftportal: [Entities.RIFT_PORTAL, 'object'],
 
   flask: [Entities.FLASK, 'object'],
   cake: [Entities.CAKE, 'object'],

@@ -80,6 +80,7 @@ export function setupNetworkHandlers(game: Game, client: GameClient): void {
   setupBossHandlers(game, client);
   setupSkillHandlers(game, client);
   setupProgressionHandlers(game, client);
+  setupRiftHandlers(game, client);
 }
 
 function setupSpawnHandlers(game: Game, client: GameClient): void {
@@ -780,6 +781,28 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
 
 function setupMiscHandlers(game: Game, client: GameClient): void {
   // Additional handlers can be added here
+}
+
+function setupRiftHandlers(game: Game, client: GameClient): void {
+  client.on(ClientEvents.RIFT_START, function (data: any) {
+    game.handleRiftStart(data);
+  });
+
+  client.on(ClientEvents.RIFT_PROGRESS, function (data: any) {
+    game.handleRiftProgress(data);
+  });
+
+  client.on(ClientEvents.RIFT_ADVANCE, function (data: any) {
+    game.handleRiftAdvance(data);
+  });
+
+  client.on(ClientEvents.RIFT_END, function (data: any) {
+    game.handleRiftEnd(data);
+  });
+
+  client.on(ClientEvents.RIFT_LEADERBOARD, function (data: any) {
+    game.handleRiftLeaderboard(data);
+  });
 }
 
 function setupShopHandlers(game: Game, client: GameClient): void {

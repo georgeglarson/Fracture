@@ -124,6 +124,13 @@ export class GameClient extends EventEmitter {
     this.handlers[Types.Messages.PROGRESSION_ASCEND] = this.receiveProgressionAscend;
     this.handlers[Types.Messages.PROGRESSION_UPDATE] = this.receiveProgressionUpdate;
 
+    // Fracture Rift handlers
+    this.handlers[Types.Messages.RIFT_START] = this.receiveRiftStart;
+    this.handlers[Types.Messages.RIFT_PROGRESS] = this.receiveRiftProgress;
+    this.handlers[Types.Messages.RIFT_ADVANCE] = this.receiveRiftAdvance;
+    this.handlers[Types.Messages.RIFT_END] = this.receiveRiftEnd;
+    this.handlers[Types.Messages.RIFT_LEADERBOARD] = this.receiveRiftLeaderboard;
+
     this.enable();
   }
 
@@ -706,6 +713,61 @@ export class GameClient extends EventEmitter {
     this.emit(ClientEvents.PROGRESSION_UPDATE, updateData);
   }
 
+  // Fracture Rift receive methods
+  receiveRiftStart(data) {
+    const riftData = {
+      runId: data[1],
+      depth: data[2],
+      modifiers: data[3],  // Array of {id, name, description, color}
+      requiredKills: data[4],
+      killCount: data[5]
+    };
+    console.log('[Rift] Started:', riftData);
+    this.emit(ClientEvents.RIFT_START, riftData);
+  }
+
+  receiveRiftProgress(data) {
+    const progressData = {
+      killCount: data[1],
+      requiredKills: data[2]
+    };
+    console.log('[Rift] Progress:', progressData.killCount + '/' + progressData.requiredKills);
+    this.emit(ClientEvents.RIFT_PROGRESS, progressData);
+  }
+
+  receiveRiftAdvance(data) {
+    const advanceData = {
+      newDepth: data[1],
+      killCount: data[2],
+      requiredKills: data[3],
+      rewards: data[4]  // {xp, gold} or undefined
+    };
+    console.log('[Rift] Advanced to depth:', advanceData.newDepth);
+    this.emit(ClientEvents.RIFT_ADVANCE, advanceData);
+  }
+
+  receiveRiftEnd(data) {
+    const endData = {
+      success: data[1] === 1,
+      reason: data[2],
+      completedDepth: data[3],
+      totalKills: data[4],
+      rewards: data[5],  // {xp, gold} or undefined
+      leaderboardRank: data[6]  // number or null
+    };
+    console.log('[Rift] Ended:', endData.reason, 'Depth:', endData.completedDepth);
+    this.emit(ClientEvents.RIFT_END, endData);
+  }
+
+  receiveRiftLeaderboard(data) {
+    const leaderboardData = {
+      entries: data[1],  // Array of {rank, playerName, maxDepth, totalKills, completionTime}
+      playerRank: data[2]  // number or null
+    };
+    console.log('[Rift] Leaderboard received:', leaderboardData.entries.length, 'entries');
+    this.emit(ClientEvents.RIFT_LEADERBOARD, leaderboardData);
+  }
+
   // ========== Send Methods ==========
 
   sendNewsRequest() {
@@ -862,5 +924,18 @@ export class GameClient extends EventEmitter {
 
   sendInventoryPickup(itemEntityId: number) {
     this.sendMessage([Types.Messages.INVENTORY_PICKUP, itemEntityId]);
+  }
+
+  // Fracture Rift send methods
+  sendRiftEnter() {
+    this.sendMessage([Types.Messages.RIFT_ENTER]);
+  }
+
+  sendRiftExit() {
+    this.sendMessage([Types.Messages.RIFT_EXIT]);
+  }
+
+  sendRiftLeaderboardRequest() {
+    this.sendMessage([Types.Messages.RIFT_LEADERBOARD_REQ]);
   }
 }

@@ -40,6 +40,7 @@ import {MinimapUI} from './ui/minimap-ui';
 import {AchievementUI} from './ui/achievement-ui';
 import {ProgressionUI, initProgressionUI} from './ui/progression-ui';
 import {SkillBarUI} from './ui/skill-bar-ui';
+import {RiftUI} from './ui/rift-ui';
 import {SkillId} from '../../shared/ts/skills';
 import {InventoryManager} from './inventory/inventory-manager';
 import {deserializeInventory, InventorySlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
@@ -105,6 +106,7 @@ export class Game {
   questController: QuestController | null = null;
   questUI: QuestUI | null = null;
   progressionUI: ProgressionUI | null = null;
+  riftUI: RiftUI | null = null;
 
   // Entity accessors (delegate to entityManager)
   get entities() { return this.entityManager?.entities ?? {}; }
@@ -2096,6 +2098,75 @@ export class Game {
       if (this.progressionUI) {
         this.progressionUI.update(this.progressionData);
       }
+    }
+  }
+
+  // Fracture Rift handlers
+  handleRiftStart(data: { runId: string; depth: number; modifiers: Array<{ id: string; name: string; description: string; color: string }>; requiredKills: number; killCount: number }) {
+    console.log('[Rift] Starting rift:', data);
+
+    // Create rift UI if it doesn't exist
+    if (!this.riftUI) {
+      this.riftUI = new RiftUI();
+    }
+
+    this.riftUI.onRiftStart(data);
+    this.audioManager?.playSound('glitch1');
+    this.showNotification(`Entering Fracture Rift - Depth ${data.depth}`);
+  }
+
+  handleRiftProgress(data: { killCount: number; requiredKills: number }) {
+    console.log('[Rift] Progress:', data);
+    this.riftUI?.onRiftProgress(data);
+  }
+
+  handleRiftAdvance(data: { newDepth: number; killCount: number; requiredKills: number; rewards?: { xp: number; gold: number } }) {
+    console.log('[Rift] Advancing to depth:', data.newDepth);
+    this.riftUI?.onRiftAdvance(data);
+    this.audioManager?.playSound('levelup');
+
+    if (data.rewards) {
+      this.showNotification(`Depth ${data.newDepth}! +${data.rewards.xp} XP, +${data.rewards.gold} Gold`);
+    }
+  }
+
+  handleRiftEnd(data: { success: boolean; reason: string; completedDepth?: number; totalKills?: number; rewards?: { xp: number; gold: number }; leaderboardRank?: number | null }) {
+    console.log('[Rift] Ended:', data);
+    this.riftUI?.onRiftEnd(data);
+
+    if (data.reason === 'death') {
+      this.showNotification(`Rift Failed at Depth ${data.completedDepth || 0}`);
+      this.audioManager?.playSound('hurt');
+    } else if (data.success) {
+      let msg = `Rift Complete! Depth ${data.completedDepth}, ${data.totalKills} kills`;
+      if (data.leaderboardRank) {
+        msg += ` - Rank #${data.leaderboardRank}`;
+      }
+      this.showNotification(msg);
+      this.audioManager?.playSound('quest');
+    }
+  }
+
+  handleRiftLeaderboard(data: { entries: Array<{ rank: number; playerName: string; maxDepth: number; totalKills: number; completionTime: number }>; playerRank: number | null }) {
+    console.log('[Rift] Leaderboard:', data);
+    this.riftUI?.showLeaderboard(data.entries, data.playerRank);
+  }
+
+  enterRift() {
+    if (this.client) {
+      this.client.sendRiftEnter();
+    }
+  }
+
+  exitRift() {
+    if (this.client) {
+      this.client.sendRiftExit();
+    }
+  }
+
+  requestRiftLeaderboard() {
+    if (this.client) {
+      this.client.sendRiftLeaderboardRequest();
     }
   }
 

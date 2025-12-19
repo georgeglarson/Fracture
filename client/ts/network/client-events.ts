@@ -117,6 +117,13 @@ export const ClientEvents = {
   PROGRESSION_INIT: 'progressionInit',
   PROGRESSION_ASCEND: 'progressionAscend',
   PROGRESSION_UPDATE: 'progressionUpdate',
+
+  // Fracture Rifts
+  RIFT_START: 'riftStart',
+  RIFT_PROGRESS: 'riftProgress',
+  RIFT_ADVANCE: 'riftAdvance',
+  RIFT_END: 'riftEnd',
+  RIFT_LEADERBOARD: 'riftLeaderboard',
 } as const;
 
 // Type for event names
@@ -232,6 +239,13 @@ export interface ClientEventPayloads {
   [ClientEvents.PROGRESSION_INIT]: [data: { ascensionCount: number; restedXp: number; efficiency: number; title: string; canAscend: boolean; maxLevel: number; bonuses: { xp: number; damage: number; hp: number } }];
   [ClientEvents.PROGRESSION_ASCEND]: [ascensionCount: number, title: string];
   [ClientEvents.PROGRESSION_UPDATE]: [data: { efficiency: number; restedXp: number }];
+
+  // Fracture Rifts
+  [ClientEvents.RIFT_START]: [data: { runId: string; depth: number; modifiers: Array<{ id: string; name: string; description: string; color: string }>; requiredKills: number; killCount: number }];
+  [ClientEvents.RIFT_PROGRESS]: [data: { killCount: number; requiredKills: number }];
+  [ClientEvents.RIFT_ADVANCE]: [data: { newDepth: number; killCount: number; requiredKills: number; rewards?: { xp: number; gold: number } }];
+  [ClientEvents.RIFT_END]: [data: { success: boolean; reason: string; completedDepth?: number; totalKills?: number; rewards?: { xp: number; gold: number }; leaderboardRank?: number | null }];
+  [ClientEvents.RIFT_LEADERBOARD]: [data: { entries: Array<{ rank: number; playerName: string; maxDepth: number; totalKills: number; completionTime: number }>; playerRank: number | null }];
 }
 
 // Typed EventEmitter interface

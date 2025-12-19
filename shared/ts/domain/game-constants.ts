@@ -111,6 +111,16 @@ export interface MessageTypes {
   readonly PROGRESSION_ASCEND: 94;
   readonly PROGRESSION_UPDATE: 95;
   readonly ASCEND_REQUEST: 96;
+
+  // Fracture Rift messages
+  readonly RIFT_ENTER: 97;
+  readonly RIFT_START: 98;
+  readonly RIFT_PROGRESS: 99;
+  readonly RIFT_ADVANCE: 100;
+  readonly RIFT_END: 101;
+  readonly RIFT_EXIT: 102;
+  readonly RIFT_LEADERBOARD: 103;
+  readonly RIFT_LEADERBOARD_REQ: 104;
 }
 
 /** All valid message type values */
@@ -235,6 +245,9 @@ export interface EntityTypes {
   // Legendary Items - Armor
   readonly CROWN_UNDYING: 130;
   readonly HELLFIRE_MANTLE: 131;
+
+  // Special Objects
+  readonly RIFT_PORTAL: 140;
 }
 
 /** All valid entity kind values */

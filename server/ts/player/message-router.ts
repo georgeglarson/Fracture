@@ -149,6 +149,11 @@ export interface MessageHandlerContext {
   // Progression system
   handleAscendRequest(): void;
 
+  // Fracture Rift system
+  handleRiftEnter(): void;
+  handleRiftExit(): void;
+  handleRiftLeaderboardRequest(): void;
+
   // Storage persistence
   characterId: string | null;
   loadFromStorage(storage: any): boolean;
@@ -654,6 +659,33 @@ export function createMessageHandlers(
     requiresAlive: true,
     handler: (ctx) => {
       ctx.handleAscendRequest();
+    }
+  });
+
+  // Fracture Rift: Enter
+  handlers.set(Types.Messages.RIFT_ENTER, {
+    rateLimit: 'shop',
+    requiresAlive: true,
+    handler: (ctx) => {
+      ctx.handleRiftEnter();
+    }
+  });
+
+  // Fracture Rift: Exit
+  handlers.set(Types.Messages.RIFT_EXIT, {
+    rateLimit: 'none',
+    requiresAlive: false,
+    handler: (ctx) => {
+      ctx.handleRiftExit();
+    }
+  });
+
+  // Fracture Rift: Leaderboard Request
+  handlers.set(Types.Messages.RIFT_LEADERBOARD_REQ, {
+    rateLimit: 'shop',
+    requiresAlive: false,
+    handler: (ctx) => {
+      ctx.handleRiftLeaderboardRequest();
     }
   });
 

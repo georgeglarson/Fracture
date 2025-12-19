@@ -38,6 +38,7 @@ import * as EquipmentHandler from './player/equipment.handler';
 import * as ZoneHandler from './player/zone.handler';
 import * as SkillHandler from './player/skill.handler';
 import * as ProgressionHandler from './player/progression.handler';
+import * as RiftHandler from './player/rift.handler';
 import { PlayerSkillState, createInitialSkillState, SkillId } from '../../shared/ts/skills';
 
 export class Player extends Character {
@@ -424,6 +425,56 @@ export class Player extends Character {
     ProgressionHandler.handleAscendRequest(ctx);
     // Update local state
     this.ascensionCount = ctx.ascensionCount;
+  }
+
+  // ============================================================================
+  // FRACTURE RIFT SYSTEM - Delegated to RiftHandler
+  // ============================================================================
+
+  /**
+   * Get rift handler context
+   */
+  private getRiftContext(): RiftHandler.RiftPlayerContext {
+    return {
+      id: this.id,
+      name: this.name,
+      level: this.level,
+      hitPoints: this.hitPoints,
+      maxHitPoints: this.maxHitPoints,
+      send: (msg: unknown[]) => this.send(msg),
+      broadcast: (msg: unknown[], ignoreSelf?: boolean) => this.broadcast(msg, ignoreSelf),
+      addXP: (amount: number, _source: string) => this.grantXP(amount),
+      addGold: (amount: number, _source: string) => this.grantGold(amount),
+      setPosition: (x: number, y: number) => this.setPosition(x, y)
+    };
+  }
+
+  /**
+   * Handle rift enter request from client
+   */
+  handleRiftEnter(): void {
+    RiftHandler.handleRiftEnter(this.getRiftContext());
+  }
+
+  /**
+   * Handle rift exit request from client
+   */
+  handleRiftExit(): void {
+    RiftHandler.handleRiftExit(this.getRiftContext());
+  }
+
+  /**
+   * Handle rift leaderboard request from client
+   */
+  handleRiftLeaderboardRequest(): void {
+    RiftHandler.handleRiftLeaderboardRequest(this.getRiftContext());
+  }
+
+  /**
+   * Check if player is in a rift
+   */
+  isInRift(): boolean {
+    return RiftHandler.isPlayerInRift(this.id);
   }
 
   // ============================================================================
