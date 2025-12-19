@@ -38,6 +38,7 @@ import {InventoryController} from './controllers/inventory.controller';
 import {ShopController} from './controllers/shop.controller';
 import {MinimapUI} from './ui/minimap-ui';
 import {AchievementUI} from './ui/achievement-ui';
+import {ProgressionUI, initProgressionUI} from './ui/progression-ui';
 import {SkillBarUI} from './ui/skill-bar-ui';
 import {SkillId} from '../../shared/ts/skills';
 import {InventoryManager} from './inventory/inventory-manager';
@@ -103,6 +104,7 @@ export class Game {
   interactionController: InteractionController | null = null;
   questController: QuestController | null = null;
   questUI: QuestUI | null = null;
+  progressionUI: ProgressionUI | null = null;
 
   // Entity accessors (delegate to entityManager)
   get entities() { return this.entityManager?.entities ?? {}; }
@@ -1985,11 +1987,35 @@ export class Game {
   }
 
   handleSkillEffect(playerId: number, skillId: string, x: number, y: number, orientation: number) {
-    // Visual feedback for skill usage - could add particles here
     const entity = this.entityManager?.getEntityById(playerId);
-    if (entity) {
-      // Flash the entity or add particle effects
-      console.log(`[Skills] Visual effect for ${skillId} at ${x},${y}`);
+    if (!entity) return;
+
+    console.log(`[Skills] Visual effect for ${skillId} at ${x},${y}`);
+
+    // Handle Phase Shift - make player translucent and mark as phased
+    if (skillId === 'phase_shift') {
+      const isLocalPlayer = playerId === this.playerId;
+
+      // Set entity as phased (for visual translucency)
+      (entity as any).isPhased = true;
+      (entity as any).phaseExpires = Date.now() + 2000; // 2 seconds
+
+      // Clear phase after duration
+      setTimeout(() => {
+        (entity as any).isPhased = false;
+        (entity as any).phaseExpires = 0;
+        if (isLocalPlayer) {
+          console.log('[Skills] Phase Shift ended');
+        }
+      }, 2000);
+
+      if (isLocalPlayer) {
+        // Disengage from any target - can't attack while phased
+        if (this.player?.hasTarget()) {
+          this.player.removeTarget();
+        }
+        console.log('[Skills] Phase Shift active - invisible and can pass through enemies');
+      }
     }
   }
 
@@ -2001,6 +2027,76 @@ export class Game {
     this.skillBarUI?.unlockSkill(skill as any);
     // Play unlock sound
     this.audioManager?.playSound('loot');
+  }
+
+  // Progression efficiency state
+  progressionData: { ascensionCount: number; restedXp: number; efficiency: number; title: string; canAscend: boolean } | null = null;
+
+  handleProgressionInit(data: { ascensionCount: number; restedXp: number; efficiency: number; title: string; canAscend: boolean; maxLevel: number; bonuses: { xp: number; damage: number; hp: number } }) {
+    console.log('[Progression] Initialized:', data);
+    this.progressionData = {
+      ascensionCount: data.ascensionCount,
+      restedXp: data.restedXp,
+      efficiency: data.efficiency,
+      title: data.title,
+      canAscend: data.canAscend
+    };
+
+    // Initialize and update progression UI
+    if (!this.progressionUI) {
+      this.progressionUI = initProgressionUI({
+        onAscend: () => {
+          if (this.client) {
+            this.client.sendAscendRequest();
+          }
+        }
+      });
+    }
+    this.progressionUI.update({
+      ...this.progressionData,
+      bonuses: data.bonuses
+    });
+
+    // Show notification if there's rested XP or ascension bonuses
+    if (data.restedXp > 0) {
+      this.showNotification(`Rested XP: +${data.restedXp.toFixed(1)}% bonus`);
+    }
+    if (data.ascensionCount > 0) {
+      this.showNotification(`${data.title} (+${data.bonuses.xp}% XP, +${data.bonuses.damage}% DMG)`);
+    }
+    if (data.efficiency < 100) {
+      this.showNotification(`Session efficiency: ${data.efficiency}%`);
+    }
+  }
+
+  handleProgressionAscend(ascensionCount: number, title: string) {
+    console.log('[Progression] ASCENDED!', ascensionCount, title);
+    this.progressionData = {
+      ...this.progressionData!,
+      ascensionCount,
+      title,
+      canAscend: false
+    };
+    this.showNotification(`ASCENDED! You are now ${title}`);
+    this.audioManager?.playSound('loot');
+
+    // Update UI
+    if (this.progressionUI && this.progressionData) {
+      this.progressionUI.update(this.progressionData);
+    }
+  }
+
+  handleProgressionUpdate(data: { efficiency: number; restedXp: number }) {
+    console.log('[Progression] Update:', data);
+    if (this.progressionData) {
+      this.progressionData.efficiency = data.efficiency;
+      this.progressionData.restedXp = data.restedXp;
+
+      // Update UI
+      if (this.progressionUI) {
+        this.progressionUI.update(this.progressionData);
+      }
+    }
   }
 
   // Achievement Panel UI

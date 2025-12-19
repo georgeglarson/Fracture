@@ -37,12 +37,18 @@ export interface PersistencePlayerContext {
   title: string | null;
   dailyData: LoadedDailyData | null;
 
+  // Progression efficiency data
+  ascensionCount: number;
+  restedXp: number;
+  lastLogoutTime: number;
+
   // Methods
   equipArmor: (kind: number) => void;
   equipWeapon: (kind: number) => void;
   setCharacterId: (id: string) => void;
   setTitle: (title: string | null) => void;
   setDailyData: (data: LoadedDailyData) => void;
+  setProgressionData: (data: { ascensionCount: number; restedXp: number; lastLogoutTime: number }) => void;
 
   // Service access
   getProgression: () => ProgressionService;
@@ -95,7 +101,14 @@ export function loadFromStorage(ctx: PersistencePlayerContext, storage: IStorage
     });
   }
 
-  console.log(`[Storage] Loaded character ${ctx.name} (${ctx.characterId}): Level ${ctx.level}, Gold ${ctx.gold}, Streak ${state.daily?.currentStreak || 0}`);
+  // Restore progression efficiency data
+  ctx.setProgressionData({
+    ascensionCount: state.character.ascensionCount || 0,
+    restedXp: state.character.restedXp || 0,
+    lastLogoutTime: state.character.lastLogoutTime || 0
+  });
+
+  console.log(`[Storage] Loaded character ${ctx.name} (${ctx.characterId}): Level ${ctx.level}, Gold ${ctx.gold}, Ascension ${state.character.ascensionCount || 0}, Streak ${state.daily?.currentStreak || 0}`);
 
   return true;
 }
@@ -122,7 +135,10 @@ export function saveToStorage(ctx: PersistencePlayerContext, storage: IStorageSe
       armorKind: ctx.armor || null,
       weaponKind: ctx.weapon || null,
       x: ctx.x,
-      y: ctx.y
+      y: ctx.y,
+      ascensionCount: (ctx as any).ascensionCount || 0,
+      restedXp: (ctx as any).restedXp || 0,
+      lastLogoutTime: Date.now()
     },
     inventory: ctx.getInventory().getSerializedSlots(),
     achievements: achievements || { unlocked: [], progress: {}, selectedTitle: null },
@@ -159,7 +175,10 @@ export function getSaveState(ctx: PersistencePlayerContext): PlayerSaveState | n
       armorKind: ctx.armor || null,
       weaponKind: ctx.weapon || null,
       x: ctx.x,
-      y: ctx.y
+      y: ctx.y,
+      ascensionCount: (ctx as any).ascensionCount || 0,
+      restedXp: (ctx as any).restedXp || 0,
+      lastLogoutTime: Date.now()
     },
     inventory: ctx.getInventory().getSerializedSlots(),
     achievements: achievements || { unlocked: [], progress: {}, selectedTitle: null },

@@ -104,6 +104,22 @@ export class SQLiteStorageService implements IStorageService {
       // Column already exists, ignore
     }
 
+    // Migration: Add progression system columns
+    try {
+      this.db.exec(`ALTER TABLE characters ADD COLUMN ascension_count INTEGER DEFAULT 0`);
+      console.log('[Storage] Added ascension_count column');
+    } catch (e) { /* Column already exists */ }
+
+    try {
+      this.db.exec(`ALTER TABLE characters ADD COLUMN rested_xp REAL DEFAULT 0`);
+      console.log('[Storage] Added rested_xp column');
+    } catch (e) { /* Column already exists */ }
+
+    try {
+      this.db.exec(`ALTER TABLE characters ADD COLUMN last_logout_time INTEGER DEFAULT 0`);
+      console.log('[Storage] Added last_logout_time column');
+    } catch (e) { /* Column already exists */ }
+
     // Inventory table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS inventory (
@@ -196,7 +212,7 @@ export class SQLiteStorageService implements IStorageService {
     try {
       const stmt = this.db.prepare(`
         SELECT id, name, level, xp, gold, armor_kind, weapon_kind, x, y,
-               created_at, last_saved
+               created_at, last_saved, ascension_count, rested_xp, last_logout_time
         FROM characters WHERE name = ?
       `);
 
@@ -214,7 +230,10 @@ export class SQLiteStorageService implements IStorageService {
         x: row.x,
         y: row.y,
         createdAt: row.created_at,
-        lastSaved: row.last_saved
+        lastSaved: row.last_saved,
+        ascensionCount: row.ascension_count || 0,
+        restedXp: row.rested_xp || 0,
+        lastLogoutTime: row.last_logout_time || 0
       };
     } catch (error) {
       console.error(`[Storage] getCharacter failed for ${name}:`, error);
@@ -231,7 +250,7 @@ export class SQLiteStorageService implements IStorageService {
     try {
       const stmt = this.db.prepare(`
         SELECT id, name, level, xp, gold, armor_kind, weapon_kind, x, y,
-               created_at, last_saved
+               created_at, last_saved, ascension_count, rested_xp, last_logout_time
         FROM characters WHERE id = ?
       `);
 
@@ -249,7 +268,10 @@ export class SQLiteStorageService implements IStorageService {
         x: row.x,
         y: row.y,
         createdAt: row.created_at,
-        lastSaved: row.last_saved
+        lastSaved: row.last_saved,
+        ascensionCount: row.ascension_count || 0,
+        restedXp: row.rested_xp || 0,
+        lastLogoutTime: row.last_logout_time || 0
       };
     } catch (error) {
       console.error(`[Storage] getCharacterById failed for ${id}:`, error);
@@ -267,7 +289,8 @@ export class SQLiteStorageService implements IStorageService {
       const stmt = this.db.prepare(`
         UPDATE characters
         SET level = ?, xp = ?, gold = ?, armor_kind = ?, weapon_kind = ?,
-            x = ?, y = ?, last_saved = CURRENT_TIMESTAMP
+            x = ?, y = ?, last_saved = CURRENT_TIMESTAMP,
+            ascension_count = ?, rested_xp = ?, last_logout_time = ?
         WHERE id = ?
       `);
 
@@ -279,6 +302,9 @@ export class SQLiteStorageService implements IStorageService {
         data.weaponKind,
         data.x,
         data.y,
+        data.ascensionCount || 0,
+        data.restedXp || 0,
+        data.lastLogoutTime || 0,
         data.id
       );
       return true;
@@ -314,7 +340,10 @@ export class SQLiteStorageService implements IStorageService {
         armorKind: null,
         weaponKind: null,
         x: 0,
-        y: 0
+        y: 0,
+        ascensionCount: 0,
+        restedXp: 0,
+        lastLogoutTime: 0
       };
     } catch (error) {
       console.error(`[Storage] createCharacter failed for ${name}:`, error);

@@ -89,6 +89,12 @@ export interface MessageHandlerContext {
   // Inventory initialization (sends to client)
   sendInventoryInit(): void;
 
+  // Skill initialization (sends to client)
+  sendSkillInit(): void;
+
+  // Progression system initialization
+  initProgressionSystem(): void;
+
   // Callbacks
   zone_callback?: () => void;
   move_callback?: (x: number, y: number) => void;
@@ -139,6 +145,9 @@ export interface MessageHandlerContext {
 
   // Skill system
   handleSkillUse(skillId: string): void;
+
+  // Progression system
+  handleAscendRequest(): void;
 
   // Storage persistence
   characterId: string | null;
@@ -257,6 +266,12 @@ export function createMessageHandlers(
 
       // Send inventory state to client
       ctx.sendInventoryInit();
+
+      // Send skill state to client
+      ctx.sendSkillInit();
+
+      // Initialize progression system (efficiency, rested XP, ascension)
+      ctx.initProgressionSystem();
 
       // Send current equipment to client (so UI can display it)
       if (ctx.weapon) {
@@ -630,6 +645,15 @@ export function createMessageHandlers(
     requiresAlive: true,
     handler: (ctx, msg) => {
       ctx.handleSkillUse(msg[1]); // msg[1] is skillId
+    }
+  });
+
+  // Ascension Request
+  handlers.set(Types.Messages.ASCEND_REQUEST, {
+    rateLimit: 'shop',
+    requiresAlive: true,
+    handler: (ctx) => {
+      ctx.handleAscendRequest();
     }
   });
 

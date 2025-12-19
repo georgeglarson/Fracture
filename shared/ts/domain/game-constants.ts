@@ -105,6 +105,12 @@ export interface MessageTypes {
   readonly SKILL_COOLDOWN: 90;
   readonly SKILL_UNLOCK: 91;
   readonly SKILL_INIT: 92;
+
+  // Progression messages
+  readonly PROGRESSION_INIT: 93;
+  readonly PROGRESSION_ASCEND: 94;
+  readonly PROGRESSION_UPDATE: 95;
+  readonly ASCEND_REQUEST: 96;
 }
 
 /** All valid message type values */

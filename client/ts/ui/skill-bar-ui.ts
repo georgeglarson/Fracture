@@ -270,7 +270,7 @@ export class SkillBarUI {
 
   private getSkillEmoji(skillId: SkillId): string {
     switch (skillId) {
-      case SkillId.DASH: return '\u21E8';      // Right arrow
+      case SkillId.PHASE_SHIFT: return '\uD83D\uDC7B'; // Ghost - invisibility
       case SkillId.POWER_STRIKE: return '\u2694'; // Crossed swords
       case SkillId.WAR_CRY: return '\uD83D\uDDE3'; // Speaking head
       case SkillId.WHIRLWIND: return '\uD83C\uDF00'; // Cyclone

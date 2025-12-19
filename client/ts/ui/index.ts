@@ -43,3 +43,11 @@ export {
   initQuestUI,
   getQuestUI
 } from './quest-ui.js';
+
+export {
+  ProgressionUI,
+  ProgressionData,
+  ProgressionCallbacks,
+  initProgressionUI,
+  getProgressionUI
+} from './progression-ui.js';

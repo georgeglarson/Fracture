@@ -420,6 +420,12 @@ export class Renderer {
         this.context.globalAlpha = entity.fadingAlpha;
       }
 
+      // Phase Shift visual effect - translucent ghost appearance
+      if ((entity as any).isPhased) {
+        this.context.save();
+        this.context.globalAlpha = 0.4; // Very translucent
+      }
+
       if (!this.mobile && !this.tablet) {
         this.drawEntityName(entity);
         this.drawEntityThought(entity);  // AI thought bubbles
@@ -487,6 +493,11 @@ export class Renderer {
       this.context.restore();
 
       if (entity.isFading) {
+        this.context.restore();
+      }
+
+      // Restore phase shift context
+      if ((entity as any).isPhased) {
         this.context.restore();
       }
     }

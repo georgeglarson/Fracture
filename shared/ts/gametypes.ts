@@ -118,7 +118,13 @@ const Messages = {
   SKILL_EFFECT: 89,        // Server -> Client: Skill visual effect for all players
   SKILL_COOLDOWN: 90,      // Server -> Client: Cooldown update
   SKILL_UNLOCK: 91,        // Server -> Client: New skill unlocked
-  SKILL_INIT: 92           // Server -> Client: Initial skill state on login
+  SKILL_INIT: 92,          // Server -> Client: Initial skill state on login
+
+  // Progression messages
+  PROGRESSION_INIT: 93,    // Server -> Client: Progression state on login
+  PROGRESSION_ASCEND: 94,  // Server -> Client: Player ascended
+  PROGRESSION_UPDATE: 95,  // Server -> Client: Efficiency/rested update
+  ASCEND_REQUEST: 96       // Client -> Server: Player requests ascension
 } as const;
 
 // ============================================================================

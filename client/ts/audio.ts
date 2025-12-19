@@ -73,6 +73,19 @@ export class AudioManager {
     } else {
       this._enabled = false;
     }
+
+    // Mute audio when window loses focus
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.muteAll();
+      } else {
+        this.unmuteAll();
+      }
+    });
+
+    // Also handle window blur/focus for when switching between windows
+    window.addEventListener('blur', () => this.muteAll());
+    window.addEventListener('focus', () => this.unmuteAll());
   }
 
   // ============================================================================
@@ -284,7 +297,7 @@ export class AudioManager {
    * Play NPC voice from TTS audio URL
    */
   playNpcVoice(audioUrl: string): void {
-    if (!this._enabled) return;
+    if (!this._enabled || this.isMuted) return;
 
     // Stop any currently playing NPC voice
     if (this.npcVoiceAudio) {
@@ -526,14 +539,52 @@ export class AudioManager {
   private savedMasterVolume: number = 1.0;
   private isMuted: boolean = false;
 
+  // Global registry of all audio elements (for focus muting)
+  private static registeredAudio: Set<HTMLAudioElement> = new Set();
+  private static savedVolumes: Map<HTMLAudioElement, number> = new Map();
+
+  /**
+   * Register an audio element for global mute control
+   */
+  static registerAudio(audio: HTMLAudioElement): void {
+    AudioManager.registeredAudio.add(audio);
+    // Auto-cleanup when audio ends or errors
+    const cleanup = () => {
+      AudioManager.registeredAudio.delete(audio);
+      AudioManager.savedVolumes.delete(audio);
+    };
+    audio.addEventListener('ended', cleanup);
+    audio.addEventListener('error', cleanup);
+  }
+
+  /**
+   * Check if audio is currently muted (static access)
+   */
+  static isGloballyMuted(): boolean {
+    return AudioManager._globalMuted;
+  }
+  private static _globalMuted: boolean = false;
+
   /**
    * Mute all audio (for when window loses focus)
    */
   muteAll(): void {
     if (this.isMuted) return;
     this.isMuted = true;
+    AudioManager._globalMuted = true;
     this.savedMasterVolume = this.masterVolume;
     this.setMasterVolume(0);
+
+    // Also mute any currently playing NPC voice
+    if (this.npcVoiceAudio) {
+      this.npcVoiceAudio.volume = 0;
+    }
+
+    // Mute all registered audio elements
+    AudioManager.registeredAudio.forEach(audio => {
+      AudioManager.savedVolumes.set(audio, audio.volume);
+      audio.volume = 0;
+    });
   }
 
   /**
@@ -542,6 +593,20 @@ export class AudioManager {
   unmuteAll(): void {
     if (!this.isMuted) return;
     this.isMuted = false;
+    AudioManager._globalMuted = false;
     this.setMasterVolume(this.savedMasterVolume);
+
+    // Restore NPC voice volume if playing
+    if (this.npcVoiceAudio) {
+      this.npcVoiceAudio.volume = this.getSfxVolume();
+    }
+
+    // Restore all registered audio elements
+    AudioManager.registeredAudio.forEach(audio => {
+      const savedVol = AudioManager.savedVolumes.get(audio);
+      if (savedVol !== undefined) {
+        audio.volume = savedVol;
+      }
+    });
   }
 }

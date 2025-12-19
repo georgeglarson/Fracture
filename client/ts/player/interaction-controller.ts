@@ -89,7 +89,10 @@ export class InteractionController {
 
     // Check for entity at target position
     const entity = this.deps.getEntityAt(targetX, targetY);
-    if (entity) {
+    const isPhased = (player as any).isPhased;
+
+    // If phased, can walk through mobs - ignore them entirely
+    if (entity && !(entity instanceof Mob && isPhased)) {
       if (entity instanceof Mob) {
         this.makePlayerAttack(entity);
         return;
@@ -171,6 +174,12 @@ export class InteractionController {
   makePlayerAttack(mob: any): void {
     const player = this.deps.getPlayer();
     if (!player) return;
+
+    // Can't attack while phased (Phase Shift skill active)
+    if ((player as any).isPhased) {
+      console.log('[Combat] Cannot attack while phased');
+      return;
+    }
 
     // Don't attack dying/dead mobs
     if (mob.isDying || mob.isDead) {
@@ -259,7 +268,12 @@ export class InteractionController {
       'constructor:', entity ? entity.constructor.name : null);
 
     if (entity instanceof Mob) {
-      this.makePlayerAttack(entity);
+      // If phased, walk through mobs instead of attacking
+      if ((player as any).isPhased) {
+        this.makePlayerGoTo(pos.x, pos.y);
+      } else {
+        this.makePlayerAttack(entity);
+      }
     }
     else if (entity instanceof Chest) {
       // Check Chest BEFORE Item since Chest extends Item

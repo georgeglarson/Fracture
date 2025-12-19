@@ -51,6 +51,9 @@ export interface SkillPlayerContext {
 
   // Power strike buff
   setPowerStrikeBuff: (active: boolean, expires: number) => void;
+
+  // Phase shift (invisibility)
+  setPhaseShift: (active: boolean, expires: number) => void;
 }
 
 /**
@@ -98,41 +101,47 @@ export function checkSkillUnlock(ctx: SkillPlayerContext, oldLevel: number, newL
  * Handle skill use request from client
  */
 export function handleSkillUse(ctx: SkillPlayerContext, skillId: string): void {
-  const skill = SKILLS[skillId as SkillId];
+  try {
+    console.log(`[Skills] ${ctx.name} attempting to use skill: ${skillId}`);
 
-  if (!skill) {
-    console.log(`[Skills] Unknown skill: ${skillId}`);
-    return;
-  }
+    const skill = SKILLS[skillId as SkillId];
 
-  // Check if player has unlocked this skill
-  if (!hasUnlockedSkill(skillId as SkillId, ctx.level)) {
-    console.log(`[Skills] ${ctx.name} tried to use ${skill.name} but hasn't unlocked it (level ${ctx.level} < ${skill.unlockLevel})`);
-    return;
-  }
+    if (!skill) {
+      console.log(`[Skills] Unknown skill: ${skillId}`);
+      return;
+    }
 
-  // Check cooldown
-  const skillState = ctx.getSkillState();
-  if (!isSkillReady(skillState, skillId as SkillId)) {
-    const remaining = Math.ceil((skillState.cooldowns[skillId as SkillId] - Date.now()) / 1000);
-    console.log(`[Skills] ${ctx.name}'s ${skill.name} on cooldown (${remaining}s remaining)`);
-    return;
-  }
+    // Check if player has unlocked this skill
+    if (!hasUnlockedSkill(skillId as SkillId, ctx.level)) {
+      console.log(`[Skills] ${ctx.name} tried to use ${skill.name} but hasn't unlocked it (level ${ctx.level} < ${skill.unlockLevel})`);
+      return;
+    }
 
-  // Execute skill
-  const success = executeSkill(ctx, skill);
+    // Check cooldown
+    const skillState = ctx.getSkillState();
+    if (!isSkillReady(skillState, skillId as SkillId)) {
+      const remaining = Math.ceil((skillState.cooldowns[skillId as SkillId] - Date.now()) / 1000);
+      console.log(`[Skills] ${ctx.name}'s ${skill.name} on cooldown (${remaining}s remaining)`);
+      return;
+    }
 
-  if (success) {
-    // Set cooldown
-    skillState.cooldowns[skillId as SkillId] = Date.now() + (skill.cooldown * 1000);
+    // Execute skill
+    const success = executeSkill(ctx, skill);
 
-    // Send cooldown update to player
-    ctx.send([Types.Messages.SKILL_COOLDOWN, skillId, skill.cooldown]);
+    if (success) {
+      // Set cooldown
+      skillState.cooldowns[skillId as SkillId] = Date.now() + (skill.cooldown * 1000);
 
-    // Broadcast skill effect to all nearby players (for visual feedback)
-    ctx.broadcastToZone([Types.Messages.SKILL_EFFECT, ctx.id, skillId, ctx.x, ctx.y, ctx.orientation], false);
+      // Send cooldown update to player
+      ctx.send([Types.Messages.SKILL_COOLDOWN, skillId, skill.cooldown]);
 
-    console.log(`[Skills] ${ctx.name} used ${skill.name}`);
+      // Broadcast skill effect to all nearby players (for visual feedback)
+      ctx.broadcastToZone([Types.Messages.SKILL_EFFECT, ctx.id, skillId, ctx.x, ctx.y, ctx.orientation], false);
+
+      console.log(`[Skills] ${ctx.name} used ${skill.name}`);
+    }
+  } catch (error) {
+    console.error(`[Skills] ERROR in handleSkillUse:`, error);
   }
 }
 
@@ -141,8 +150,8 @@ export function handleSkillUse(ctx: SkillPlayerContext, skillId: string): void {
  */
 function executeSkill(ctx: SkillPlayerContext, skill: typeof SKILLS[SkillId]): boolean {
   switch (skill.params.type) {
-    case 'dash':
-      return executeDash(ctx, skill.params.distance);
+    case 'phase_shift':
+      return executePhaseShift(ctx, skill.params.duration);
 
     case 'power_strike':
       return executePowerStrike(ctx, skill.params.damageMultiplier, skill.params.duration);
@@ -160,49 +169,26 @@ function executeSkill(ctx: SkillPlayerContext, skill: typeof SKILLS[SkillId]): b
 }
 
 /**
- * Dash - Instantly move in facing direction
+ * Phase Shift - Become invisible, clear aggro, allow walking through entities
  */
-function executeDash(ctx: SkillPlayerContext, distance: number): boolean {
-  // Find valid position (check each tile along path)
-  let finalX = ctx.x;
-  let finalY = ctx.y;
+function executePhaseShift(ctx: SkillPlayerContext, duration: number): boolean {
+  const expires = Date.now() + duration;
+  const skillState = ctx.getSkillState();
 
-  for (let i = 1; i <= distance; i++) {
-    let checkX = ctx.x;
-    let checkY = ctx.y;
+  // Set phase shift active
+  skillState.phaseShiftActive = true;
+  skillState.phaseShiftExpires = expires;
+  ctx.setPhaseShift(true, expires);
 
-    switch (ctx.orientation) {
-      case Types.Orientations.UP:
-        checkY = ctx.y - i;
-        break;
-      case Types.Orientations.DOWN:
-        checkY = ctx.y + i;
-        break;
-      case Types.Orientations.LEFT:
-        checkX = ctx.x - i;
-        break;
-      case Types.Orientations.RIGHT:
-        checkX = ctx.x + i;
-        break;
+  // Clear aggro from all mobs targeting this player
+  ctx.getWorld().forEachMob((mob: any) => {
+    if (mob.target && mob.target.id === ctx.id) {
+      mob.clearTarget();
     }
+  });
 
-    if (ctx.getWorld().isValidPosition(checkX, checkY)) {
-      finalX = checkX;
-      finalY = checkY;
-    } else {
-      // Hit a wall, stop here
-      break;
-    }
-  }
-
-  // Move player if we moved at all
-  if (finalX !== ctx.x || finalY !== ctx.y) {
-    ctx.setPosition(finalX, finalY);
-    ctx.broadcast([Types.Messages.TELEPORT, ctx.id, finalX, finalY], false);
-    return true;
-  }
-
-  return true; // Skill still "worked" even if we couldn't move (maybe already against wall)
+  console.log(`[Skills] ${ctx.name} activated Phase Shift for ${duration}ms`);
+  return true;
 }
 
 /**

@@ -23,6 +23,11 @@ export interface CharacterData {
   y: number;
   createdAt?: string;
   lastSaved?: string;
+
+  // Progression system
+  ascensionCount: number;       // Number of times prestige/ascended
+  restedXp: number;             // Bonus XP % accumulated while offline (0-100)
+  lastLogoutTime: number;       // Timestamp of last logout for rested XP calc
 }
 
 /**

@@ -6,7 +6,7 @@
  */
 
 export enum SkillId {
-  DASH = 'dash',
+  PHASE_SHIFT = 'phase_shift',
   POWER_STRIKE = 'power_strike',
   WAR_CRY = 'war_cry',
   WHIRLWIND = 'whirlwind'
@@ -33,14 +33,14 @@ export interface SkillDefinition {
 }
 
 export type SkillParams =
-  | DashParams
+  | PhaseShiftParams
   | PowerStrikeParams
   | WarCryParams
   | WhirlwindParams;
 
-export interface DashParams {
-  type: 'dash';
-  distance: number;       // tiles
+export interface PhaseShiftParams {
+  type: 'phase_shift';
+  duration: number;       // ms - how long invisibility lasts
 }
 
 export interface PowerStrikeParams {
@@ -65,18 +65,18 @@ export interface WhirlwindParams {
  * Master skill definitions - source of truth
  */
 export const SKILLS: Record<SkillId, SkillDefinition> = {
-  [SkillId.DASH]: {
-    id: SkillId.DASH,
-    name: 'Dash',
-    description: 'Instantly move 3 tiles in the direction you\'re facing',
+  [SkillId.PHASE_SHIFT]: {
+    id: SkillId.PHASE_SHIFT,
+    name: 'Phase Shift',
+    description: 'Become invisible for 2s. Enemies lose aggro and you can walk through them.',
     type: SkillType.MOBILITY,
     unlockLevel: 5,
-    cooldown: 8,
+    cooldown: 12,
     hotkey: 1,
-    icon: 'skill-dash',
+    icon: 'skill-phase',
     params: {
-      type: 'dash',
-      distance: 3
+      type: 'phase_shift',
+      duration: 2000  // 2 seconds
     }
   },
 
@@ -158,6 +158,8 @@ export interface PlayerSkillState {
   cooldowns: Record<SkillId, number>;  // skill -> timestamp when ready
   powerStrikeActive: boolean;          // For Power Strike buff tracking
   powerStrikeExpires: number;          // Timestamp when buff expires
+  phaseShiftActive: boolean;           // For Phase Shift invisibility
+  phaseShiftExpires: number;           // Timestamp when phasing ends
 }
 
 /**
@@ -166,13 +168,15 @@ export interface PlayerSkillState {
 export function createInitialSkillState(): PlayerSkillState {
   return {
     cooldowns: {
-      [SkillId.DASH]: 0,
+      [SkillId.PHASE_SHIFT]: 0,
       [SkillId.POWER_STRIKE]: 0,
       [SkillId.WAR_CRY]: 0,
       [SkillId.WHIRLWIND]: 0
     },
     powerStrikeActive: false,
-    powerStrikeExpires: 0
+    powerStrikeExpires: 0,
+    phaseShiftActive: false,
+    phaseShiftExpires: 0
   };
 }
 

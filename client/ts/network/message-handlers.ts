@@ -79,6 +79,7 @@ export function setupNetworkHandlers(game: Game, client: GameClient): void {
   setupZoneHandlers(game, client);
   setupBossHandlers(game, client);
   setupSkillHandlers(game, client);
+  setupProgressionHandlers(game, client);
 }
 
 function setupSpawnHandlers(game: Game, client: GameClient): void {
@@ -761,6 +762,19 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
     const today = new Date().toISOString().split('T')[0];
     game.storage.saveDailyLogin(today, streak);
     game.showDailyRewardPopup(gold, xp, streak);
+  });
+
+  // Efficiency/rested/ascension handlers
+  client.on(ClientEvents.PROGRESSION_INIT, function (data) {
+    game.handleProgressionInit(data);
+  });
+
+  client.on(ClientEvents.PROGRESSION_ASCEND, function (ascensionCount, title) {
+    game.handleProgressionAscend(ascensionCount, title);
+  });
+
+  client.on(ClientEvents.PROGRESSION_UPDATE, function (data) {
+    game.handleProgressionUpdate(data);
   });
 }
 

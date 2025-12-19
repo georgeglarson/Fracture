@@ -5,6 +5,8 @@
  * Now with dimension-specific themes for each zone!
  */
 
+import { AudioManager } from '../audio';
+
 /**
  * Dimension theme configuration
  */
@@ -171,6 +173,7 @@ export class FractureAtmosphere {
     soundFiles.forEach(file => {
       const audio = new Audio(`audio/sounds/${file}`);
       audio.volume = 0.2;
+      AudioManager.registerAudio(audio);
       this.glitchSounds.push(audio);
     });
   }
@@ -178,6 +181,7 @@ export class FractureAtmosphere {
   private preloadRadioChatter(): void {
     this.numbersStation = new Audio('audio/sounds/numbers.mp3');
     this.numbersStation.volume = 0.08; // Very quiet, eerie background
+    AudioManager.registerAudio(this.numbersStation);
     this.startRadioChatterLoop();
   }
 

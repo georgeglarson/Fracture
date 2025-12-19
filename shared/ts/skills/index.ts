@@ -7,7 +7,7 @@ export {
   SkillType,
   SkillDefinition,
   SkillParams,
-  DashParams,
+  PhaseShiftParams,
   PowerStrikeParams,
   WarCryParams,
   WhirlwindParams,

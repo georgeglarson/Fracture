@@ -119,6 +119,11 @@ export class GameClient extends EventEmitter {
     this.handlers[Types.Messages.SKILL_COOLDOWN] = this.receiveSkillCooldown;
     this.handlers[Types.Messages.SKILL_UNLOCK] = this.receiveSkillUnlock;
 
+    // Progression system handlers
+    this.handlers[Types.Messages.PROGRESSION_INIT] = this.receiveProgressionInit;
+    this.handlers[Types.Messages.PROGRESSION_ASCEND] = this.receiveProgressionAscend;
+    this.handlers[Types.Messages.PROGRESSION_UPDATE] = this.receiveProgressionUpdate;
+
     this.enable();
   }
 
@@ -682,6 +687,25 @@ export class GameClient extends EventEmitter {
     this.emit(ClientEvents.SKILL_UNLOCK, skill);
   }
 
+  receiveProgressionInit(data) {
+    const progressionData = data[1];
+    console.log('[Progression] Received init:', progressionData);
+    this.emit(ClientEvents.PROGRESSION_INIT, progressionData);
+  }
+
+  receiveProgressionAscend(data) {
+    const ascensionCount = data[1];
+    const title = data[2];
+    console.log('[Progression] Ascended! Count:', ascensionCount, 'Title:', title);
+    this.emit(ClientEvents.PROGRESSION_ASCEND, ascensionCount, title);
+  }
+
+  receiveProgressionUpdate(data) {
+    const updateData = data[1];
+    console.log('[Progression] Update:', updateData);
+    this.emit(ClientEvents.PROGRESSION_UPDATE, updateData);
+  }
+
   // ========== Send Methods ==========
 
   sendNewsRequest() {
@@ -769,6 +793,10 @@ export class GameClient extends EventEmitter {
 
   sendSkillUse(skillId: string) {
     this.sendMessage([Types.Messages.SKILL_USE, skillId]);
+  }
+
+  sendAscendRequest() {
+    this.sendMessage([Types.Messages.ASCEND_REQUEST]);
   }
 
   sendDailyCheck() {

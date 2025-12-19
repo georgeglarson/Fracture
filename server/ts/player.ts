@@ -37,6 +37,7 @@ import * as PersistenceHandler from './player/persistence.handler';
 import * as EquipmentHandler from './player/equipment.handler';
 import * as ZoneHandler from './player/zone.handler';
 import * as SkillHandler from './player/skill.handler';
+import * as ProgressionHandler from './player/progression.handler';
 import { PlayerSkillState, createInitialSkillState, SkillId } from '../../shared/ts/skills';
 
 export class Player extends Character {
@@ -97,6 +98,12 @@ export class Player extends Character {
 
   // Daily login data (loaded from SQLite)
   dailyData: PersistenceHandler.LoadedDailyData | null = null;
+
+  // Progression efficiency system (loaded from SQLite)
+  ascensionCount: number = 0;
+  restedXp: number = 0;
+  lastLogoutTime: number = 0;
+  sessionStartTime: number = Date.now();
 
   zone_callback: ((zoneId: number) => void) | null = null;
   move_callback: ((x: number, y: number) => void) | null = null;
@@ -223,6 +230,12 @@ export class Player extends Character {
     this.dailyData = data;
   }
 
+  setProgressionData(data: { ascensionCount: number; restedXp: number; lastLogoutTime: number }) {
+    this.ascensionCount = data.ascensionCount;
+    this.restedXp = data.restedXp;
+    this.lastLogoutTime = data.lastLogoutTime;
+  }
+
   getProgression() {
     return this.progression;
   }
@@ -340,9 +353,12 @@ export class Player extends Character {
 
   /**
    * Grant XP to the player, handling level ups
+   * Applies efficiency and rested XP multipliers
    */
   grantXP(amount: number): void {
-    this.progression.grantXP(amount);
+    // Apply progression multipliers (efficiency, rested, ascension)
+    const result = ProgressionHandler.applyXpGain(this.getProgressionContext(), amount);
+    this.progression.grantXP(result.finalXp);
   }
 
   /**
@@ -354,9 +370,12 @@ export class Player extends Character {
 
   /**
    * Grant gold to the player
+   * Applies session efficiency multiplier
    */
   grantGold(amount: number): void {
-    this.progression.grantGold(amount);
+    // Apply efficiency multiplier (no rested bonus for gold)
+    const finalGold = ProgressionHandler.applyGoldMultiplier(this.getProgressionContext(), amount);
+    this.progression.grantGold(finalGold);
   }
 
   /**
@@ -364,6 +383,47 @@ export class Player extends Character {
    */
   setGold(gold: number): void {
     this.progression.setGold(gold);
+  }
+
+  /**
+   * Get context object for progression handler functions
+   */
+  private getProgressionContext(): ProgressionHandler.ProgressionPlayerContext {
+    return {
+      id: this.id,
+      name: this.name,
+      level: this.level,
+      xp: this.xp,
+      ascensionCount: this.ascensionCount,
+      restedXp: this.restedXp,
+      lastLogoutTime: this.lastLogoutTime,
+      sessionStartTime: this.sessionStartTime,
+      send: (msg) => this.send(msg),
+      setLevel: (lvl) => this.progression.setLevel(lvl),
+      setXp: (xp) => { this.progression.xp = xp; },
+      getMaxHitPoints: () => this.maxHitPoints
+    };
+  }
+
+  /**
+   * Initialize progression system on login
+   */
+  initProgressionSystem(): void {
+    const ctx = this.getProgressionContext();
+    ProgressionHandler.initProgression(ctx);
+    // Update local state from context (rested XP may have increased)
+    this.restedXp = ctx.restedXp;
+    this.sessionStartTime = ctx.sessionStartTime;
+  }
+
+  /**
+   * Handle ascension request from client
+   */
+  handleAscendRequest(): void {
+    const ctx = this.getProgressionContext();
+    ProgressionHandler.handleAscendRequest(ctx);
+    // Update local state
+    this.ascensionCount = ctx.ascensionCount;
   }
 
   // ============================================================================
@@ -675,6 +735,21 @@ export class Player extends Character {
   setPowerStrikeBuff(active: boolean, expires: number) {
     this.skillState.powerStrikeActive = active;
     this.skillState.powerStrikeExpires = expires;
+  }
+
+  /**
+   * Set phase shift (invisibility) state
+   */
+  setPhaseShift(active: boolean, expires: number) {
+    this.skillState.phaseShiftActive = active;
+    this.skillState.phaseShiftExpires = expires;
+  }
+
+  /**
+   * Check if player is currently phased (invisible)
+   */
+  isPhased(): boolean {
+    return this.skillState.phaseShiftActive && Date.now() < this.skillState.phaseShiftExpires;
   }
 
   /**

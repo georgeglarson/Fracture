@@ -56,8 +56,8 @@ export class MinimapUI {
       right: 10px;
       width: ${this.displayWidth + 8}px;
       height: ${this.displayHeight + 28}px;
-      background: linear-gradient(135deg, #d4c4a8 0%, #c9b896 50%, #bfae87 100%);
-      border: 3px solid #6b4423;
+      background: linear-gradient(135deg, rgba(212, 196, 168, 0.85) 0%, rgba(201, 184, 150, 0.85) 50%, rgba(191, 174, 135, 0.85) 100%);
+      border: 3px solid rgba(107, 68, 35, 0.7);
       border-radius: 3px;
       box-shadow:
         inset 0 0 10px rgba(139, 90, 43, 0.3),
@@ -65,8 +65,16 @@ export class MinimapUI {
         inset 0 0 30px rgba(139, 90, 43, 0.1);
       z-index: 5000;
       user-select: none;
-      display: block;
+      display: none;
+      opacity: 0.7;
+      transition: opacity 0.2s ease;
     `;
+    this.container.addEventListener('mouseenter', () => {
+      this.container!.style.opacity = '1';
+    });
+    this.container.addEventListener('mouseleave', () => {
+      this.container!.style.opacity = '0.7';
+    });
 
     // Header - parchment style
     const header = document.createElement('div');

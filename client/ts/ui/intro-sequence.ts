@@ -3,6 +3,8 @@
  * Single Responsibility: Display animated intro with voice narration
  */
 
+import { AudioManager } from '../audio';
+
 export interface IntroData {
   story: string;
   lines: string[];
@@ -34,6 +36,7 @@ export class IntroSequence {
     // Preload glitch intro sound
     this.glitchIntroAudio = new Audio('audio/sounds/glitch-intro.mp3');
     this.glitchIntroAudio.volume = 0.4;
+    AudioManager.registerAudio(this.glitchIntroAudio);
   }
 
   /**
@@ -43,6 +46,7 @@ export class IntroSequence {
     try {
       const audio = new Audio('audio/sounds/shatter.mp3');
       audio.volume = 0.6;
+      AudioManager.registerAudio(audio);
       audio.play().catch(e => {
         console.warn('[IntroSequence] Could not play shatter sound:', e);
       });
@@ -310,6 +314,7 @@ export class IntroSequence {
     return new Promise((resolve) => {
       this.audio = new Audio(url);
       this.audio.volume = 0.8;
+      AudioManager.registerAudio(this.audio);
 
       // Resolve when audio ends
       this.audio.addEventListener('ended', () => {

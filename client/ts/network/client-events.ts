@@ -112,6 +112,11 @@ export const ClientEvents = {
   SKILL_EFFECT: 'skillEffect',
   SKILL_COOLDOWN: 'skillCooldown',
   SKILL_UNLOCK: 'skillUnlock',
+
+  // Progression
+  PROGRESSION_INIT: 'progressionInit',
+  PROGRESSION_ASCEND: 'progressionAscend',
+  PROGRESSION_UPDATE: 'progressionUpdate',
 } as const;
 
 // Type for event names
@@ -222,6 +227,11 @@ export interface ClientEventPayloads {
   [ClientEvents.SKILL_EFFECT]: [playerId: number, skillId: string, x: number, y: number, orientation: number];
   [ClientEvents.SKILL_COOLDOWN]: [skillId: string, duration: number];
   [ClientEvents.SKILL_UNLOCK]: [skill: { id: string; name: string; description: string; cooldown: number; hotkey: number; icon: string }];
+
+  // Progression
+  [ClientEvents.PROGRESSION_INIT]: [data: { ascensionCount: number; restedXp: number; efficiency: number; title: string; canAscend: boolean; maxLevel: number; bonuses: { xp: number; damage: number; hp: number } }];
+  [ClientEvents.PROGRESSION_ASCEND]: [ascensionCount: number, title: string];
+  [ClientEvents.PROGRESSION_UPDATE]: [data: { efficiency: number; restedXp: number }];
 }
 
 // Typed EventEmitter interface

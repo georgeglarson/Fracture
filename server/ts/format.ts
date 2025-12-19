@@ -56,6 +56,15 @@ export class FormatChecker {
     this.formats[Types.Messages.INVENTORY_SWAP] = ['n', 'n']; // fromSlot, toSlot
     this.formats[Types.Messages.INVENTORY_PICKUP] = ['n']; // itemEntityId
     this.formats[Types.Messages.UNEQUIP_TO_INVENTORY] = ['s']; // slot ("weapon" or "armor")
+
+    // Shop sell
+    this.formats[Types.Messages.SHOP_SELL] = ['n']; // slotIndex
+
+    // Skill system
+    this.formats[Types.Messages.SKILL_USE] = ['s']; // skillId
+
+    // Progression system
+    this.formats[Types.Messages.ASCEND_REQUEST] = []; // no params
   }
 
   check(msg: unknown[]): boolean {
