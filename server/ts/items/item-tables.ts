@@ -103,6 +103,28 @@ export const WeaponStats: Record<number, WeaponBaseStats> = {
     damageMin: 25,
     damageMax: 42,
     displayName: 'Dragon Sword'
+  },
+
+  // Legendary Weapons (boss-only drops)
+  [Types.Entities.GREEDS_EDGE]: {
+    damageMin: 30,
+    damageMax: 48,
+    displayName: "Greed's Edge"
+  },
+  [Types.Entities.DRAGONBONE_CLEAVER]: {
+    damageMin: 35,
+    damageMax: 55,
+    displayName: 'Dragonbone Cleaver'
+  },
+  [Types.Entities.VOIDHEART_BLADE]: {
+    damageMin: 32,
+    damageMax: 50,
+    displayName: 'Voidheart Blade'
+  },
+  [Types.Entities.SOUL_HARVESTER]: {
+    damageMin: 28,
+    damageMax: 52,
+    displayName: 'Soul Harvester'
   }
 };
 
@@ -173,6 +195,16 @@ export const ArmorStats: Record<number, ArmorBaseStats> = {
   [Types.Entities.DRAGON_SCALE]: {
     defense: 12,
     displayName: 'Dragon Scale'
+  },
+
+  // Legendary Armors (boss-only drops)
+  [Types.Entities.CROWN_UNDYING]: {
+    defense: 15,
+    displayName: 'Crown of the Undying'
+  },
+  [Types.Entities.HELLFIRE_MANTLE]: {
+    defense: 13,
+    displayName: 'Hellfire Mantle'
   }
 };
 

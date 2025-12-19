@@ -7,6 +7,7 @@ import { ItemProperties, Rarity, RarityColors, RarityNames, formatItemStats } fr
 import { Types } from '../../../shared/ts/gametypes';
 import { getWeaponStats, getArmorStats, compareWeapons } from '../../../shared/ts/equipment/equipment-stats';
 import { getItemSet, getSetDefinition, formatSetBonus, SetId } from '../../../shared/ts/equipment/set-data';
+import { getLegendaryByKind } from '../../../shared/ts/items/legendary-data';
 
 export class ItemTooltip {
   private element: HTMLDivElement | null = null;
@@ -140,6 +141,9 @@ export class ItemTooltip {
     // Set info
     html += this.buildSetInfo(item.kind);
 
+    // Legendary effect info
+    html += this.buildLegendaryInfo(item.kind);
+
     // Comparison with equipped (for weapons) using shared compareWeapons
     if (Types.isWeapon(item.kind) && equippedWeaponKind) {
       html += this.buildComparison(item.kind, props, equippedWeaponKind, equippedWeaponProps);
@@ -212,6 +216,27 @@ export class ItemTooltip {
       const color = isNegative ? '#f88' : '#8f8';
       html += `<div style="color: ${color}; font-size: 10px; padding-left: 8px;">${line}</div>`;
     }
+
+    html += `</div>`;
+    return html;
+  }
+
+  /**
+   * Build legendary effect info for legendary items
+   */
+  private buildLegendaryInfo(itemKind: number): string {
+    const legendary = getLegendaryByKind(itemKind);
+    if (!legendary) return '';
+
+    let html = `<div style="border-top: 1px solid ${legendary.color}60; margin-top: 6px; padding-top: 6px;">`;
+
+    // Legendary label
+    html += `<div style="color: ${legendary.color}; font-weight: bold; font-size: 11px;">`;
+    html += `LEGENDARY</div>`;
+
+    // Unique effect
+    html += `<div style="color: ${legendary.color}; font-size: 10px; padding-left: 8px; font-style: italic;">`;
+    html += `${legendary.effectDescription}</div>`;
 
     html += `</div>`;
     return html;

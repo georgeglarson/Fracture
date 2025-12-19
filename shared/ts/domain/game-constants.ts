@@ -225,6 +225,16 @@ export interface EntityTypes {
   readonly GUARDIAN_PLATE: 111;
   readonly SHADOW_CLOAK: 112;
   readonly DRAGON_SCALE: 113;
+
+  // Legendary Items - Weapons
+  readonly GREEDS_EDGE: 120;
+  readonly DRAGONBONE_CLEAVER: 121;
+  readonly VOIDHEART_BLADE: 122;
+  readonly SOUL_HARVESTER: 123;
+
+  // Legendary Items - Armor
+  readonly CROWN_UNDYING: 130;
+  readonly HELLFIRE_MANTLE: 131;
 }
 
 /** All valid entity kind values */

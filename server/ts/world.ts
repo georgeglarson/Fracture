@@ -18,6 +18,8 @@ import {SpawnManager} from './world/spawn-manager';
 import {GameLoop} from './world/game-loop';
 import {getZoneManager, ZoneManager} from './zones';
 import {ZoneBossManager} from './roaming-boss';
+import {getLegendariesForBoss} from '../../shared/ts/items/legendary-data';
+import {Rarity} from '../../shared/ts/items/item-types';
 import {IStorageService} from './storage/storage.interface';
 import {getStorageService} from './storage/sqlite.service';
 import {Server} from './ws';
@@ -696,6 +698,31 @@ export class World {
     // Get zone at mob position for loot bonuses
     const zone = this.zoneManager.getZoneAt(mob.x, mob.y);
 
+    // Check for zone boss legendary drops
+    if ((mob as any).bossId) {
+      const bossId = (mob as any).bossId as string;
+      const legendaries = getLegendariesForBoss(bossId);
+
+      for (const legendary of legendaries) {
+        if (Math.random() < legendary.dropChance) {
+          // Legendary dropped! Create with legendary rarity
+          console.log(`[LEGENDARY DROP] ${legendary.name} dropped from ${bossId}!`);
+          const legendaryItem = this.createItemWithProperties(legendary.kind, mob.x, mob.y, zone);
+          if (legendaryItem && legendaryItem.properties) {
+            // Force legendary rarity and add legendary flags
+            legendaryItem.properties.rarity = Rarity.LEGENDARY;
+            legendaryItem.properties.isLegendary = true;
+            legendaryItem.properties.legendaryId = legendary.id;
+            item = this.addItem(legendaryItem);
+
+            // Server-wide broadcast for legendary drop
+            this.broadcastLegendaryDrop(legendary.name, bossId);
+            return item;
+          }
+        }
+      }
+    }
+
     // Apply zone modifiers to drop table (increased armor/weapon chances)
     const drops = this.zoneManager.modifyDropTable(baseDrops, zone);
 
@@ -712,6 +739,16 @@ export class World {
     }
 
     return item;
+  }
+
+  /**
+   * Broadcast legendary drop to all players
+   */
+  private broadcastLegendaryDrop(itemName: string, bossId: string): void {
+    const message = `A legendary ${itemName} has dropped from ${bossId.replace(/_/g, ' ')}!`;
+    console.log(`[BROADCAST] ${message}`);
+    // Use chat broadcast for now - could add a dedicated message type later
+    this.pushBroadcast(new Messages.Chat({ id: 0, name: 'World' } as any, `[LEGENDARY] ${message}`));
   }
 
   onMobMoveCallback(mob: Mob) {

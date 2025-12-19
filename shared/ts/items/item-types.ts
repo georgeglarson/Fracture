@@ -67,6 +67,10 @@ export interface ItemProperties {
 
   // Equipment set (if part of a set)
   setId?: string;
+
+  // Legendary item properties
+  isLegendary?: boolean;
+  legendaryId?: string;
 }
 
 /**

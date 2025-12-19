@@ -235,7 +235,17 @@ const Entities = {
   BERSERKER_MAIL: 110,
   GUARDIAN_PLATE: 111,
   SHADOW_CLOAK: 112,
-  DRAGON_SCALE: 113
+  DRAGON_SCALE: 113,
+
+  // Legendary Items - Weapons
+  GREEDS_EDGE: 120,
+  DRAGONBONE_CLEAVER: 121,
+  VOIDHEART_BLADE: 122,
+  SOUL_HARVESTER: 123,
+
+  // Legendary Items - Armor
+  CROWN_UNDYING: 130,
+  HELLFIRE_MANTLE: 131
 } as const;
 
 // ============================================================================
@@ -296,6 +306,11 @@ const kinds: KindsRegistry = {
   shadowdagger: [Entities.SHADOW_DAGGER, 'weapon'],
   dragonsword: [Entities.DRAGON_SWORD, 'weapon'],
 
+  greedsedge: [Entities.GREEDS_EDGE, 'weapon'],
+  dragonbonecleaver: [Entities.DRAGONBONE_CLEAVER, 'weapon'],
+  voidheartblade: [Entities.VOIDHEART_BLADE, 'weapon'],
+  soulharvester: [Entities.SOUL_HARVESTER, 'weapon'],
+
   firefox: [Entities.FIREFOX, 'armor'],
   clotharmor: [Entities.CLOTHARMOR, 'armor'],
   leatherarmor: [Entities.LEATHERARMOR, 'armor'],
@@ -315,6 +330,9 @@ const kinds: KindsRegistry = {
   guardianplate: [Entities.GUARDIAN_PLATE, 'armor'],
   shadowcloak: [Entities.SHADOW_CLOAK, 'armor'],
   dragonscale: [Entities.DRAGON_SCALE, 'armor'],
+
+  crownundying: [Entities.CROWN_UNDYING, 'armor'],
+  hellfiremantle: [Entities.HELLFIRE_MANTLE, 'armor'],
 
   flask: [Entities.FLASK, 'object'],
   cake: [Entities.CAKE, 'object'],
@@ -371,7 +389,12 @@ const rankedWeapons = [
   Entities.BERSERKER_BLADE,
   Entities.GUARDIAN_HAMMER,
   Entities.SHADOW_DAGGER,
-  Entities.DRAGON_SWORD
+  Entities.DRAGON_SWORD,
+  // Legendary Weapons (boss-only drops, highest tier)
+  Entities.GREEDS_EDGE,
+  Entities.DRAGONBONE_CLEAVER,
+  Entities.VOIDHEART_BLADE,
+  Entities.SOUL_HARVESTER
 ] as const;
 
 const rankedArmors = [
@@ -390,7 +413,10 @@ const rankedArmors = [
   Entities.BERSERKER_MAIL,
   Entities.GUARDIAN_PLATE,
   Entities.SHADOW_CLOAK,
-  Entities.DRAGON_SCALE
+  Entities.DRAGON_SCALE,
+  // Legendary Armors (boss-only drops, highest tier)
+  Entities.CROWN_UNDYING,
+  Entities.HELLFIRE_MANTLE
 ] as const;
 
 // ============================================================================
