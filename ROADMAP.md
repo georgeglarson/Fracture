@@ -2,11 +2,11 @@
 
 > A living document tracking the path from foundation to addictive, successful game.
 
-## Current State: Code Quality Refactor (020) Active
+## Current State: Phase 6 Planning (Real Game)
 
-We have a fully playable core game with SRP architecture, roaming bosses, and AI-powered NPCs.
+We have a fully playable core game with SRP architecture, roaming bosses, and AI-powered NPCs. Technical foundation is solid. Now it's time to add the depth that makes a real game.
 
-**Current Focus**: Technical debt reduction before adding more features. See `specs/020-code-quality-refactor/`.
+**Current Focus**: Gameplay systems that create replayability. See Phase 6 specs (030-033).
 
 **Recent Milestones:**
 - `v2.0.0-pixelquest` - Rebrand from BrowserQuest-Ultra
@@ -33,8 +33,11 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - **Combat polish** - screen shake, particles, death effects (010 ✅)
 - **Fullscreen responsive UI** with status bar (011 ✅)
 
-**What's missing for a "real game":**
-- More content (areas, mobs, bosses)
+**What's missing for a "real game":** (See Phase 6)
+- Combat skills (active abilities)
+- Equipment sets (build diversity)
+- Boss-exclusive legendaries
+- Endgame content (Fracture Rifts)
 
 ---
 
@@ -311,6 +314,66 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 
 ---
 
+## Phase 6: Real Game (Make It Worth Playing)
+
+> Goal: Transform from tech demo to a game people actually play.
+
+The difference between a portfolio piece and a real game is players. These features create the depth, replayability, and aspirational content that keeps players coming back.
+
+### 030: Combat Skills
+**Impact:** Critical - Combat is currently click-and-wait
+**Status:** Draft Spec
+**Spec:** `specs/030-combat-skills/`
+
+Active abilities that give players agency in combat:
+- Dash (Level 5): Mobility, escape/engage
+- Power Strike (Level 10): Burst damage
+- War Cry (Level 15): AOE stun
+- Whirlwind (Level 20): AOE damage
+
+Transforms combat from passive to active. Players make decisions every fight.
+
+### 031: Equipment Sets
+**Impact:** High - Creates build identity and farming goals
+**Status:** Draft Spec
+**Spec:** `specs/031-equipment-sets/`
+
+Matching gear grants set bonuses:
+- Berserker's Fury: +damage, -health (glass cannon)
+- Guardian's Resolve: +defense, +health (tank)
+- Shadow Walker: +speed, +crit (assassin)
+- Dragon's Wrath: Balanced with fire proc
+
+Players choose a playstyle. Farming for specific pieces creates goals.
+
+### 032: Boss Loot
+**Impact:** High - Gives bosses purpose
+**Status:** Draft Spec
+**Spec:** `specs/032-boss-loot/`
+
+Boss-exclusive legendary drops with unique effects:
+- Crown of the Undying: Revive once per 5 min
+- Greed's Edge: +50% gold from kills
+- Dragonbone Cleaver: 10% double damage
+- Hellfire Mantle: Reflect fire damage
+
+Legendaries are aspirational. Server-wide announcements create social moments.
+
+### 033: Challenge Mode (Fracture Rifts)
+**Impact:** Critical - Endgame content
+**Status:** Draft Spec
+**Spec:** `specs/033-challenge-mode/`
+
+Infinitely scaling roguelike dungeon:
+- Progressive difficulty (depth = harder)
+- Random modifiers per run
+- Leaderboard competition
+- Rewards scale with depth
+
+Solves "nothing to do at max level." Leaderboard creates competition.
+
+---
+
 ## Principles for Prioritization
 
 1. **Core loop first**: Item + Progression before anything else
@@ -332,4 +395,4 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 ---
 
 *This roadmap is not a timeline. It's a direction.*
-*Last updated: 2025-12-16*
+*Last updated: 2025-12-19*
