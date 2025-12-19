@@ -6,9 +6,10 @@
 
 We have a fully playable core game with SRP architecture, roaming bosses, and AI-powered NPCs. Technical foundation is solid. Now it's time to add the depth that makes a real game.
 
-**Current Focus**: Gameplay systems that create replayability. See Phase 6 specs (030-033).
+**Current Focus**: Phase 6 Complete! All core gameplay systems implemented. See Phase 6 specs (030-033).
 
 **Recent Milestones:**
+- `Phase 6 Complete` - Combat Skills, Equipment Sets, Boss Loot, Fracture Rifts
 - `v2.0.0-pixelquest` - Rebrand from BrowserQuest-Ultra
 - `v3.0.0-fracture` - Full rebrand to Fracture
 - `v1.1.0-spec-kit` - Spec-driven development setup
@@ -320,55 +321,59 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 
 The difference between a portfolio piece and a real game is players. These features create the depth, replayability, and aspirational content that keeps players coming back.
 
-### 030: Combat Skills
+### 030: Combat Skills ✅
 **Impact:** Critical - Combat is currently click-and-wait
-**Status:** Draft Spec
+**Status:** Complete
 **Spec:** `specs/030-combat-skills/`
 
 Active abilities that give players agency in combat:
-- Dash (Level 5): Mobility, escape/engage
-- Power Strike (Level 10): Burst damage
-- War Cry (Level 15): AOE stun
-- Whirlwind (Level 20): AOE damage
+- [x] Dash (Level 5): Mobility, escape/engage
+- [x] Power Strike (Level 10): Burst damage
+- [x] War Cry (Level 15): AOE stun
+- [x] Whirlwind (Level 20): AOE damage
+- [x] Skill bar UI with hotkeys (1-4)
+- [x] Cooldown system with visual feedback
 
 Transforms combat from passive to active. Players make decisions every fight.
 
-### 031: Equipment Sets
+### 031: Equipment Sets ✅
 **Impact:** High - Creates build identity and farming goals
-**Status:** Draft Spec
+**Status:** Complete
 **Spec:** `specs/031-equipment-sets/`
 
 Matching gear grants set bonuses:
-- Berserker's Fury: +damage, -health (glass cannon)
-- Guardian's Resolve: +defense, +health (tank)
-- Shadow Walker: +speed, +crit (assassin)
-- Dragon's Wrath: Balanced with fire proc
+- [x] Berserker's Fury: +15% damage, -10% max HP
+- [x] Guardian's Resolve: +20% max HP, +10% defense
+- [x] Shadow Walker: +15% speed, +10% crit chance
+- [x] Dragon's Wrath: +10% damage, +10% max HP, fire proc
 
 Players choose a playstyle. Farming for specific pieces creates goals.
 
-### 032: Boss Loot
+### 032: Boss Loot ✅
 **Impact:** High - Gives bosses purpose
-**Status:** Draft Spec
+**Status:** Complete
 **Spec:** `specs/032-boss-loot/`
 
 Boss-exclusive legendary drops with unique effects:
-- Crown of the Undying: Revive once per 5 min
-- Greed's Edge: +50% gold from kills
-- Dragonbone Cleaver: 10% double damage
-- Hellfire Mantle: Reflect fire damage
+- [x] Crown of the Undying: Revive on death (5 min CD)
+- [x] Greed's Edge: +50% gold from kills
+- [x] Dragonbone Cleaver: 10% chance double damage
+- [x] Hellfire Mantle: Reflect 15% fire damage
+- [x] Server-wide legendary drop announcements
 
 Legendaries are aspirational. Server-wide announcements create social moments.
 
-### 033: Challenge Mode (Fracture Rifts)
+### 033: Challenge Mode (Fracture Rifts) ✅
 **Impact:** Critical - Endgame content
-**Status:** Draft Spec
+**Status:** Complete
 **Spec:** `specs/033-challenge-mode/`
 
 Infinitely scaling roguelike dungeon:
-- Progressive difficulty (depth = harder)
-- Random modifiers per run
-- Leaderboard competition
-- Rewards scale with depth
+- [x] Progressive difficulty (HP/DMG multipliers per depth)
+- [x] 13 random modifiers per run (9 debuffs, 4 buffs)
+- [x] Leaderboard tracking max depth/kills/time
+- [x] Rewards scale with depth and modifier count
+- [x] Rift UI with HUD and progress tracking
 
 Solves "nothing to do at max level." Leaderboard creates competition.
 
