@@ -5,7 +5,6 @@
  * Other players cannot tell if they're interacting with AI or real people.
  */
 
-import * as _ from 'lodash';
 import { Character } from '../character';
 import { Mob } from '../mob';
 import { Types } from '../../../shared/ts/gametypes';
@@ -15,15 +14,7 @@ import { Properties } from '../properties';
 import { Formulas } from '../formulas';
 import { World } from '../world';
 import { getVeniceService } from './venice.service';
-
-/**
- * Minimal mob interface for haters list
- */
-interface MobReference {
-  id: number | string;
-  x: number;
-  y: number;
-}
+import { getCombatTracker } from '../combat/combat-tracker';
 
 /**
  * Combat target interface
@@ -154,8 +145,9 @@ export class AIPlayer extends Character {
   private targetX: number | null = null;
   private targetY: number | null = null;
 
-  // Haters list (mobs targeting this AI)
-  haters: Record<string | number, MobReference> = {};
+  // Damage processing - tracks when each attacker last hit us
+  private lastDamageFromAttacker: Map<number | string, number> = new Map();
+  private static readonly ATTACKER_HIT_COOLDOWN = 900; // ms between hits (matches game animation speed)
 
   // Required Player-like properties
   hasEnteredGame = true;
@@ -166,6 +158,9 @@ export class AIPlayer extends Character {
   constructor(world: World, usedNames?: Set<string>) {
     const id = aiPlayerIdCounter++;
     super(id.toString(), 'player', Types.Entities.WARRIOR, 0, 0);
+
+    // Mark as AI to distinguish from human Player (both have type === 'player')
+    this.isAI = true;
 
     this.world = world;
     this.name = this.generateName(usedNames);
@@ -304,6 +299,9 @@ export class AIPlayer extends Character {
         break;
     }
 
+    // Process incoming damage from attackers (AI players don't have clients to send HURT)
+    this.processDamageFromAttackers(now);
+
     // Random chance to chat (personality-based)
     if (now - this.lastChatTime > this.chatCooldown) {
       this.maybeChat();
@@ -319,9 +317,9 @@ export class AIPlayer extends Character {
     const group = this.world.groups[this.group];
     this.nearbyPlayers.clear();
 
-    _.each(group.players, (playerId: number) => {
+    group.players.forEach((playerId) => {
       if (playerId !== this.id) {
-        this.nearbyPlayers.add(playerId);
+        this.nearbyPlayers.add(playerId as number);
       }
     });
   }
@@ -428,6 +426,42 @@ export class AIPlayer extends Character {
     }
   }
 
+  /**
+   * Process damage from attacking mobs.
+   * AI players don't have clients to send HURT messages, so we process damage server-side.
+   */
+  private processDamageFromAttackers(now: number): void {
+    // Get all mobs from CombatTracker (mobs that have aggro on this AI player)
+    this.forEachHater((attacker: Mob) => {
+      // Skip if attacker is dead
+      if (!attacker || attacker.isDead || attacker.hitPoints <= 0) return;
+
+      // Check if mob is adjacent (distance <= 1 tile = 16 pixels)
+      // Utils.distanceTo returns Chebyshev distance in PIXELS
+      const distance = Utils.distanceTo(this.x, this.y, attacker.x, attacker.y);
+      if (distance > 16) return;
+
+      // Check attack cooldown for this specific attacker
+      const lastHit = this.lastDamageFromAttacker.get(attacker.id) || 0;
+      if (now - lastHit < AIPlayer.ATTACKER_HIT_COOLDOWN) return;
+
+      // Calculate and apply damage using the same formula as real players
+      const mobWeaponLevel = attacker.weaponLevel || 1;
+      const damage = Formulas.dmg(mobWeaponLevel, this.armorLevel);
+
+      // Convert id to number if needed
+      const attackerId = typeof attacker.id === 'string' ? parseInt(attacker.id, 10) : attacker.id;
+      this.receiveDamage(damage, attackerId);
+      this.lastDamageFromAttacker.set(attacker.id, now);
+
+      // NOTE: AIPlayers do NOT broadcast health updates.
+      // Unlike human players, AIPlayers don't have connected clients.
+      // Broadcasting health() would confuse human players since HEALTH
+      // messages don't include a player ID - they'd apply AIPlayer's HP
+      // to their own health bar, causing erratic jumps.
+    });
+  }
+
   // ============================================================================
   // ACTIONS
   // ============================================================================
@@ -482,12 +516,12 @@ export class AIPlayer extends Character {
   }
 
   private moveAwayFromDanger(): void {
-    // Find direction away from attackers
+    // Find direction away from mobs that have aggro on us
     let avgAttackerX = 0;
     let avgAttackerY = 0;
     let count = 0;
 
-    this.forEachAttacker((attacker: MobReference) => {
+    this.forEachHater((attacker: Mob) => {
       avgAttackerX += attacker.x;
       avgAttackerY += attacker.y;
       count++;
@@ -622,6 +656,11 @@ export class AIPlayer extends Character {
       this.die();
     } else if (this.hitPoints < this.maxHitPoints * 0.2) {
       this.behaviorState = 'fleeing';
+    } else if (this.behaviorState !== 'fighting') {
+      // Fight back! Set the attacker as target and switch to fighting state
+      this.target = attackerId;
+      this.behaviorState = 'fighting';
+      console.log(`[AIPlayer] ${this.name} is now fighting back against attacker ${attackerId}`);
     }
   }
 
@@ -629,6 +668,23 @@ export class AIPlayer extends Character {
     this.isDead = true;
     this.deathCount++;
     this.say(this.getRandomChat('death'));
+
+    // Clear all mob aggro using CombatTracker
+    const tracker = getCombatTracker();
+    tracker.clearPlayerAggro(this.id as number);
+
+    // Clear attackers and redirect mobs to other targets
+    this.attackers = {};
+
+    // Broadcast despawn to nearby players
+    if (this.group) {
+      this.world.pushToGroup(this.group, new Messages.Despawn(this.id));
+    }
+
+    // Remove from world entities temporarily
+    this.world.removeEntity(this);
+
+    console.log(`[AIPlayer] ${this.name} died (death #${this.deathCount})`);
 
     // Respawn after delay
     setTimeout(() => {
@@ -643,6 +699,7 @@ export class AIPlayer extends Character {
     this.behaviorState = 'idle';
     this.clearTarget();
     this.attackers = {};
+    this.lastDamageFromAttacker.clear();
 
     // Re-add to world
     this.world.handleEntityGroupMembership(this);
@@ -650,21 +707,39 @@ export class AIPlayer extends Character {
     console.log(`[AIPlayer] ${this.name} respawned at (${this.x}, ${this.y})`);
   }
 
-  // Hater management (same as Player)
-  addHater(mob: MobReference): void {
-    if (mob && !(mob.id in this.haters)) {
-      this.haters[mob.id] = mob;
-    }
+  /**
+   * Add a mob to the player's haters list (mob has aggro on player)
+   * Note: CombatTracker is the source of truth - this is called from combat-system
+   */
+  addHater(_mob: Mob): void {
+    // No-op: CombatTracker tracks this via mob.increaseHateFor() -> addAggro()
+    // Keeping method signature for interface compatibility
   }
 
-  removeHater(mob: MobReference): void {
-    if (mob && mob.id in this.haters) {
-      delete this.haters[mob.id];
-    }
+  /**
+   * Remove a mob from the player's haters list
+   * Note: CombatTracker is the source of truth
+   */
+  removeHater(_mob: Mob): void {
+    // No-op: CombatTracker tracks this via mob.forgetPlayer() -> removeAggro()
+    // Keeping method signature for interface compatibility
   }
 
-  forEachHater(callback: (mob: MobReference) => void): void {
-    _.each(this.haters, callback);
+  /**
+   * Iterate over all mobs that have aggro on this AI player
+   * Queries CombatTracker directly - no local cache
+   */
+  forEachHater(callback: (mob: Mob) => void): void {
+    const playerId = typeof this.id === 'string' ? parseInt(this.id, 10) : this.id;
+    getCombatTracker().forEachMobAttackingWithEntity<Mob>(playerId, callback);
+  }
+
+  /**
+   * Clear all aggro relationships when AI player dies/despawns
+   */
+  clearAllAggro(): void {
+    const playerId = typeof this.id === 'string' ? parseInt(this.id, 10) : this.id;
+    getCombatTracker().clearPlayerAggro(playerId);
   }
 
   // Equip display (for Messages.EquipItem)
