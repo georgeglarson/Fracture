@@ -1,5 +1,4 @@
 import {Types} from '../../shared/ts/gametypes';
-import * as _ from 'lodash';
 import { serializeProperties, ItemProperties } from '../../shared/ts/items/index.js';
 
 // Minimal interfaces for message serialization (avoid circular deps)
@@ -108,7 +107,7 @@ export const Messages = {
         this.item.id,
         this.item.kind,
         properties,
-        _.map(this.mob.hatelist, 'id')];
+        this.mob.hatelist?.map(h => h.id) || []];
 
       return drop;
     }

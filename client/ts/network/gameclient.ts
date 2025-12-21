@@ -2,7 +2,6 @@ import {Types} from '../../../shared/ts/gametypes';
 import {Player} from '../entity/character/player/player';
 import {EntityFactory} from '../entity/entityfactory';
 import io from 'socket.io-client';
-import * as _ from 'lodash';
 import EventEmitter from 'eventemitter3';
 import { ClientEvents } from './client-events';
 
@@ -229,7 +228,7 @@ export class GameClient extends EventEmitter {
     if (action >= 27 && action <= 39) {
       console.log('[Client] Venice AI message received, type:', action, 'data:', data);
     }
-    if (this.handlers[action] && _.isFunction(this.handlers[action])) {
+    if (this.handlers[action] && typeof this.handlers[action] === 'function') {
       this.handlers[action].call(this, data);
     }
     else {
@@ -239,7 +238,7 @@ export class GameClient extends EventEmitter {
 
   receiveActionBatch(actions) {
     var self = this;
-    _.each(actions, function (action) {
+    actions.forEach(function (action: any) {
       self.receiveAction(action);
     });
   }
@@ -247,11 +246,11 @@ export class GameClient extends EventEmitter {
   // ========== Receive Methods ==========
 
   receiveWelcome(data) {
-    var id = data[1], name = data[2], x = data[3], y = data[4], hp = data[5];
+    var id = data[1], name = data[2], x = data[3], y = data[4], hp = data[5], maxHp = data[6];
     // Extended WELCOME includes: level, xp, xpToNext, gold
-    var level = data[6] || 1, xp = data[7] || 0, xpToNext = data[8] || 100, gold = data[9] || 0;
-    console.info('[WELCOME] Received: id=' + id + ' level=' + level + ' xp=' + xp + '/' + xpToNext + ' gold=' + gold);
-    this.emit(ClientEvents.WELCOME, id, name, x, y, hp, level, xp, xpToNext, gold);
+    var level = data[7] || 1, xp = data[8] || 0, xpToNext = data[9] || 100, gold = data[10] || 0;
+    console.info('[WELCOME] Received: id=' + id + ' hp=' + hp + '/' + maxHp + ' level=' + level + ' xp=' + xp + '/' + xpToNext + ' gold=' + gold);
+    this.emit(ClientEvents.WELCOME, id, name, x, y, hp, maxHp, level, xp, xpToNext, gold);
   }
 
   receiveMove(data) {

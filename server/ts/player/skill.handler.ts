@@ -135,8 +135,9 @@ export function handleSkillUse(ctx: SkillPlayerContext, skillId: string): void {
       // Send cooldown update to player
       ctx.send([Types.Messages.SKILL_COOLDOWN, skillId, skill.cooldown]);
 
-      // Broadcast skill effect to all nearby players (for visual feedback)
-      ctx.broadcastToZone([Types.Messages.SKILL_EFFECT, ctx.id, skillId, ctx.x, ctx.y, ctx.orientation], false);
+      // Send skill effect to the player (for visual feedback)
+      // Using direct send since broadcastToZone requires Message objects with serialize()
+      ctx.send([Types.Messages.SKILL_EFFECT, ctx.id, skillId, ctx.x, ctx.y, ctx.orientation]);
 
       console.log(`[Skills] ${ctx.name} used ${skill.name}`);
     }
@@ -180,10 +181,18 @@ function executePhaseShift(ctx: SkillPlayerContext, duration: number): boolean {
   skillState.phaseShiftExpires = expires;
   ctx.setPhaseShift(true, expires);
 
-  // Clear aggro from all mobs targeting this player
+  // Make all mobs completely forget this player
+  // This removes them from hate lists and makes mobs return to spawn if no other targets
   ctx.getWorld().forEachMob((mob: any) => {
-    if (mob.target && mob.target.id === ctx.id) {
-      mob.clearTarget();
+    // Clear target if mob was actively targeting this player
+    if (mob.target === ctx.id) {
+      if (mob.clearTarget) {
+        mob.clearTarget();
+      }
+    }
+    // Remove from aggro/hate tracking
+    if (mob.forgetPlayer) {
+      mob.forgetPlayer(ctx.id);
     }
   });
 
@@ -219,20 +228,26 @@ function getDistance(x1: number, y1: number, x2: number, y2: number): number {
 function executeWarCry(ctx: SkillPlayerContext, radius: number, stunDuration: number): boolean {
   let stunCount = 0;
 
+  // Convert tile radius to pixels (16 pixels per tile)
+  const pixelRadius = radius * 16;
+
   ctx.getWorld().forEachMob((mob: any) => {
+    // Skip dead mobs
+    if (mob.isDead) return;
+
     const dist = getDistance(ctx.x, ctx.y, mob.x, mob.y);
-    if (dist <= radius) {
-      // Stun the mob by clearing its target temporarily
-      if (mob.target) {
+    if (dist <= pixelRadius) {
+      // Stun the mob - clear target and prevent re-aggro
+      if (mob.clearTarget) {
         mob.clearTarget();
-        // Set a timeout to prevent re-aggro during stun
-        mob.stunUntil = Date.now() + stunDuration;
-        stunCount++;
       }
+      // Set stun timer to prevent attacks and re-aggro during stun
+      mob.stunUntil = Date.now() + stunDuration;
+      stunCount++;
     }
   });
 
-  console.log(`[Skills] War Cry stunned ${stunCount} enemies`);
+  console.log(`[Skills] War Cry stunned ${stunCount} enemies in ${radius} tile radius`);
   return true;
 }
 
@@ -246,22 +261,21 @@ function executeWhirlwind(ctx: SkillPlayerContext, radius: number, damagePercent
   const avgDamage = (weaponDmg.min + weaponDmg.max) / 2;
   const damage = Math.floor(avgDamage * (damagePercent / 100));
 
+  // Convert tile radius to pixels (16 pixels per tile)
+  const pixelRadius = radius * 16;
+
   let hitCount = 0;
 
   ctx.getWorld().forEachMob((mob: any) => {
     const dist = getDistance(ctx.x, ctx.y, mob.x, mob.y);
-    if (dist <= radius && !mob.isDead) {
+    if (dist <= pixelRadius && !mob.isDead) {
       // Deal damage directly
       mob.receiveDamage(damage);
       hitCount++;
 
-      // Broadcast damage to all players
-      ctx.broadcastToZone([Types.Messages.DAMAGE, mob.id, damage], false);
-
-      // Check if mob died
-      if (mob.hitPoints <= 0) {
-        // Let the normal death handling take care of it
-      }
+      // Send damage feedback to the player who used the skill
+      // Using ctx.send() since broadcastToZone requires serialize()
+      ctx.send([Types.Messages.DAMAGE, mob.id, damage]);
     }
   });
 

@@ -57,17 +57,21 @@ export function handleShopBuy(ctx: ShopPlayerContext, npcKind: number, itemKind:
         return;
       }
 
-      // Deduct gold
+      // Add to inventory BEFORE deducting gold to prevent losing gold on failure
+      const slotIndex = inventory.addItem(itemKind, null, 1);
+      if (slotIndex < 0) {
+        console.log(`[Shop] ${ctx.name}'s inventory failed to add item (race condition?)`);
+        ctx.send(new Messages.ShopBuyResult(false, itemKind, ctx.gold, 'Inventory is full').serialize());
+        return;
+      }
+
+      // Deduct gold only after item is successfully added
       ctx.setGold(result.newGold);
       console.log(`[Shop] ${ctx.name} purchased item ${itemKind} for ${result.cost}g (new balance: ${ctx.gold}g)`);
 
-      // Add to inventory (shop items have no special properties)
-      const slotIndex = inventory.addItem(itemKind, null, 1);
-      if (slotIndex >= 0) {
-        // Send inventory add message
-        ctx.send([Types.Messages.INVENTORY_ADD, slotIndex, itemKind, null, 1]);
-        console.log(`[Shop] ${ctx.name} added ${Types.getKindAsString(itemKind)} to inventory slot ${slotIndex}`);
-      }
+      // Send inventory add message
+      ctx.send([Types.Messages.INVENTORY_ADD, slotIndex, itemKind, null, 1]);
+      console.log(`[Shop] ${ctx.name} added ${Types.getKindAsString(itemKind)} to inventory slot ${slotIndex}`);
     } else if (result.isConsumable) {
       // Consumables go to inventory (player can use them when needed)
       const inventory = ctx.getInventory();
@@ -79,17 +83,21 @@ export function handleShopBuy(ctx: ShopPlayerContext, npcKind: number, itemKind:
         return;
       }
 
-      // Deduct gold
+      // Add to inventory BEFORE deducting gold to prevent losing gold on failure
+      const slotIndex = inventory.addItem(itemKind, null, 1);
+      if (slotIndex < 0) {
+        console.log(`[Shop] ${ctx.name}'s inventory failed to add item (race condition?)`);
+        ctx.send(new Messages.ShopBuyResult(false, itemKind, ctx.gold, 'Inventory is full').serialize());
+        return;
+      }
+
+      // Deduct gold only after item is successfully added
       ctx.setGold(result.newGold);
       console.log(`[Shop] ${ctx.name} purchased item ${itemKind} for ${result.cost}g (new balance: ${ctx.gold}g)`);
 
-      // Add to inventory (consumables stack)
-      const slotIndex = inventory.addItem(itemKind, null, 1);
-      if (slotIndex >= 0) {
-        const slot = inventory.getSlot(slotIndex);
-        ctx.send([Types.Messages.INVENTORY_ADD, slotIndex, itemKind, null, slot?.count || 1]);
-        console.log(`[Shop] ${ctx.name} added ${Types.getKindAsString(itemKind)} to inventory slot ${slotIndex}`);
-      }
+      const slot = inventory.getSlot(slotIndex);
+      ctx.send([Types.Messages.INVENTORY_ADD, slotIndex, itemKind, null, slot?.count || 1]);
+      console.log(`[Shop] ${ctx.name} added ${Types.getKindAsString(itemKind)} to inventory slot ${slotIndex}`);
     }
 
     // Send success response with new gold total

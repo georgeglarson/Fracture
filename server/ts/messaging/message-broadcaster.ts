@@ -3,7 +3,6 @@
  * Single Responsibility: Queue and deliver messages to players
  */
 
-import * as _ from 'lodash';
 
 export interface Message {
   serialize(): any[];
@@ -84,9 +83,8 @@ export class MessageBroadcaster {
     try {
       if (player && player.id in this.outgoingQueues) {
         this.outgoingQueues[player.id].push(message.serialize());
-      } else {
-        console.debug('[Broadcaster] pushToPlayer: player was undefined or has no queue');
       }
+      // AIPlayers don't have queues - this is expected, no need to log
     } catch (error) {
       console.error(`[Broadcaster] Failed to push to player ${player?.id}:`, error);
     }
@@ -100,7 +98,7 @@ export class MessageBroadcaster {
       const group = this.groups[groupId];
 
       if (group) {
-        _.each(group.players, (playerId) => {
+        group.players.forEach((playerId) => {
           if (playerId != ignoredPlayer) {
             const player = this.entityProvider.getEntityById(playerId);
             this.pushToPlayer(player, message);
@@ -133,7 +131,7 @@ export class MessageBroadcaster {
   pushToPreviousGroups(player: Player, message: Message): void {
     try {
       if (player.recentlyLeftGroups) {
-        _.each(player.recentlyLeftGroups, (id) => {
+        player.recentlyLeftGroups.forEach((id) => {
           this.pushToGroup(id, message);
         });
         player.recentlyLeftGroups = [];

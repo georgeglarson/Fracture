@@ -3,7 +3,6 @@
  * Single Responsibility: Manage MobAreas, ChestAreas, and entity lifecycle
  */
 
-import * as _ from 'lodash';
 import { MobArea } from '../mobarea.js';
 import { ChestArea } from '../chestarea.js';
 import { Types } from '../../../shared/ts/gametypes.js';
@@ -91,7 +90,7 @@ export class SpawnManager {
     const self = this;
 
     // Populate all mob "roaming" areas
-    _.each(this.map.mobAreas, function(a) {
+    this.map.mobAreas.forEach(function(a) {
       const area = new MobArea(a.id, a.nb, a.type, a.x, a.y, a.width, a.height, self.worldContext);
       area.spawnMobs();
       area.onEmpty(self.handleEmptyMobArea.bind(self, area));
@@ -99,14 +98,14 @@ export class SpawnManager {
     });
 
     // Create all chest areas
-    _.each(this.map.chestAreas, function(a) {
+    this.map.chestAreas.forEach(function(a) {
       const area = new ChestArea(a.id, a.x, a.y, a.w, a.h, a.tx, a.ty, a.i, self.worldContext);
       self.chestAreas.push(area);
       area.onEmpty(self.handleEmptyChestArea.bind(self, area));
     });
 
     // Spawn static chests
-    _.each(this.map.staticChests, function(chest) {
+    this.map.staticChests.forEach(function(chest) {
       const c = self.entityManager!.createChest(chest.x, chest.y, chest.i);
       self.entityManager!.addStaticItem(c);
     });
@@ -115,7 +114,7 @@ export class SpawnManager {
     this.spawnStaticEntities();
 
     // Set maximum number of entities contained in each chest area
-    _.each(this.chestAreas, function(area) {
+    this.chestAreas.forEach(function(area) {
       area.setNumberOfEntities(area.entities.length);
     });
   }
@@ -183,7 +182,7 @@ export class SpawnManager {
    * Try to add a mob to any chest area it's contained in
    */
   tryAddingMobToChestArea(mob: any): void {
-    _.each(this.chestAreas, function(area) {
+    this.chestAreas.forEach(function(area) {
       if (area.contains(mob)) {
         area.addToArea(mob);
       }

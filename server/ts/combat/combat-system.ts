@@ -3,7 +3,6 @@
  * Single Responsibility: Combat mechanics, damage, death, aggro management
  */
 
-import * as _ from 'lodash';
 import { Messages } from '../message.js';
 import { Types } from '../../../shared/ts/gametypes.js';
 import { Formulas } from '../formulas.js';
@@ -11,6 +10,7 @@ import { getVeniceService } from '../ai/venice.service.js';
 import { getServerEventBus } from '../../../shared/ts/events/index.js';
 import { PartyService } from '../party/index.js';
 import { getKillStreakService } from './kill-streak.service.js';
+import { getCombatTracker } from './combat-tracker.js';
 
 export interface Entity {
   id: string | number;
@@ -20,11 +20,13 @@ export interface Entity {
   group?: string;
   hitPoints: number;
   armorLevel?: number;  // For XP calculation
+  weaponLevel?: number;  // For damage calculation
   x?: number;  // Pixel position X
   y?: number;  // Pixel position Y
   target?: string | number;
-  hatelist?: Array<{ id: string | number }>;
   attackers?: Record<string | number, any>;
+  stunUntil?: number;  // Timestamp when stun expires (War Cry)
+  isDead?: boolean;  // Death flag to prevent processing dead entities
   increaseHateFor?(playerId: string | number, hatePoints: number): void;
   addHater?(mob: any): void;
   removeHater?(mob: any): void;
@@ -43,6 +45,7 @@ export interface Entity {
   grantXP?(amount: number): void;  // For progression system
   grantGold?(amount: number): void;  // For economy system
   checkKillAchievements?(mobKind: number): void;  // For achievement system
+  isPhased?(): boolean;  // Phase shift immunity check
 }
 
 export interface Message {
@@ -89,16 +92,24 @@ export class CombatSystem {
 
   /**
    * Clear all hate links between mob and players
+   * Uses CombatTracker as the source of truth
    */
   clearMobHateLinks(mob: Entity): void {
-    if (mob && mob.hatelist) {
-      _.each(mob.hatelist, (obj) => {
-        const player = this.world.getEntityById(obj.id);
-        if (player) {
-          player.removeHater?.(mob);
-        }
-      });
-    }
+    if (!mob) return;
+
+    const mobId = typeof mob.id === 'string' ? parseInt(mob.id, 10) : mob.id;
+    const tracker = getCombatTracker();
+
+    // Iterate all players this mob has aggro on
+    tracker.forEachPlayerHated(mobId, (playerId) => {
+      const player = this.world.getEntityById(playerId);
+      if (player) {
+        player.removeHater?.(mob);
+      }
+    });
+
+    // Clear the mob's aggro in CombatTracker
+    tracker.clearMobAggro(mobId);
   }
 
   /**
@@ -119,23 +130,55 @@ export class CombatSystem {
   }
 
   /**
+   * Check if a mob is currently stunned (War Cry)
+   */
+  isMobStunned(mob: Entity): boolean {
+    return mob.stunUntil !== undefined && Date.now() < mob.stunUntil;
+  }
+
+  /**
    * Choose mob's target based on hate ranking
    */
   chooseMobTarget(mob: Entity, hateRank?: number): void {
+    // Stunned mobs can't acquire new targets
+    if (this.isMobStunned(mob)) {
+      return;
+    }
+
     const playerId = mob.getHatedPlayerId?.(hateRank);
     if (!playerId) return;
 
     const player = this.world.getEntityById(playerId);
 
+    // Skip phased players - they are invisible/invulnerable
+    if (player && player.isPhased?.()) {
+      // Try next most hated player instead
+      this.chooseMobTarget(mob, (hateRank || 1) + 1);
+      return;
+    }
+
     // If the mob is not already attacking the player, create an attack link
     if (player && player.attackers && !(mob.id in player.attackers)) {
       this.clearMobAggroLink(mob);
 
-      player.addAttacker?.(mob);
+      // Always set the target so the mob chases the player
       mob.setTarget?.(player);
 
-      this.broadcastAttacker(mob);
-      console.debug(mob.id + ' is now attacking ' + player.id);
+      // Only register as attacker and broadcast attack when in melee range
+      // This prevents clients from auto-retaliating to far-away mobs
+      // Positions are in pixels (16 pixels per tile), melee range is ~2 tiles
+      const MELEE_RANGE_PIXELS = 32;
+      const dx = Math.abs((mob.x || 0) - (player.x || 0));
+      const dy = Math.abs((mob.y || 0) - (player.y || 0));
+      const distance = Math.max(dx, dy); // Chebyshev distance
+
+      if (distance <= MELEE_RANGE_PIXELS) {
+        player.addAttacker?.(mob);
+        this.broadcastAttacker(mob);
+        console.debug(mob.id + ' is now attacking ' + player.id + ' (in melee range)');
+      } else {
+        console.debug(mob.id + ' is chasing ' + player.id + ' (distance: ' + distance + 'px)');
+      }
     }
   }
 
@@ -155,6 +198,11 @@ export class CombatSystem {
    * Handle entity taking damage
    */
   handleHurtEntity(entity: Entity, attacker?: Entity, damage?: number): void {
+    // Skip processing for already-dead entities to prevent double death handling
+    if (entity.isDead) {
+      return;
+    }
+
     if (entity.type === 'player') {
       // A player is only aware of his own hitpoints
       if (entity.health) {
@@ -194,7 +242,7 @@ export class CombatSystem {
   private handleMobDeath(mob: Entity, attacker?: Entity): void {
     // CRITICAL: Set isDead flag IMMEDIATELY to prevent further damage processing
     // This must happen before any messages are sent to prevent race conditions
-    (mob as any).isDead = true;
+    mob.isDead = true;
 
     const item = this.world.getDroppedItem(mob);
 
@@ -307,20 +355,32 @@ export class CombatSystem {
    * Redirects all attacking mobs to their next target
    */
   handlePlayerVanish(player: Entity): void {
-    const previousAttackers: Entity[] = [];
+    const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+    const tracker = getCombatTracker();
 
-    // Collect all mobs attacking this player and redirect them
-    player.forEachAttacker?.((mob) => {
-      previousAttackers.push(mob);
-      this.chooseMobTarget(mob, 2); // Target second most hated player
-    });
+    // Get all mobs that have aggro on this player from CombatTracker (source of truth)
+    const mobIds = tracker.getMobsAttacking(playerId);
 
-    // Clean up the attack links
-    _.each(previousAttackers, (mob) => {
-      player.removeAttacker?.(mob);
-      mob.clearTarget?.();
-      mob.forgetPlayer?.(player.id, 1000);
-    });
+    // Redirect each mob to a new target and clear their aggro
+    for (const mobId of mobIds) {
+      const mob = this.world.getEntityById(mobId);
+      if (mob) {
+        // Clear the mob's target
+        mob.clearTarget?.();
+        // Tell mob to forget this player (also removes from CombatTracker)
+        mob.forgetPlayer?.(playerId, 1000);
+        // Try to find a new target (second most hated)
+        this.chooseMobTarget(mob, 2);
+      }
+    }
+
+    // Clear player's local attackers cache
+    if (player.attackers) {
+      player.attackers = {};
+    }
+
+    // Clear all aggro for this player in CombatTracker (belt and suspenders)
+    tracker.clearPlayerAggro(playerId);
 
     this.world.handleEntityGroupMembership(player);
   }

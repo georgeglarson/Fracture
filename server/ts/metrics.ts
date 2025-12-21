@@ -1,4 +1,3 @@
-import * as _ from 'lodash';
 import {World} from './world';
 
 // Config interface for metrics
@@ -48,8 +47,8 @@ export class Metrics {
   updatePlayerCounters(worlds: World[], updatedCallback?: (total: number) => void): void {
     var self = this,
       config = this.config,
-      numServers = _.size(config.game_servers),
-      playerCount = _.reduce(worlds, function (sum, world: World) {
+      numServers = config.game_servers.length,
+      playerCount = worlds.reduce(function (sum, world: World) {
         return sum + world.playerCount;
       }, 0);
 
@@ -59,7 +58,7 @@ export class Metrics {
         var total_players = 0;
 
         // Recalculate the total number of players and set it
-        _.each(config.game_servers, function (server) {
+        config.game_servers.forEach(function (server) {
           self.client.get('player_count_' + server.name, function (error, result) {
             var count = result ? parseInt(result) : 0;
 

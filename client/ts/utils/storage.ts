@@ -1,5 +1,3 @@
-import * as _ from 'lodash';
-
 export class Storage {
   data: any;
 
@@ -115,7 +113,7 @@ export class Storage {
   // Achievements
 
   hasUnlockedAchievement(id) {
-    return _.include(this.data.achievements.unlocked, id);
+    return this.data.achievements.unlocked.includes(id);
   }
 
   unlockAchievement(id) {
@@ -128,7 +126,7 @@ export class Storage {
   }
 
   getAchievementCount() {
-    return _.size(this.data.achievements.unlocked);
+    return this.data.achievements.unlocked.length;
   }
 
   // Angry rats

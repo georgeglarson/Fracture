@@ -6,8 +6,6 @@ import {NPCs} from './character/npc/npcs';
 import {Chest} from './objects/chest';
 import {CHEST_KINDS} from '../../../shared/ts/entities/chest-config';
 
-import * as _ from 'lodash';
-
 export const EntityFactory: any = {};
 
 EntityFactory.createEntity = function (kind, id, name) {
@@ -16,7 +14,7 @@ EntityFactory.createEntity = function (kind, id, name) {
     return;
   }
 
-  if (!_.isFunction(EntityFactory.builders[kind])) {
+  if (typeof EntityFactory.builders[kind] !== 'function') {
     throw Error(kind + ' is not a valid Entity type');
   }
 

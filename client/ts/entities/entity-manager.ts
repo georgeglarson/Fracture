@@ -5,7 +5,6 @@
 
 import { Entity } from '../entity/entity';
 import { Mob } from '../entity/character/mob/mob';
-import _ from 'lodash';
 
 export interface GridManagerContext {
   registerEntityPosition(entity: any): void;
@@ -187,7 +186,7 @@ export class EntityManager {
    * Iterate through all entities
    */
   forEachEntity(callback: (entity: any) => void): void {
-    _.each(this.entities, function(entity) {
+    Object.values(this.entities).forEach(function(entity) {
       callback(entity);
     });
   }
@@ -196,7 +195,7 @@ export class EntityManager {
    * Iterate through all Mob entities
    */
   forEachMob(callback: (mob: any) => void): void {
-    _.each(this.entities, function(entity) {
+    Object.values(this.entities).forEach(function(entity) {
       if (entity instanceof Mob) {
         callback(entity);
       }
@@ -216,21 +215,19 @@ export class EntityManager {
    * Remove all obsolete entities (except the player)
    */
   removeObsoleteEntities(playerId: string | number): number {
-    const nb = _.size(this.obsoleteEntities);
+    const nb = this.obsoleteEntities?.length ?? 0;
     const self = this;
 
     if (nb > 0 && this.obsoleteEntities) {
-      _.each(this.obsoleteEntities, function(entity) {
+      this.obsoleteEntities.forEach(function(entity) {
         if (entity.id !== playerId) {
           self.removeEntity(entity);
         }
       });
-      console.debug('Removed ' + nb + ' entities: ' + _.pluck(
-        _.reject(this.obsoleteEntities, function(entity) {
-          return entity.id === playerId;
-        }),
-        'id'
-      ));
+      const removedIds = this.obsoleteEntities
+        .filter((entity) => entity.id !== playerId)
+        .map((entity) => entity.id);
+      console.debug('Removed ' + nb + ' entities: ' + removedIds);
       this.obsoleteEntities = null;
     }
 

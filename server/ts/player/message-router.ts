@@ -161,6 +161,10 @@ export interface MessageHandlerContext {
 
   // Timeouts
   firepotionTimeout: NodeJS.Timeout | null;
+
+  // Skill state checks
+  isPhased(): boolean;
+  consumePowerStrike(): number;
 }
 
 /**
@@ -250,7 +254,7 @@ export function createMessageHandlers(
       const xpToNext = Formulas.xpToNextLevel(ctx.level || 1);
 
       // Send expanded WELCOME with full player state
-      // [WELCOME, id, name, x, y, hp, level, xp, xpToNext, gold]
+      // [WELCOME, id, name, x, y, hp, maxHp, level, xp, xpToNext, gold]
       ctx.send([
         Types.Messages.WELCOME,
         ctx.id,
@@ -258,6 +262,7 @@ export function createMessageHandlers(
         ctx.x,
         ctx.y,
         ctx.hitPoints,
+        ctx.maxHitPoints,
         ctx.level || 1,
         ctx.xp || 0,
         xpToNext,
@@ -292,8 +297,9 @@ export function createMessageHandlers(
   // WHO - Entity info request
   handlers.set(Types.Messages.WHO, {
     handler: (ctx, msg) => {
-      msg.shift();
-      ctx.world.pushSpawnsToPlayer(ctx, msg);
+      // Use slice to avoid mutating the original message array
+      const entityIds = msg.slice(1);
+      ctx.world.pushSpawnsToPlayer(ctx, entityIds);
     }
   });
 
@@ -379,7 +385,10 @@ export function createMessageHandlers(
       const mob = ctx.world.getEntityById(msg[1]);
       // Check mob exists and is not already dead (prevents hitting during death animation)
       if (mob && !mob.isDead) {
-        const dmg = Formulas.dmg(ctx.weaponLevel, mob.armorLevel);
+        // Apply Power Strike multiplier (consumes the buff if active)
+        const powerStrikeMultiplier = ctx.consumePowerStrike();
+        const baseDmg = Formulas.dmg(ctx.weaponLevel, mob.armorLevel);
+        const dmg = Math.floor(baseDmg * powerStrikeMultiplier);
         if (dmg > 0) {
           mob.receiveDamage(dmg, ctx.id);
           ctx.world.handleMobHate(mob.id, ctx.id, dmg);
@@ -395,7 +404,34 @@ export function createMessageHandlers(
       const mob = ctx.world.getEntityById(msg[1]);
       // Check mob exists, is alive (isDead flag + hitPoints > 0), and player is alive
       // Double-check (hitPoints > 0) prevents damage from mobs in death animation
-      if (mob && !mob.isDead && mob.hitPoints > 0 && ctx.hitPoints > 0) {
+      // Phase shift makes player immune to damage
+      // Stunned mobs (War Cry) can't deal damage
+      const isStunned = mob?.stunUntil && Date.now() < mob.stunUntil;
+      if (mob && !mob.isDead && mob.hitPoints > 0 && ctx.hitPoints > 0 && !ctx.isPhased() && !isStunned) {
+        // Range check: mob must be adjacent (melee range) to deal damage
+        // Positions are in pixels (16 pixels per tile)
+        // Use Chebyshev distance (max of dx, dy) which is standard for grid-based games
+        const dx = Math.abs(ctx.x - mob.x);
+        const dy = Math.abs(ctx.y - mob.y);
+        const distancePixels = Math.max(dx, dy); // Chebyshev distance in pixels
+        const MELEE_RANGE_TILES = 2; // tiles - allows for diagonal adjacency + small desync buffer
+        const MELEE_RANGE_PIXELS = MELEE_RANGE_TILES * 16;
+
+        if (distancePixels > MELEE_RANGE_PIXELS) {
+          // Mob is too far away - clear its aggro on this player
+          if (mob.clearTarget) mob.clearTarget();
+          if (mob.forgetPlayer) mob.forgetPlayer(ctx.id);
+          return;
+        }
+
+        // Create attack link if not already attacking (for mobs that chased from far away)
+        // This broadcasts the attack to clients so they know the mob is now hitting
+        const player = ctx as any; // ctx is Player but typed as MessageHandlerContext
+        if (player.attackers && !(mob.id in player.attackers)) {
+          if (player.addAttacker) player.addAttacker(mob);
+          ctx.world.broadcastAttacker(mob);
+        }
+
         ctx.hitPoints -= Formulas.dmg(mob.weaponLevel, ctx.armorLevel);
         ctx.world.handleHurtEntity(ctx);
 
@@ -767,10 +803,19 @@ export class MessageRouter {
       }
     }
 
-    // Execute handler
-    const result = config.handler(ctx, message);
-    if (result instanceof Promise) {
-      await result;
+    // Execute handler with error boundary
+    try {
+      const result = config.handler(ctx, message);
+      if (result instanceof Promise) {
+        await result;
+      }
+    } catch (error) {
+      log.error(
+        { playerId: ctx.id, action, messageType: Types.getMessageTypeAsString(action), error },
+        'Handler error - message dropped'
+      );
+      // Return true to indicate message was "handled" (rejected due to error)
+      // Don't crash the server on bad message data
     }
 
     return true;

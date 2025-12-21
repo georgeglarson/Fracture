@@ -7,6 +7,7 @@
 
 import { Messages } from '../message';
 import { PartyService } from '../party';
+import { isPlayer } from '../utils';
 
 /**
  * Player interface for party handler
@@ -49,7 +50,8 @@ export function handlePartyInvite(ctx: PartyPlayerContext, targetId: number): vo
   const world = ctx.getWorld();
   const targetPlayer = world.getEntityById(targetId);
 
-  if (!targetPlayer || targetPlayer.constructor.name !== 'Player') {
+  // Use isPlayer() to reject AIPlayers and other non-human entities
+  if (!targetPlayer || !isPlayer(targetPlayer)) {
     console.log(`[Party] ${ctx.name} tried to invite invalid player ${targetId}`);
     return;
   }
@@ -194,7 +196,8 @@ export function handlePlayerInspect(ctx: PartyPlayerContext, targetId: number): 
   const world = ctx.getWorld();
   const targetPlayer = world.getEntityById(targetId);
 
-  if (!targetPlayer || targetPlayer.constructor.name !== 'Player') {
+  // Use isPlayer() to reject AIPlayers and other non-human entities
+  if (!targetPlayer || !isPlayer(targetPlayer)) {
     console.log(`[Inspect] ${ctx.name} tried to inspect invalid player ${targetId}`);
     return;
   }

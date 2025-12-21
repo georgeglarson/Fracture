@@ -1,8 +1,6 @@
 import {Area} from './map/area';
 import {Detect} from './utils/detect';
 
-import * as _ from 'lodash';
-
 /**
  * AudioManager - Centralized audio control with single point of state management
  *
@@ -43,9 +41,9 @@ export class AudioManager {
 
 
     var loadSoundFiles = function () {
-      var counter = _.size(self.soundNames);
+      var counter = self.soundNames.length;
       console.info('Loading sound files...');
-      _.each(self.soundNames, function (name) {
+      self.soundNames.forEach(function (name) {
         self.loadSound(name, function () {
           counter -= 1;
           if (counter === 0) {
@@ -61,7 +59,7 @@ export class AudioManager {
       if (!self.game.renderer.mobile) {
         console.info('Loading music files...');
         self.loadMusic(self.musicNames.shift(), function () {
-          _.each(self.musicNames, function (name) {
+          self.musicNames.forEach(function (name) {
             self.loadMusic(name);
           });
         });
@@ -241,9 +239,9 @@ export class AudioManager {
     sound.load();
 
     this.sounds[name] = [sound];
-    _.times(channels - 1, function () {
+    for (let i = 0; i < channels - 1; i++) {
       self.sounds[name].push(sound.cloneNode(true));
-    });
+    }
   }
 
   loadSound(name, handleLoaded): void {
@@ -268,7 +266,7 @@ export class AudioManager {
     if (!this.sounds[name]) {
       return null;
     }
-    var sound: any = _.detect(this.sounds[name], function (sound) {
+    var sound: any = this.sounds[name].find(function (sound) {
       return sound.ended || sound.paused;
     });
     if (sound) {
@@ -350,7 +348,7 @@ export class AudioManager {
     if (!entity) return null;
 
     var music = null,
-      area: any = _.detect(this.areas, function (area) {
+      area: any = this.areas.find(function (area: any) {
         return area.contains(entity);
       });
 
@@ -542,12 +540,66 @@ export class AudioManager {
   // Global registry of all audio elements (for focus muting)
   private static registeredAudio: Set<HTMLAudioElement> = new Set();
   private static savedVolumes: Map<HTMLAudioElement, number> = new Map();
+  private static staticHandlersInitialized: boolean = false;
+
+  /**
+   * Initialize static document-level handlers for registered audio
+   * These work even before an AudioManager instance exists
+   */
+  private static initStaticHandlers(): void {
+    if (AudioManager.staticHandlersInitialized) return;
+    AudioManager.staticHandlersInitialized = true;
+
+    // Mute all registered audio when window loses focus
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        AudioManager.muteAllRegistered();
+      } else {
+        AudioManager.unmuteAllRegistered();
+      }
+    });
+
+    window.addEventListener('blur', () => AudioManager.muteAllRegistered());
+    window.addEventListener('focus', () => AudioManager.unmuteAllRegistered());
+  }
+
+  /**
+   * Mute all registered audio (static, works without instance)
+   */
+  private static muteAllRegistered(): void {
+    AudioManager._globalMuted = true;
+    AudioManager.registeredAudio.forEach(audio => {
+      AudioManager.savedVolumes.set(audio, audio.volume);
+      audio.volume = 0;
+    });
+  }
+
+  /**
+   * Unmute all registered audio (static, works without instance)
+   */
+  private static unmuteAllRegistered(): void {
+    AudioManager._globalMuted = false;
+    AudioManager.registeredAudio.forEach(audio => {
+      const savedVol = AudioManager.savedVolumes.get(audio);
+      if (savedVol !== undefined) {
+        audio.volume = savedVol;
+      }
+    });
+  }
 
   /**
    * Register an audio element for global mute control
    */
   static registerAudio(audio: HTMLAudioElement): void {
+    // Initialize static handlers on first registration
+    AudioManager.initStaticHandlers();
+
     AudioManager.registeredAudio.add(audio);
+    // If already muted (window out of focus), mute this audio too
+    if (AudioManager._globalMuted) {
+      AudioManager.savedVolumes.set(audio, audio.volume);
+      audio.volume = 0;
+    }
     // Auto-cleanup when audio ends or errors
     const cleanup = () => {
       AudioManager.registeredAudio.delete(audio);

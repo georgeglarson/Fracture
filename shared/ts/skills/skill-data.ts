@@ -107,8 +107,8 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
     icon: 'skill-war-cry',
     params: {
       type: 'war_cry',
-      radius: 2,
-      stunDuration: 1500
+      radius: 3,
+      stunDuration: 3000
     }
   },
 

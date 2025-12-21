@@ -3,8 +3,6 @@ import {Types} from '../../../../shared/ts/gametypes';
 import {Transition} from '../../utils/transition';
 import {Timer} from '../../utils/timer';
 
-import * as _ from 'lodash';
-
 export class Character extends Entity {
 
   // Position & Orientation
@@ -104,7 +102,7 @@ export class Character extends Entity {
       this.flipSpriteX = false;
       this.flipSpriteY = false;
 
-      if (_.indexOf(oriented, animation) >= 0) {
+      if (oriented.indexOf(animation) >= 0) {
         animation += '_' + (o === Types.Orientations.LEFT ? 'right' : Types.getOrientationAsString(o));
         this.flipSpriteX = (this.orientation === Types.Orientations.LEFT) ? true : false;
       }
@@ -459,7 +457,7 @@ export class Character extends Entity {
    * @param {Function} callback Function which must accept one character argument.
    */
   forEachAttacker(callback) {
-    _.each(this.attackers, function (attacker) {
+    Object.values(this.attackers).forEach(function (attacker: any) {
       callback(attacker);
     });
   }

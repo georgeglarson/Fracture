@@ -1,7 +1,6 @@
 import {Area} from './area';
 import {Mob} from './mob';
 import {Types} from '../../shared/ts/gametypes';
-import * as _ from 'lodash';
 import {Utils} from './utils';
 
 // Extended World interface for MobArea's needs
@@ -69,7 +68,7 @@ export class MobArea extends Area {
     var self = this;
 
     setInterval(function () {
-      _.each(self.entities, function (entity) {
+      self.entities.forEach(function (entity) {
         const mob = entity as Mob;
         var canRoam = (Utils.random(20) === 1),
           pos;

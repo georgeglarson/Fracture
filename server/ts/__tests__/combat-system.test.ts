@@ -39,6 +39,17 @@ vi.mock('./kill-streak.service.js', () => ({
   }),
 }));
 
+// Track mock function for forEachPlayerHated
+const mockForEachPlayerHated = vi.fn();
+const mockClearMobAggro = vi.fn();
+
+vi.mock('../combat/combat-tracker.js', () => ({
+  getCombatTracker: () => ({
+    forEachPlayerHated: mockForEachPlayerHated,
+    clearMobAggro: mockClearMobAggro,
+  }),
+}));
+
 import { CombatSystem, Entity, WorldContext, Message } from '../combat/combat-system';
 
 describe('CombatSystem', () => {
@@ -79,7 +90,6 @@ describe('CombatSystem', () => {
       armorLevel: 3,
       group: 'zone1',
       target: null,
-      hatelist: [],
       increaseHateFor: vi.fn(),
       getHatedPlayerId: vi.fn(() => 1),
       setTarget: vi.fn(),
@@ -89,6 +99,10 @@ describe('CombatSystem', () => {
       despawn: vi.fn(() => ({ serialize: () => [3, 100] })),
       drop: vi.fn((item) => ({ serialize: () => [4, item.id] })),
     };
+
+    // Reset CombatTracker mocks
+    mockForEachPlayerHated.mockReset();
+    mockClearMobAggro.mockReset();
 
     // Create mock world context
     mockWorld = {
@@ -180,19 +194,26 @@ describe('CombatSystem', () => {
   });
 
   describe('clearMobHateLinks', () => {
-    it('should remove mob from all hated players', () => {
+    it('should remove mob from all hated players via CombatTracker', () => {
       const player2 = { ...mockPlayer, id: 2, removeHater: vi.fn() };
-      mockMob.hatelist = [{ id: 1 }, { id: 2 }];
       mockWorld.getEntityById = vi.fn((id) => {
         if (id === 1) return mockPlayer;
         if (id === 2) return player2;
         return undefined;
       });
 
+      // Mock CombatTracker to iterate over player IDs 1 and 2
+      mockForEachPlayerHated.mockImplementation((mobId, callback) => {
+        callback(1);
+        callback(2);
+      });
+
       combatSystem.clearMobHateLinks(mockMob);
 
+      expect(mockForEachPlayerHated).toHaveBeenCalledWith(100, expect.any(Function));
       expect(mockPlayer.removeHater).toHaveBeenCalledWith(mockMob);
       expect(player2.removeHater).toHaveBeenCalledWith(mockMob);
+      expect(mockClearMobAggro).toHaveBeenCalledWith(100);
     });
   });
 

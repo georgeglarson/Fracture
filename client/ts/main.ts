@@ -3,7 +3,6 @@ import {Game} from './game';
 import {Detect} from './utils/detect';
 import {VolumeUI} from './ui/volume-ui';
 import {TitleAnimation} from './ui/title-animation';
-import * as _ from 'lodash';
 
 
 var app, game;
@@ -421,7 +420,7 @@ var initGame = function () {
       }
       if (key === 27) { // ESC
         app.hideWindows();
-        _.each(game.player.attackers, function (attacker) {
+        Object.values(game.player.attackers).forEach(function (attacker: any) {
           attacker.stop();
         });
         return false;

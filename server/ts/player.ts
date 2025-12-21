@@ -1,5 +1,4 @@
 // Fracture Player - with AI Narrator integration
-import * as _ from 'lodash';
 import {FormatChecker} from './format';
 import {Character} from './character';
 import {Connection, Server} from './ws';
@@ -8,6 +7,7 @@ import {Utils} from './utils';
 import {World} from './world';
 import {Messages} from './message';
 import {Formulas} from './formulas';
+import {getCombatTracker} from './combat/combat-tracker';
 import type {Mob} from './mob';
 import type {Checkpoint} from './checkpoint';
 import type {Item} from './item';
@@ -54,7 +54,6 @@ export class Player extends Character {
 
   hasEnteredGame = false;
   isDead = false;
-  haters: Record<number | string, Mob> = {};
   lastCheckpoint: Checkpoint | null = null;
   disconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   formatChecker: FormatChecker;
@@ -186,10 +185,12 @@ export class Player extends Character {
     });
     this.attackers = {};
 
+    // Tell each mob that has aggro on us to forget us
     this.forEachHater(function (mob) {
       mob.forgetPlayer(self.id);
     });
-    this.haters = {};
+    // CombatTracker is the single source of truth - clear all aggro for this player
+    getCombatTracker().clearPlayerAggro(this.id as number);
   }
 
   getState() {
@@ -293,24 +294,31 @@ export class Player extends Character {
     return new Messages.EquipItem(this, item);
   }
 
-  addHater(mob: Mob) {
-    if (mob) {
-      if (!(mob.id in this.haters)) {
-        this.haters[mob.id] = mob;
-      }
-    }
+  /**
+   * Add a mob to the player's haters list (mob has aggro on player)
+   * Note: CombatTracker is the source of truth - this is called from combat-system
+   * when mob.increaseHateFor() establishes the aggro relationship
+   */
+  addHater(_mob: Mob) {
+    // No-op: CombatTracker tracks this via mob.increaseHateFor() -> addAggro()
+    // Keeping method signature for interface compatibility
   }
 
-  removeHater(mob: Mob) {
-    if (mob && mob.id in this.haters) {
-      delete this.haters[mob.id];
-    }
+  /**
+   * Remove a mob from the player's haters list
+   * Note: CombatTracker is the source of truth - this is called when aggro is cleared
+   */
+  removeHater(_mob: Mob) {
+    // No-op: CombatTracker tracks this via mob.forgetPlayer() -> removeAggro()
+    // Keeping method signature for interface compatibility
   }
 
+  /**
+   * Iterate over all mobs that have aggro on this player
+   * Queries CombatTracker directly - no local cache
+   */
   forEachHater(callback: (mob: Mob) => void) {
-    _.each(this.haters, function (mob) {
-      callback(mob);
-    });
+    getCombatTracker().forEachMobAttackingWithEntity<Mob>(this.id as number, callback);
   }
 
   // ============================================================================

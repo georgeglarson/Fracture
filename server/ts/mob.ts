@@ -1,16 +1,11 @@
 import {Character} from './character';
 import {Properties} from './properties';
-import * as _ from 'lodash';
 import {Messages} from './message';
 import {ChestArea} from './chestarea';
 import {MobArea} from './mobarea';
 import {Utils} from './utils';
+import {getCombatTracker} from './combat/combat-tracker';
 import type {Item} from './item';
-
-interface HateEntry {
-  id: number;
-  hate: number;
-}
 
 // Message return type
 interface SerializableMessage {
@@ -24,7 +19,6 @@ export class Mob extends Character {
   armorLevel: number;
   weaponLevel: number;
   aggroRange: number;
-  hatelist: HateEntry[] = [];
   respawnTimeout: ReturnType<typeof setTimeout> | null = null;
   returnTimeout: ReturnType<typeof setTimeout> | null = null;
   isDead: boolean = false;
@@ -44,7 +38,8 @@ export class Mob extends Character {
 
   destroy(): void {
     this.isDead = true;
-    this.hatelist = [];
+    // Clear all aggro relationships in CombatTracker
+    getCombatTracker().clearMobAggro(this.id as number);
     this.clearTarget();
     this.updateHitPoints();
     this.resetPosition();
@@ -57,23 +52,12 @@ export class Mob extends Character {
   }
 
   hates(playerId: number): boolean {
-    return _.some(this.hatelist, function (obj: HateEntry) {
-      return obj.id === playerId;
-    });
+    return getCombatTracker().hasAggro(this.id as number, playerId);
   }
 
   increaseHateFor(playerId: number, points: number): void {
-    if (this.hates(playerId)) {
-      const found = _.find(this.hatelist, function (obj: HateEntry) {
-        return obj.id === playerId;
-      });
-      if (found) {
-        found.hate += points;
-      }
-    }
-    else {
-      this.hatelist.push({id: playerId, hate: points});
-    }
+    // Add aggro through CombatTracker (handles both new and existing hate)
+    getCombatTracker().addAggro(this.id as number, playerId, points);
 
     if (this.returnTimeout) {
       // Prevent the mob from returning to its spawning position
@@ -84,37 +68,21 @@ export class Mob extends Character {
   }
 
   getHatedPlayerId(hateRank?: number): number | undefined {
-    var i: number, playerId: number | undefined,
-      sorted = _.sortBy(this.hatelist, function (obj: HateEntry) {
-        return obj.hate;
-      }),
-      size = _.size(this.hatelist);
-
-    if (hateRank && hateRank <= size) {
-      i = size - hateRank;
-    }
-    else {
-      i = size - 1;
-    }
-    if (sorted && sorted[i]) {
-      playerId = sorted[i].id;
-    }
-
-    return playerId;
+    const tracker = getCombatTracker();
+    const result = tracker.getHatedPlayerId(this.id as number, hateRank ?? 1);
+    return result ?? undefined;
   }
 
   forgetPlayer(playerId: number, duration?: number): void {
-    this.hatelist = _.reject(this.hatelist, function (obj: HateEntry) {
-      return obj.id === playerId;
-    });
+    getCombatTracker().removeAggro(this.id as number, playerId);
 
-    if (this.hatelist.length === 0) {
+    if (getCombatTracker().getMobAggroCount(this.id as number) === 0) {
       this.returnToSpawningPosition(duration);
     }
   }
 
   forgetEveryone(): void {
-    this.hatelist = [];
+    getCombatTracker().clearMobAggro(this.id as number);
     this.returnToSpawningPosition(1);
   }
 

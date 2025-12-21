@@ -263,7 +263,9 @@ export class RoamingBoss extends Mob {
     if (!this.world || this.hasTarget()) return;
 
     let closestPlayer: PlayerLike | null = null;
-    let closestDistance = this.aggroRange;
+    // this.aggroRange is in TILES, convert to PIXELS (16 pixels per tile)
+    const aggroRangePixels = this.aggroRange * 16;
+    let closestDistance = aggroRangePixels;
 
     // Check all players
     const players = this.world.players;
@@ -271,6 +273,7 @@ export class RoamingBoss extends Mob {
       const player = players[playerId];
       if (!player || player.isDead) continue;
 
+      // Utils.distanceTo returns Chebyshev distance in PIXELS
       const distance = Utils.distanceTo(this.x, this.y, player.x, player.y);
 
       if (distance < closestDistance) {

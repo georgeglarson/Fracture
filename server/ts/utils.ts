@@ -1,11 +1,26 @@
-import * as sanitizer from 'sanitizer';
 import {Types} from '../../shared/ts/gametypes';
+
+// HTML entities for escaping
+const HTML_ENTITIES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#x27;'
+};
 
 export class Utils {
 
+  /**
+   * Sanitize user input by stripping HTML tags and escaping entities.
+   * This prevents XSS attacks in chat messages and player names.
+   */
   static sanitize(string: string): string {
-    // Strip unsafe tags, then escape as html entities.
-    return sanitizer.escape(sanitizer.sanitize(string));
+    if (!string) return '';
+    // Strip HTML tags
+    const stripped = string.replace(/<[^>]*>/g, '');
+    // Escape HTML entities
+    return stripped.replace(/[&<>"']/g, (char) => HTML_ENTITIES[char] || char);
   }
 
   static random(range: number): number {
@@ -64,4 +79,59 @@ export class Utils {
 
     return (distX > distY) ? distX : distY;
   }
+}
+
+// ============================================================================
+// Entity ID Normalization & Type Guards
+// ============================================================================
+
+/**
+ * Normalize entity IDs to numbers.
+ * IDs in the codebase are sometimes strings, sometimes numbers.
+ * This function ensures consistent number-based comparison.
+ */
+export function normalizeId(id: string | number): number {
+  if (typeof id === 'number') return id;
+  const parsed = parseInt(id, 10);
+  if (isNaN(parsed)) {
+    console.error(`[normalizeId] Invalid ID: ${id}`);
+    return 0;
+  }
+  return parsed;
+}
+
+/**
+ * Type guard: Check if entity is a human Player (not AIPlayer).
+ * Both Player and AIPlayer have type === 'player', so we check isAI flag.
+ */
+export function isPlayer(entity: any): boolean {
+  return entity?.type === 'player' && !entity.isAI;
+}
+
+/**
+ * Type guard: Check if entity is an AIPlayer.
+ */
+export function isAIPlayer(entity: any): boolean {
+  return entity?.type === 'player' && entity.isAI === true;
+}
+
+/**
+ * Type guard: Check if entity is a Mob.
+ */
+export function isMob(entity: any): boolean {
+  return entity?.type === 'mob';
+}
+
+/**
+ * Type guard: Check if entity is an NPC.
+ */
+export function isNpc(entity: any): boolean {
+  return entity?.type === 'npc';
+}
+
+/**
+ * Type guard: Check if entity is an Item.
+ */
+export function isItem(entity: any): boolean {
+  return entity?.type === 'item';
 }

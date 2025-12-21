@@ -21,7 +21,6 @@ import {GameClient} from './network/gameclient';
 import {ClientEvents} from './network/client-events';
 import {Mobs} from './entity/character/mob/mobs';
 import {Exceptions} from './exceptions';
-import _ from 'lodash';
 import {Entity} from './entity/entity';
 import {Renderer} from './renderer/renderer';
 import {GridManager} from './world/grid-manager';
@@ -46,7 +45,6 @@ import {InventoryManager} from './inventory/inventory-manager';
 import {deserializeInventory, InventorySlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
 import {setupNetworkHandlers} from './network/message-handlers';
 import {ZoningManager} from './world/zoning-manager';
-import {InteriorManager} from './world/interior-manager';
 import {SpriteLoader} from './assets/sprite-loader';
 import {getAchievementById} from '../../shared/ts/achievements/achievement-data';
 import {FractureAtmosphere} from './ui/fracture-atmosphere';
@@ -98,7 +96,6 @@ export class Game {
   achievementUI: AchievementUI | null = null;
   skillBarUI: SkillBarUI | null = null;
   zoningManager: ZoningManager | null = null;
-  interiorManager: InteriorManager | null = null;
   spriteLoader: SpriteLoader | null = null;
   fractureAtmosphere: FractureAtmosphere | null = null;
   playerController: PlayerController | null = null;
@@ -304,7 +301,7 @@ export class Game {
 
     this.achievements = {};
 
-    _.each(this.achievements, function (obj) {
+    Object.values(this.achievements).forEach(function (obj: any) {
       if (!obj.isCompleted) {
         obj.isCompleted = function () {
           return true;
@@ -324,7 +321,7 @@ export class Game {
 
   getAchievementById(id) {
     var found = null;
-    _.each(this.achievements, function (achievement, key) {
+    Object.values(this.achievements).forEach(function (achievement: any) {
       if (achievement.id === parseInt(id)) {
         found = achievement;
       }
@@ -579,7 +576,7 @@ export class Game {
 
   initMusicAreas() {
     var self = this;
-    _.each(this.map.musicAreas, function (area) {
+    this.map.musicAreas.forEach(function (area) {
       self.audioManager.addArea(area.x, area.y, area.w, area.h, area.id);
     });
   }
@@ -628,7 +625,6 @@ export class Game {
         self.uiManager = bootstrapResult.uiManager;
         self.itemTooltip = bootstrapResult.itemTooltip;
         self.zoningManager = bootstrapResult.zoningManager;
-        self.interiorManager = bootstrapResult.interiorManager;
         self.playerController = bootstrapResult.playerController;
         self.interactionController = bootstrapResult.interactionController;
         self.questController = bootstrapResult.questController;
@@ -679,6 +675,19 @@ export class Game {
 
       // Update minimap
       this.minimapUI?.update();
+
+      // Safety check: If player has wandered outside camera viewport, recenter
+      // This catches edge cases where zone transitions fail to update camera
+      if (this.player && !this.isZoning() && !this.camera.isVisible(this.player)) {
+        console.warn('[Camera] Player outside viewport - recentering camera');
+        // If camera is stuck in fixed mode, reset to outdoor mode
+        if (this.camera.isViewportFixed()) {
+          console.warn('[Camera] Resetting stuck fixed viewport mode');
+          this.camera.setZoneViewport(this.camera.fullGridW, this.camera.fullGridH, false);
+        }
+        this.camera.focusEntity(this.player);
+        this.renderer.renderStaticCanvases();
+      }
     }
 
     if (!this.isStopped) {
@@ -738,24 +747,24 @@ export class Game {
     }
 
     this.client.on(ClientEvents.LIST, function (list: number[]) {
-      var entityIds = _.pluck(self.entities, 'id'),
-        knownIds = _.intersection(entityIds, list),
-        newIds = _.difference(list, knownIds);
+      var entityIds = Object.values(self.entities).map((e: Entity) => e.id),
+        knownIds = entityIds.filter((id) => list.includes(id)),
+        newIds = list.filter((id) => !knownIds.includes(id));
 
-      self.entityManager?.setObsoleteEntities(_.reject(self.entities, function (entity: Entity) {
-        return _.include(knownIds, entity.id) || entity.id === self.player.id;
+      self.entityManager?.setObsoleteEntities(Object.values(self.entities).filter(function (entity: Entity) {
+        return !knownIds.includes(entity.id) && entity.id !== self.player.id;
       }) as Entity[]);
 
       // Destroy entities outside of the player's zone group
       self.removeObsoleteEntities();
 
       // Ask the server for spawn information about unknown entities
-      if (_.size(newIds) > 0) {
+      if (newIds.length > 0) {
         self.client.sendWho(newIds);
       }
     });
 
-    this.client.on(ClientEvents.WELCOME, function (id: number, name: string, x: number, y: number, hp: number, level: number, xp: number, xpToNext: number, gold: number) {
+    this.client.on(ClientEvents.WELCOME, function (id: number, name: string, x: number, y: number, hp: number, maxHp: number, level: number, xp: number, xpToNext: number, gold: number) {
       console.info('Received player ID from server : ' + id);
       self.player.id = id;
       self.playerId = id;
@@ -763,7 +772,9 @@ export class Game {
       // sanitize and shorten names exceeding the allowed length.
       self.player.name = name;
       self.player.setGridPosition(x, y);
-      self.player.setMaxHitPoints(hp);
+      // Set max HP first, then current HP (they can differ if player had damage)
+      self.player.maxHitPoints = maxHp;
+      self.player.hitPoints = hp;
 
       self.updateBars();
       self.resetCamera();
@@ -968,7 +979,7 @@ export class Game {
     this.camera.forEachVisiblePosition(function (x, y) {
       if (!m.isOutOfBounds(x, y)) {
         if (self.renderingGrid[y][x]) {
-          _.each(self.renderingGrid[y][x], function (entity) {
+          Object.values(self.renderingGrid[y][x]).forEach(function (entity) {
             callback(entity);
           });
         }
@@ -998,13 +1009,13 @@ export class Game {
 
     if (m.isLoaded) {
       this.forEachVisibleTileIndex(function (tileIndex) {
-        if (_.isArray(m.data[tileIndex])) {
-          _.each(m.data[tileIndex], function (id: number) {
+        if (Array.isArray(m.data[tileIndex])) {
+          m.data[tileIndex].forEach(function (id: number) {
             callback(id - 1, tileIndex);
           });
         }
         else {
-          if (_.isNaN(m.data[tileIndex] - 1)) {
+          if (Number.isNaN(m.data[tileIndex] - 1)) {
             //throw Error("Tile number for index:"+tileIndex+" is NaN");
           } else {
             callback(m.data[tileIndex] - 1, tileIndex);
@@ -1019,7 +1030,7 @@ export class Game {
    */
   forEachAnimatedTile(callback) {
     if (this.animatedTiles) {
-      _.each(this.animatedTiles, function (tile) {
+      this.animatedTiles.forEach(function (tile) {
         callback(tile);
       });
     }
@@ -1087,7 +1098,7 @@ export class Game {
 
     if (this.pathfinder && character) {
       if (ignoreList) {
-        _.each(ignoreList, function (entity) {
+        ignoreList.forEach(function (entity) {
           self.pathfinder.ignoreEntity(entity);
         });
       }
@@ -1429,8 +1440,7 @@ export class Game {
   restart() {
     console.debug('Beginning restart');
 
-    // Reset interior state (fixes viewport stuck small after dying in building)
-    this.interiorManager?.reset();
+    // Reset camera after respawn
     this.camera.rescale();
 
     // Clear all bubbles
@@ -1851,10 +1861,18 @@ export class Game {
   }
 
   useInventorySlot(slotIndex: number) {
+    // Auto-init inventory if not yet initialized
+    if (!this.inventoryController) {
+      this.initInventory();
+    }
     InventoryHandler.useInventorySlot(this, slotIndex);
   }
 
   useFirstConsumable() {
+    // Auto-init inventory if not yet initialized (same as toggleInventory)
+    if (!this.inventoryController) {
+      this.initInventory();
+    }
     InventoryHandler.useFirstConsumable(this);
   }
 
@@ -2036,9 +2054,11 @@ export class Game {
         this.showNotification('War Cry! Enemies stunned');
         this.audioManager?.playSound('hurt');
       }
-      // Spawn particles in a ring around player
-      this.renderer?.particles.spawnHitParticles(entity.x, entity.y - 8, 12, '#ffff00');
-      this.renderer?.camera.shake(5, 150);
+      // Spawn particles in a ring around player - more particles for visibility
+      this.renderer?.particles.spawnHitParticles(entity.x, entity.y - 8, 24, '#ffff00');
+      this.renderer?.particles.spawnHitParticles(entity.x, entity.y - 8, 12, '#ffaa00');
+      // Stronger camera shake for impact
+      this.renderer?.camera.shake(8, 300);
     }
 
     // Handle Whirlwind - visual spin/damage effect

@@ -11,7 +11,6 @@ import { Npc } from '../entity/character/npc/npc';
 import { Chest } from '../entity/objects/chest';
 import { Item } from '../entity/objects/item';
 import { Types } from '../../../shared/ts/gametypes';
-import _ from 'lodash';
 
 export interface MapContext {
   width: number;
@@ -209,8 +208,9 @@ export class GridManager {
 
     const entities = this.entityGrid[y][x];
     let entity: Entity | null = null;
-    if (_.size(entities) > 0) {
-      entity = entities[_.keys(entities)[0]];
+    const keys = Object.keys(entities);
+    if (keys.length > 0) {
+      entity = entities[keys[0]];
     }
     return entity;
   }
@@ -245,10 +245,11 @@ export class GridManager {
     }
     const items = this.itemGrid[y][x];
     let item: Item | null = null;
+    const keys = Object.keys(items);
 
-    if (_.size(items) > 0) {
+    if (keys.length > 0) {
       // If there are potions/burgers stacked with equipment items on the same tile, always get expendable items first.
-      _.each(items, function (i: Item) {
+      Object.values(items).forEach(function (i: Item) {
         if (Types.isExpendableItem(i.kind)) {
           item = i;
         }
@@ -256,7 +257,7 @@ export class GridManager {
 
       // Else, get the first item of the stack
       if (!item) {
-        item = items[_.keys(items)[0]];
+        item = items[keys[0]];
       }
     }
     return item;
@@ -266,23 +267,23 @@ export class GridManager {
    * Returns true if an entity is located at the given position on the world grid.
    */
   isEntityAt(x: number, y: number): boolean {
-    return !_.isNull(this.getEntityAt(x, y));
+    return this.getEntityAt(x, y) !== null;
   }
 
   isMobAt(x: number, y: number): boolean {
-    return !_.isNull(this.getMobAt(x, y));
+    return this.getMobAt(x, y) !== null;
   }
 
   isItemAt(x: number, y: number): boolean {
-    return !_.isNull(this.getItemAt(x, y));
+    return this.getItemAt(x, y) !== null;
   }
 
   isNpcAt(x: number, y: number): boolean {
-    return !_.isNull(this.getNpcAt(x, y));
+    return this.getNpcAt(x, y) !== null;
   }
 
   isChestAt(x: number, y: number): boolean {
-    return !_.isNull(this.getChestAt(x, y));
+    return this.getChestAt(x, y) !== null;
   }
 
   /**
@@ -297,7 +298,7 @@ export class GridManager {
     const list = this.entityGrid[Y][X];
     let result = false;
 
-    _.each(list, function (entity: Entity) {
+    Object.values(list).forEach(function (entity: Entity) {
       if (entity instanceof Mob && entity.id !== mob.id) {
         result = true;
       }
@@ -314,7 +315,7 @@ export class GridManager {
     for (let i = x - radius, max_i = x + radius; i <= max_i; i += 1) {
       for (let j = y - radius, max_j = y + radius; j <= max_j; j += 1) {
         if (!this.map.isOutOfBounds(i, j)) {
-          _.each(this.renderingGrid[j][i], function (entity: Entity) {
+          Object.values(this.renderingGrid[j][i]).forEach(function (entity: Entity) {
             callback(entity);
           });
         }

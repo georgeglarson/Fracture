@@ -8,9 +8,7 @@
 import { Player } from '../entity/character/player/player';
 import { Npc } from '../entity/character/npc/npc';
 import { Chest } from '../entity/objects/chest';
-import { InteriorManager } from '../world/interior-manager';
 import { UnifiedZoneManager } from '../world/unified-zone-manager';
-import _ from 'lodash';
 
 /**
  * Dependencies injected into PlayerController
@@ -23,7 +21,6 @@ export interface PlayerControllerDeps {
   map: any;
   audioManager: any;
   storage: any;
-  interiorManager: InteriorManager;
   unifiedZoneManager: UnifiedZoneManager;
 
   // Game state accessors
@@ -323,7 +320,7 @@ export class PlayerController {
     this.deps.resetZone();
 
     // Coward achievement
-    if (_.size(this.player.attackers) > 0) {
+    if (Object.keys(this.player.attackers).length > 0) {
       setTimeout(() => this.deps.tryUnlockingAchievement('COWARD'), 500);
     }
 
@@ -357,10 +354,18 @@ export class PlayerController {
   private handleRequestPath(x: number, y: number): any {
     if (!this.player) return null;
 
-    const ignored = [this.player];
+    const ignored: any[] = [this.player];
     if (this.player.hasTarget()) {
       ignored.push(this.player.target);
     }
+
+    // When phased (Phase Shift skill), ignore all mobs for pathfinding
+    if ((this.player as any).isPhased) {
+      this.deps.forEachMob((mob: any) => {
+        ignored.push(mob);
+      });
+    }
+
     return this.deps.findPath(this.player, x, y, ignored);
   }
 

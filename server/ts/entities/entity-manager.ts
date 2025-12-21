@@ -72,24 +72,34 @@ export class EntityManager {
 
   // ========== Entity CRUD ==========
 
-  addEntity(entity: Entity): void {
+  /**
+   * Add entity to the manager
+   * @returns true if successfully added, false otherwise
+   */
+  addEntity(entity: Entity): boolean {
     try {
       if (!entity || entity.id === undefined) {
         console.error('[EntityManager] Cannot add invalid entity');
-        return;
+        return false;
       }
       this.entities[entity.id] = entity;
       this.groupContext?.handleEntityGroupMembership(entity);
+      return true;
     } catch (error) {
       console.error(`[EntityManager] Failed to add entity ${entity?.id}:`, error);
+      return false;
     }
   }
 
-  removeEntity(entity: Entity): void {
+  /**
+   * Remove entity from the manager
+   * @returns true if successfully removed, false otherwise
+   */
+  removeEntity(entity: Entity): boolean {
     try {
       if (!entity || entity.id === undefined) {
         console.error('[EntityManager] Cannot remove invalid entity');
-        return;
+        return false;
       }
 
       if (entity.id in this.entities) {
@@ -110,42 +120,68 @@ export class EntityManager {
       entity.destroy();
       this.groupContext?.removeFromGroups(entity);
       console.debug('Removed ' + Types.getKindAsString(entity.kind) + ' : ' + entity.id);
+      return true;
     } catch (error) {
       console.error(`[EntityManager] Failed to remove entity ${entity?.id}:`, error);
+      return false;
     }
   }
 
   // ========== Player Management ==========
 
-  addPlayer(player: Player): void {
+  /**
+   * Add player to the manager
+   * @returns true if successfully added, false otherwise
+   */
+  addPlayer(player: Player): boolean {
     try {
-      this.addEntity(player);
+      if (!this.addEntity(player)) {
+        return false;
+      }
       this.players[player.id] = player;
       this.broadcaster?.createQueue(player.id);
+      return true;
     } catch (error) {
       console.error(`[EntityManager] Failed to add player ${player?.id}:`, error);
+      return false;
     }
   }
 
-  removePlayer(player: Player): void {
+  /**
+   * Remove player from the manager
+   * @returns true if successfully removed, false otherwise
+   */
+  removePlayer(player: Player): boolean {
     try {
       player.broadcast(player.despawn?.());
-      this.removeEntity(player);
+      if (!this.removeEntity(player)) {
+        return false;
+      }
       delete this.players[player.id];
       this.broadcaster?.removeQueue(player.id);
+      return true;
     } catch (error) {
       console.error(`[EntityManager] Failed to remove player ${player?.id}:`, error);
+      return false;
     }
   }
 
   // ========== Mob Management ==========
 
-  addMob(mob: Mob): void {
+  /**
+   * Add mob to the manager
+   * @returns true if successfully added, false otherwise
+   */
+  addMob(mob: Mob): boolean {
     try {
-      this.addEntity(mob);
+      if (!this.addEntity(mob)) {
+        return false;
+      }
       this.mobs[mob.id] = mob;
+      return true;
     } catch (error) {
       console.error(`[EntityManager] Failed to add mob ${mob?.id}:`, error);
+      return false;
     }
   }
 
@@ -311,10 +347,9 @@ export class EntityManager {
   getEntityById(id: string | number): Entity | undefined {
     if (id in this.entities) {
       return this.entities[id];
-    } else {
-      console.error('Unknown entity : ' + id);
-      return undefined;
     }
+    // Don't log - this is a normal lookup miss, especially for AIPlayers
+    return undefined;
   }
 
   getPlayerCount(): number {

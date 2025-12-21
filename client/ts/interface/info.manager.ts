@@ -1,13 +1,11 @@
 import {Game} from '../game';
 import {DamageInfo} from './damage.info';
 
-import * as _ from 'lodash';
-
 export class InfoManager {
 
   game: Game;
-  infos = {};
-  destroyQueue = [];
+  infos: Record<string, DamageInfo> = {};
+  destroyQueue: string[] = [];
 
   constructor(game: Game) {
     this.game = game;
@@ -27,9 +25,7 @@ export class InfoManager {
   }
 
   forEachInfo(callback) {
-    var self = this;
-
-    _.each(this.infos, function (info, id) {
+    Object.values(this.infos).forEach(function (info) {
       callback(info);
     });
   }
@@ -41,7 +37,7 @@ export class InfoManager {
       info.update(time);
     });
 
-    _.each(this.destroyQueue, function (id) {
+    this.destroyQueue.forEach(function (id) {
       delete self.infos[id];
     });
     this.destroyQueue = [];

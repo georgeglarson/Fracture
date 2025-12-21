@@ -6,7 +6,6 @@ import {ParticleManager} from './particle-manager';
 import {Item} from '../entity/objects/item';
 import {Types} from '../../../shared/ts/gametypes';
 import {Detect} from '../utils/detect';
-import * as _ from 'lodash';
 
 export class Renderer {
 
@@ -266,7 +265,7 @@ export class Renderer {
     if (positions) {
       for (var i = 0; i < positions.length; i += 1) {
         for (var j = 0; j < positions[i].length; j += 1) {
-          if (!_.isNull(positions[i][j])) {
+          if (positions[i][j] !== null) {
             this.drawCellHighlight(i, j, 'rgba(50, 50, 255, 0.5)');
           }
         }
@@ -351,8 +350,8 @@ export class Renderer {
 
   drawScaledImage(ctx, image, x, y, w, h, dx, dy) {
     var s = this.upscaledRendering ? 1 : this.scale;
-    _.each(arguments, function (arg) {
-      if (_.isUndefined(arg) || _.isNaN(arg) || _.isNull(arg) || arg < 0) {
+    [ctx, image, x, y, w, h, dx, dy].forEach(function (arg) {
+      if (arg === undefined || Number.isNaN(arg) || arg === null || (typeof arg === 'number' && arg < 0)) {
         console.error('x:' + x + ' y:' + y + ' w:' + w + ' h:' + h + ' dx:' + dx + ' dy:' + dy, true);
         throw Error('A problem occured when trying to draw on the canvas');
       }

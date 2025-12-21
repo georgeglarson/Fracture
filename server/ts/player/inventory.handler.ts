@@ -99,7 +99,8 @@ export function handleInventoryPickup(ctx: InventoryPlayerContext, itemId: numbe
   // Add to inventory
   const slotIndex = inventory.addItem(item.kind, properties, 1);
   if (slotIndex === -1) {
-    console.log(`[Inventory] Failed to add item to inventory`);
+    console.log(`[Inventory] Failed to add item to inventory (race condition?)`);
+    ctx.send([Types.Messages.CHAT, 'Inventory full! Drop or sell items first.']);
     return;
   }
 
@@ -158,8 +159,17 @@ export function handleInventoryUse(ctx: InventoryPlayerContext, slotIndex: numbe
     if (healAmount > 0 && !ctx.hasFullHealth()) {
       ctx.regenHealthBy(healAmount);
       world.pushToPlayer(ctx, ctx.health());
+      inventory.removeItem(slotIndex, 1);
+      console.log(`[Inventory] ${ctx.name} healed for ${healAmount} HP`);
+    } else if (ctx.hasFullHealth()) {
+      // Don't consume if at full health - just notify
+      ctx.send([Types.Messages.CHAT, 'You are already at full health']);
+      console.log(`[Inventory] ${ctx.name} tried to heal at full health`);
+      return; // Don't consume the item
+    } else {
+      // Unknown consumable with 0 heal amount
+      inventory.removeItem(slotIndex, 1);
     }
-    inventory.removeItem(slotIndex, 1);
   }
 
   // Send update or remove based on remaining count
@@ -329,7 +339,8 @@ export function handleUnequipToInventory(ctx: InventoryPlayerContext, slot: stri
   // Add to inventory
   const slotIndex = inventory.addItem(currentKind, null, 1);
   if (slotIndex === -1) {
-    console.log(`[Inventory] Failed to add ${slot} to inventory`);
+    console.log(`[Inventory] Failed to add ${slot} to inventory (race condition?)`);
+    ctx.send([Types.Messages.CHAT, 'Inventory full! Drop or sell items first.']);
     return;
   }
 

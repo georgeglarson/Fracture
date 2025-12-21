@@ -5,7 +5,6 @@
 
 import { Sprite } from '../renderer/sprite';
 import { Types } from '../../../shared/ts/gametypes';
-import _ from 'lodash';
 
 export interface SpriteLoaderContext {
   renderer: {
@@ -88,7 +87,7 @@ export class SpriteLoader {
       this.sprites = this.spritesets[scale - 1];
 
       // Update all entities with new scale sprites
-      _.each(this.context.entities, (entity) => {
+      Object.values(this.context.entities).forEach((entity) => {
         entity.sprite = null;
         entity.setSprite(this.sprites[entity.getSpriteName()]);
       });
@@ -99,7 +98,7 @@ export class SpriteLoader {
    * Check if all sprites are loaded
    */
   spritesLoaded(): boolean {
-    return !_.any(this.sprites, (sprite: Sprite) => !sprite.isLoaded);
+    return !Object.values(this.sprites).some((sprite: Sprite) => !sprite.isLoaded);
   }
 
   /**

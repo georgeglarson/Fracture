@@ -1,6 +1,5 @@
 
 import {Types} from '../../shared/ts/gametypes';
-import * as _ from 'lodash';
 
 export class FormatChecker {
   formats: Record<number, string[]> = {};
@@ -79,10 +78,10 @@ export class FormatChecker {
         return false;
       }
       for (var i = 0, n = message.length; i < n; i += 1) {
-        if (format[i] === 'n' && !_.isNumber(message[i])) {
+        if (format[i] === 'n' && typeof message[i] !== 'number') {
           return false;
         }
-        if (format[i] === 's' && !_.isString(message[i])) {
+        if (format[i] === 's' && typeof message[i] !== 'string') {
           return false;
         }
       }
@@ -90,9 +89,7 @@ export class FormatChecker {
     }
     else if (type === Types.Messages.WHO) {
       // WHO messages have a variable amount of params, all of which must be numbers.
-      return message.length > 0 && _.all(message, function (param) {
-        return _.isNumber(param)
-      });
+      return message.length > 0 && message.every((param) => typeof param === 'number');
     }
     else {
       console.error('Unknown message type: ' + type);

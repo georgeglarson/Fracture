@@ -1,5 +1,4 @@
 import * as fs from 'fs';
-import * as _ from 'lodash';
 import {Checkpoint} from './checkpoint';
 import {Utils} from './utils';
 
@@ -158,7 +157,7 @@ export class Map {
       for (var j, i = 0; i < this.height; i++) {
         this.grid[i] = [];
         for (j = 0; j < this.width; j++) {
-          if (_.include(this.collisions, tileIndex)) {
+          if (this.collisions.includes(tileIndex)) {
             this.grid[i][j] = 1;
           } else {
             this.grid[i][j] = 0;
@@ -218,23 +217,25 @@ export class Map {
         pos(x - 1, y + 1), pos(x, y + 1), pos(x + 1, y + 1)];
 
     // groups connected via doors
-    _.each(this.connectedGroups[id], function (position: Position) {
-      // don't add a connected group if it's already part of the surrounding ones.
-      if (!_.some(list, function (groupPos: Position) {
-          return equalPositions(groupPos, position);
-        })) {
-        list.push(position);
-      }
-    });
+    if (this.connectedGroups[id]) {
+      this.connectedGroups[id].forEach(function (position: Position) {
+        // don't add a connected group if it's already part of the surrounding ones.
+        if (!list.some(function (groupPos: Position) {
+            return equalPositions(groupPos, position);
+          })) {
+          list.push(position);
+        }
+      });
+    }
 
-    return _.reject(list, function (p: Position) {
-      return p.x < 0 || p.y < 0 || p.x >= self.groupWidth || p.y >= self.groupHeight;
+    return list.filter(function (p: Position) {
+      return p.x >= 0 && p.y >= 0 && p.x < self.groupWidth && p.y < self.groupHeight;
     });
   }
 
   forEachAdjacentGroup(groupId: string, callback: (groupId: string) => void) {
     if (groupId) {
-      _.each(this.getAdjacentGroupPositions(groupId), function (p: Position) {
+      this.getAdjacentGroupPositions(groupId).forEach(function (p: Position) {
         callback(p.x + '-' + p.y);
       });
     }
@@ -244,7 +245,7 @@ export class Map {
     var self = this;
 
     this.connectedGroups = {};
-    _.each(doors, function (door: DoorData) {
+    doors.forEach(function (door: DoorData) {
       var groupId = self.getGroupIdFromPosition(door.x, door.y),
         connectedGroupId = self.getGroupIdFromPosition(door.tx, door.ty),
         connectedPosition = self.GroupIdToGroupPosition(connectedGroupId);
@@ -263,7 +264,7 @@ export class Map {
     this.checkpoints = {};
     this.startingAreas = [];
 
-    _.each(cpList, function (cp: CheckpointData) {
+    cpList.forEach(function (cp: CheckpointData) {
       var checkpoint = new Checkpoint(cp.id, cp.x, cp.y, cp.w, cp.h);
       self.checkpoints[checkpoint.id] = checkpoint;
       if (cp.s === 1) {
@@ -277,7 +278,7 @@ export class Map {
   }
 
   getRandomStartingPosition() {
-    var nbAreas = _.size(this.startingAreas);
+    var nbAreas = this.startingAreas.length;
     var i = Utils.randomInt(0, nbAreas - 1);
     var area = this.startingAreas[i];
 

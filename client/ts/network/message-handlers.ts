@@ -12,7 +12,6 @@ import { Mobs } from '../entity/character/mob/mobs';
 import { Item } from '../entity/objects/item';
 import { Chest } from '../entity/objects/chest';
 import { Npc } from '../entity/character/npc/npc';
-import _ from 'lodash';
 
 import type { Game } from '../game';
 import type { GameClient } from './gameclient';
@@ -79,7 +78,6 @@ export function setupNetworkHandlers(game: Game, client: GameClient): void {
   setupZoneHandlers(game, client);
   setupBossHandlers(game, client);
   setupSkillHandlers(game, client);
-  setupProgressionHandlers(game, client);
   setupRiftHandlers(game, client);
 }
 
@@ -384,20 +382,23 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
         }
 
         // Auto-retaliate: fight back when hurt if not already attacking
+        // Only retaliate against attackers within melee range (3 tiles)
+        const MELEE_RANGE_TILES = 3;
         if (!player.isAttacking()) {
           let nearestAttacker: any = null;
           let nearestDist = Infinity;
           player.forEachAttacker((attacker: any) => {
             if (attacker && !attacker.isDead) {
               const dist = player.getDistanceToEntity(attacker);
-              if (dist < nearestDist) {
+              // Only consider attackers within melee range
+              if (dist <= MELEE_RANGE_TILES && dist < nearestDist) {
                 nearestDist = dist;
                 nearestAttacker = attacker;
               }
             }
           });
           if (nearestAttacker) {
-            console.debug('[Auto-retaliate] Fighting back against', nearestAttacker.id);
+            console.debug('[Auto-retaliate] Fighting back against', nearestAttacker.id, 'at distance', nearestDist);
             game.makePlayerAttack(nearestAttacker);
           }
         }
@@ -500,20 +501,40 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
     }
 
     // Auto-retaliate: if player is attacked while idle, fight back
+    // Only retaliate if attacker is within melee range (3 tiles)
+    const MELEE_RANGE_TILES = 3;
     if (targetId === game.playerId && attacker && game.player && !game.player.target) {
-      console.debug('[Auto-retaliate] Player attacked by ' + attacker.id + ', fighting back');
-      game.makePlayerAttack(attacker);
+      const distance = game.player.getDistanceToEntity(attacker);
+      if (distance <= MELEE_RANGE_TILES) {
+        console.debug('[Auto-retaliate] Player attacked by ' + attacker.id + ' at distance ' + distance + ', fighting back');
+        game.makePlayerAttack(attacker);
+      } else {
+        console.debug('[Auto-retaliate] Attacker ' + attacker.id + ' too far away (' + distance + ' tiles), ignoring');
+      }
     }
 
-    if (attacker && target && attacker.id !== game.playerId) {
-      console.debug(attacker.id + ' attacks ' + target.id);
+    if (attacker && attacker.id !== game.playerId) {
+      if (target) {
+        console.debug(attacker.id + ' attacks ' + target.id);
 
-      if (target instanceof Player && target.id !== game.playerId && target.target && target.target.id === attacker.id && attacker.getDistanceToEntity(target) < 3) {
-        setTimeout(function () {
+        if (target instanceof Player && target.id !== game.playerId && target.target && target.target.id === attacker.id && attacker.getDistanceToEntity(target) < 3) {
+          setTimeout(function () {
+            game.createAttackLink(attacker, target);
+          }, 200);
+        } else {
           game.createAttackLink(attacker, target);
-        }, 200);
+        }
       } else {
-        game.createAttackLink(attacker, target);
+        // Target doesn't exist on client (e.g., AIPlayer not spawned yet)
+        // CRITICAL: Call disengage() to clear both attackingMode AND target
+        // Just removeTarget() leaves attackingMode=true, causing mob to keep attacking old target
+        // Also clear previousTarget to prevent re-engaging old player target in tick loop
+        console.debug('[ATTACK] Target ' + targetId + ' not found, disengaging attacker ' + attacker.id);
+        if (attacker.disengage) {
+          attacker.disengage();
+          attacker.idle();
+          attacker.previousTarget = null;
+        }
       }
     }
   });
@@ -670,6 +691,9 @@ function setupAIHandlers(game: Game, client: GameClient): void {
   });
 
   client.on(ClientEvents.CHAT, function (entityId, message) {
+    // Guard against undefined messages
+    if (!message) return;
+
     // System messages should be shown as notifications, not chat bubbles
     const systemMessages = [
       'Inventory full',
@@ -677,7 +701,7 @@ function setupAIHandlers(game: Game, client: GameClient): void {
       'Not enough gold'
     ];
 
-    const isSystemMessage = systemMessages.some(prefix => message.startsWith(prefix));
+    const isSystemMessage = message && systemMessages.some(prefix => message.startsWith(prefix));
 
     if (isSystemMessage) {
       // Show as toast notification instead of chat bubble
@@ -728,13 +752,6 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
 
     if (game.levelup_callback) {
       game.levelup_callback(newLevel, bonusHP, bonusDamage);
-    }
-
-    // Show "Hire Me" banner for 5 seconds on level up
-    const hireMe = document.getElementById('hire-me');
-    if (hireMe) {
-      hireMe.classList.add('visible');
-      setTimeout(() => hireMe.classList.remove('visible'), 5000);
     }
   });
 

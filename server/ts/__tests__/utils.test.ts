@@ -26,8 +26,8 @@ describe('Utils', () => {
 
     it('should escape quotes', () => {
       const result = Utils.sanitize('Say "hello"');
-      // sanitizer uses numeric entity &#34; instead of &quot;
-      expect(result).toContain('&#34;');
+      // sanitizer uses &quot; for double quotes
+      expect(result).toContain('&quot;');
     });
 
     it('should handle empty string', () => {

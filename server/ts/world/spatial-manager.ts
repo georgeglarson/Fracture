@@ -3,7 +3,6 @@
  * Single Responsibility: Spatial partitioning for entity visibility and messaging
  */
 
-import * as _ from 'lodash';
 import { Chest } from '../chest.js';
 import { Item } from '../item.js';
 import { Messages } from '../message.js';
@@ -82,8 +81,8 @@ export class SpatialManager {
 
       // Check type instead of instanceof to support AIPlayer
       if (entity.type === 'player') {
-        group.players = _.reject(group.players, function(id) {
-          return id === entity.id;
+        group.players = group.players.filter(function(id) {
+          return id !== entity.id;
         });
       }
 
@@ -113,7 +112,7 @@ export class SpatialManager {
         const group = self.groups[id];
 
         if (group) {
-          if (!_.include(group.entities, entity.id)
+          if (!(entity.id in group.entities)
             // Items dropped off of mobs are handled differently via DROP messages. See handleHurtEntity.
             && (!isItem || isChest || (isItem && !isDroppedItem))) {
             group.incoming.push(entity);
@@ -151,7 +150,7 @@ export class SpatialManager {
    */
   logGroupPlayers(groupId: string): void {
     console.debug('Players inside group ' + groupId + ':');
-    _.each(this.groups[groupId].players, function(id) {
+    this.groups[groupId].players.forEach(function(id) {
       console.debug('- player ' + id);
     });
   }
@@ -172,8 +171,8 @@ export class SpatialManager {
         const oldGroups = this.removeFromGroups(entity);
         const newGroups = this.addToGroup(entity, groupId);
 
-        if (_.size(oldGroups) > 0) {
-          entity.recentlyLeftGroups = _.difference(oldGroups, newGroups);
+        if (oldGroups.length > 0) {
+          entity.recentlyLeftGroups = oldGroups.filter(g => !newGroups.includes(g));
           console.debug('group diff: ' + entity.recentlyLeftGroups);
         }
       }
@@ -193,7 +192,7 @@ export class SpatialManager {
     if (this.zoneGroupsReady && this.map && this.broadcaster) {
       this.map.forEachGroup(function(id) {
         if (self.groups[id].incoming.length > 0) {
-          _.each(self.groups[id].incoming, function(entity) {
+          self.groups[id].incoming.forEach(function(entity) {
             // Check type instead of instanceof to support AIPlayer
             if (entity.type === 'player') {
               self.broadcaster!.pushToGroup(id, new Messages.Spawn(entity), entity.id);

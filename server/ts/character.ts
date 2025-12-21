@@ -1,5 +1,5 @@
 import {Entity} from './entity';
-import {Utils} from './utils';
+import {Utils, normalizeId} from './utils';
 import {Messages} from './message';
 
 // Message return type for serializable messages
@@ -14,6 +14,9 @@ export abstract class Character extends Entity {
   target: number | null = null;
   maxHitPoints: number = 0;
   hitPoints: number = 0;
+
+  /** Flag to distinguish AIPlayer from human Player (both have type === 'player') */
+  isAI: boolean = false;
 
   constructor(id: string | number, type: string, kind: number, x: number, y: number) {
     super(id, type, kind, x, y);
@@ -82,14 +85,20 @@ export abstract class Character extends Entity {
 
   addAttacker(entity: Character): void {
     if (entity) {
-      this.attackers[entity.id] = entity;
+      // Normalize ID for consistent key lookup
+      const key = normalizeId(entity.id);
+      this.attackers[key] = entity;
     }
   }
 
   removeAttacker(entity: Character): void {
-    if (entity && entity.id in this.attackers) {
-      delete this.attackers[entity.id];
-      console.debug(this.id + " REMOVED ATTACKER " + entity.id);
+    if (entity) {
+      // Normalize ID for consistent key lookup
+      const key = normalizeId(entity.id);
+      if (key in this.attackers) {
+        delete this.attackers[key];
+        console.debug(this.id + " REMOVED ATTACKER " + key);
+      }
     }
   }
 

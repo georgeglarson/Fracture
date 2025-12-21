@@ -1,4 +1,3 @@
-import * as _ from 'lodash';
 import {Utils} from './utils';
 import type {Entity} from './entity';
 
@@ -50,8 +49,10 @@ export class Area {
   }
 
   removeFromArea(entity: AreaEntity): void {
-    var i = _.indexOf(_.map(this.entities, 'id'), entity.id);
-    this.entities.splice(i, 1);
+    var i = this.entities.findIndex(e => e.id === entity.id);
+    if (i >= 0) {
+      this.entities.splice(i, 1);
+    }
 
     if (this.isEmpty() && this.hasCompletelyRespawned && this.empty_callback) {
       this.hasCompletelyRespawned = false;
@@ -75,13 +76,11 @@ export class Area {
   }
 
   isEmpty(): boolean {
-    return !_.some(this.entities, function (entity: AreaEntity) {
-      return !entity.isDead
-    });
+    return !this.entities.some((entity: AreaEntity) => !entity.isDead);
   }
 
   isFull(): boolean {
-    return !this.isEmpty() && (this.nbEntities === _.size(this.entities));
+    return !this.isEmpty() && (this.nbEntities === this.entities.length);
   }
 
   onEmpty(callback: () => void): void {

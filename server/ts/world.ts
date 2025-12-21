@@ -1,16 +1,16 @@
-import * as _ from 'lodash';
 import {Messages} from './message';
 import {Types} from '../../shared/ts/gametypes';
 import {Chest} from './chest';
 import {Item} from './item';
 import {Properties} from './properties';
 import {Mob} from './mob';
-import {Utils} from './utils';
+import {Utils, isMob} from './utils';
 import {Map} from './map';
 import {getVeniceService} from './ai/venice.service';
 import {AIPlayerManager} from './ai/aiplayer';
 import {MessageBroadcaster} from './messaging/message-broadcaster';
 import {CombatSystem} from './combat/combat-system';
+import {getCombatTracker} from './combat/combat-tracker';
 import {nemesisService} from './combat/nemesis.service';
 import {EntityManager} from './entities/entity-manager';
 import {SpatialManager, Group} from './world/spatial-manager';
@@ -143,6 +143,8 @@ export class World {
         console.debug(player.name + ' is moving to (' + x + ', ' + y + ').');
 
         player.forEachAttacker(function (attacker) {
+          // Use type guard to ensure attacker is a Mob before using Mob-specific methods
+          if (!isMob(attacker)) return;
           const mob = attacker as Mob;
           if (!mob.target) return;
           var target = self.getEntityById(mob.target);
@@ -254,10 +256,10 @@ export class World {
         totalEntities += entities.length;
 
         // Only process a random subset to avoid spam (max 3 per group per tick)
-        // lodash 3.x uses _.sample(collection, n) instead of _.sampleSize
-        const toProcess = _.sample(entities, Math.min(3, entities.length)) as Entity[];
+        const shuffled = [...entities].sort(() => Math.random() - 0.5);
+        const toProcess = shuffled.slice(0, Math.min(3, entities.length));
 
-        _.each(toProcess, function (entity: Entity) {
+        toProcess.forEach(function (entity: Entity) {
           // Determine state
           let state: 'idle' | 'combat' | 'playerNearby' = 'idle';
           const charEntity = entity as Character;
@@ -298,13 +300,24 @@ export class World {
           return;
         }
 
+        // Skip if mob is stunned (War Cry effect)
+        if ((mob as any).stunUntil && Date.now() < (mob as any).stunUntil) {
+          return;
+        }
+
         let closestPlayer: Player | null = null;
-        let closestDistance = mob.aggroRange;
+        // mob.aggroRange is in TILES, convert to PIXELS (16 pixels per tile)
+        const aggroRangePixels = mob.aggroRange * 16;
+        let closestDistance = aggroRangePixels;
 
         // Check all players
         self.forEachPlayer(function(player: Player) {
           if (!player || player.isDead) return;
 
+          // Skip phased players (Phase Shift effect) - they are invisible
+          if (player.isPhased && player.isPhased()) return;
+
+          // Utils.distanceTo returns Chebyshev distance in PIXELS
           const distance = Utils.distanceTo(mob.x, mob.y, player.x, player.y);
 
           if (distance < closestDistance) {
@@ -316,7 +329,7 @@ export class World {
         // Aggro closest player if found
         if (closestPlayer) {
           // Add initial hate points based on distance (closer = more hate)
-          const hatePoints = Math.max(1, Math.floor((mob.aggroRange - closestDistance) * 10));
+          const hatePoints = Math.max(1, Math.floor((aggroRangePixels - closestDistance) / 16 * 10));
           mob.increaseHateFor(closestPlayer.id, hatePoints);
           self.handleMobHate(mob.id, closestPlayer.id, hatePoints);
 
@@ -375,6 +388,10 @@ export class World {
       // Wire entity manager dependencies
       self.entityManager!.setBroadcaster(self.broadcaster!);
       self.entityManager!.setCombatSystem(self.combatSystem!);
+
+      // Initialize CombatTracker with entity lookup
+      const combatTracker = getCombatTracker();
+      combatTracker.setEntityLookup((id: number) => self.getEntityById(id));
 
       // Initialize nemesis service context
       nemesisService.setContext({
@@ -495,17 +512,11 @@ export class World {
   }
 
   pushRelevantEntityListTo(player: Player) {
-    var entities;
-
     if (player && (player.group! in this.groups)) {
-      entities = _.keys(this.groups[player.group!].entities);
-      entities = _.reject(entities, function (id: string) {
-        return id == String(player.id);
-      });
-      entities = _.map(entities, function (id: string) {
-        return parseInt(id);
-      });
-      if (entities) {
+      const entities = Object.keys(this.groups[player.group!].entities)
+        .filter(id => id !== String(player.id))
+        .map(id => parseInt(id));
+      if (entities.length > 0) {
         this.pushToPlayer(player, new Messages.List(entities));
       }
     }
@@ -514,14 +525,24 @@ export class World {
   pushSpawnsToPlayer(player: Player, ids: number[]) {
     var self = this;
 
-    _.each(ids, function (id: number) {
+    // Sort IDs so players (including AIPlayers with id >= 100000) are sent first
+    // This ensures mobs' targets are known before the mobs spawn
+    const sortedIds = [...ids].sort((a, b) => {
+      const aIsPlayer = a >= 100000 || Types.isPlayer(self.getEntityById(a)?.kind ?? 0);
+      const bIsPlayer = b >= 100000 || Types.isPlayer(self.getEntityById(b)?.kind ?? 0);
+      if (aIsPlayer && !bIsPlayer) return -1;
+      if (!aIsPlayer && bIsPlayer) return 1;
+      return 0;
+    });
+
+    sortedIds.forEach(function (id: number) {
       var entity = self.getEntityById(id);
       if (entity) {
         self.pushToPlayer(player, new Messages.Spawn(entity));
       }
     });
 
-    console.debug('Pushed ' + _.size(ids) + ' new spawns to ' + player.id);
+    console.debug('Pushed ' + sortedIds.length + ' new spawns to ' + player.id);
   }
 
   pushToPlayer(player: Player, message: { serialize(): unknown[] }) {
@@ -664,7 +685,7 @@ export class World {
   // spawnStaticEntities() moved to SpawnManager
 
   isValidPosition(x: number, y: number) {
-    if (this.map && _.isNumber(x) && _.isNumber(y) && !this.map.isOutOfBounds(x, y) && !this.map.isColliding(x, y)) {
+    if (this.map && typeof x === 'number' && typeof y === 'number' && !this.map.isOutOfBounds(x, y) && !this.map.isColliding(x, y)) {
       return true;
     }
     return false;

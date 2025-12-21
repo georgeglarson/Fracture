@@ -1,6 +1,5 @@
 import {Storage} from './utils/storage';
 import {Config} from './config';
-import * as _ from 'lodash';
 import {IntroSequence} from './ui/intro-sequence';
 
 export class App {
@@ -402,6 +401,22 @@ export class App {
     if ($('body').hasClass('about')) {
       this.closeInGameAbout();
     }
+    // Close shop popup if open
+    if (this.game?.shopUI?.isOpen()) {
+      this.game.shopUI.hide();
+    }
+    // Close inventory if open
+    if (this.game?.inventoryUI?.isVisible()) {
+      this.game.inventoryUI.hide();
+    }
+    // Close newspaper if open
+    if (this.game?.uiManager?.isNewspaperVisible?.()) {
+      this.game.toggleNewspaper?.();
+    }
+    // Close quest UI if open
+    if (this.game?.questUI?.isTrackerVisible?.()) {
+      this.game.questUI?.hide?.();
+    }
   }
 
   showAchievementNotification(id, name) {
@@ -449,7 +464,7 @@ export class App {
       count = 0,
       $p = null;
 
-    _.each(achievements, function (achievement) {
+    Object.values(achievements).forEach(function (achievement: any) {
       count++;
 
       var $a = $achievement.clone();
@@ -483,7 +498,7 @@ export class App {
   initUnlockedAchievements(ids) {
     var self = this;
 
-    _.each(ids, function (id) {
+    ids.forEach(function (id: any) {
       self.displayUnlockedAchievement(id);
     });
     $('#unlocked-achievements').text(ids.length);

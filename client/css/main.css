@@ -425,35 +425,71 @@ footer, header, hgroup, menu, nav, section {
     /* Fracture Logo - CSS Text */
     #logo {font-family:'GraphicPixel', sans-serif;color:#FFD700;text-shadow:4px 4px 0 #8B4513, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 6px 0 #5C3317;letter-spacing:4px;text-align:center;background:none !important;}
 
-    /* Hire Me Banner - appears on level up */
-    #hire-me {
+    /* Venice Button - LEFT side */
+    #venice-button {
         position:fixed;
-        top:20px;
-        right:-200px;
-        padding:12px 24px;
-        background:linear-gradient(135deg, #FFD700, #FFA500);
-        color:#000;
-        font-family:'GraphicPixel', sans-serif;
-        font-size:18px;
-        text-decoration:none;
-        border-radius:8px;
-        box-shadow:0 4px 15px rgba(255,215,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3);
-        z-index:9999;
-        opacity:0;
-        transition:right 0.5s ease-out, opacity 0.3s ease;
-        text-shadow:1px 1px 0 rgba(255,255,255,0.3);
+        bottom:10px;
+        left:10px;
+        z-index:10001;
+        opacity:0.9;
+        transition:opacity 0.3s ease, bottom 0.3s ease;
+        pointer-events:auto;
+        background:rgba(255,255,255,0.95);
+        padding:6px 10px;
+        border-radius:6px;
+        border:1px solid rgba(200,200,200,0.8);
+        display:block;
     }
-    #hire-me.visible {
-        right:20px;
+    #venice-button:hover {
         opacity:1;
     }
-    #hire-me:hover {
-        background:linear-gradient(135deg, #FFA500, #FF8C00);
-        transform:scale(1.05);
-        box-shadow:0 6px 20px rgba(255,165,0,0.6);
+    #venice-button img {
+        height:80px;
+        width:auto;
+        display:block;
     }
-    #hire-me span {
-        display:inline-block;
+    /* During game: move above status bar */
+    .game #venice-button {
+        bottom:68px;
+        left:20px;
+    }
+
+    /* Hire Me Button - RIGHT side */
+    #hire-button {
+        position:fixed;
+        bottom:10px;
+        right:10px;
+        z-index:10001;
+        opacity:0.85;
+        transition:opacity 0.3s ease, bottom 0.3s ease, background 0.2s ease;
+        pointer-events:auto;
+        background:rgba(20,16,12,0.9);
+        padding:8px 14px;
+        border-radius:6px;
+        border:1px solid rgba(90,74,58,0.6);
+        color:#FFD700;
+        font-family:'GraphicPixel', sans-serif;
+        font-size:12px;
+        text-decoration:none;
+        text-shadow:1px 1px 2px rgba(0,0,0,0.8);
+    }
+    #hire-button:hover {
+        opacity:1;
+        background:rgba(40,32,24,0.95);
+        color:#FFA500;
+    }
+    /* During game: move above status bar */
+    .game #hire-button {
+        bottom:68px;
+        right:20px;
+    }
+
+    /* Hide on small screens */
+    @media (max-width: 800px) {
+        #venice-button,
+        #hire-button {
+            display:none;
+        }
     }
 
      {height:49px;width:118px;position:fixed;top:0;right:15%;background:url('../img/1/spritesheet.png') no-repeat -229px -204px;display:block;}

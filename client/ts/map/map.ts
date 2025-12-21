@@ -3,7 +3,6 @@ import {Types} from '../../../shared/ts/gametypes';
 import {Area} from './area';
 import {isInt} from '../utils/util';
 
-import * as _ from 'lodash';
 import * as $ from 'jquery';
 
 export default class Map {
@@ -125,7 +124,7 @@ export default class Map {
     var doors = {},
       self = this;
 
-    _.each(map.doors, function (door) {
+    map.doors.forEach(function (door: any) {
       var o;
 
       switch (door.to) {
@@ -236,12 +235,12 @@ export default class Map {
       }
     }
 
-    _.each(this.collisions, function (tileIndex) {
+    this.collisions.forEach(function (tileIndex: number) {
       var pos = self.tileIndexToGridPosition(tileIndex + 1);
       self.grid[pos.y][pos.x] = 1;
     });
 
-    _.each(this.blocking, function (tileIndex) {
+    this.blocking.forEach(function (tileIndex: number) {
       var pos = self.tileIndexToGridPosition(tileIndex + 1);
       if (self.grid[pos.y] !== undefined) {
         self.grid[pos.y][pos.x] = 1;
@@ -257,7 +256,7 @@ export default class Map {
     for (var j, i = 0; i < this.height; i++) {
       this.plateauGrid[i] = [];
       for (j = 0; j < this.width; j++) {
-        if (_.include(this.plateau, tileIndex)) {
+        if (this.plateau.includes(tileIndex)) {
           this.plateauGrid[i][j] = 1;
         } else {
           this.plateauGrid[i][j] = 0;
@@ -286,7 +285,7 @@ export default class Map {
    * @see Renderer.drawHighTiles
    */
   isHighTile(id) {
-    return _.indexOf(this.high, id + 1) >= 0;
+    return this.high.indexOf(id + 1) >= 0;
   }
 
   /**
@@ -326,7 +325,7 @@ export default class Map {
 
   _getCheckpoints(map) {
     var checkpoints = [];
-    _.each(map.checkpoints, function (cp) {
+    map.checkpoints.forEach(function (cp: any) {
       var area = new Area(cp.x, cp.y, cp.w, cp.h);
       area.id = cp.id;
       checkpoints.push(area);
@@ -335,7 +334,7 @@ export default class Map {
   }
 
   getCurrentCheckpoint(entity) {
-    return _.detect(this.checkpoints, function (checkpoint: Area) {
+    return this.checkpoints.find(function (checkpoint: Area) {
       return checkpoint.contains(entity);
     });
   }

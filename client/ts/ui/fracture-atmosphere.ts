@@ -203,6 +203,8 @@ export class FractureAtmosphere {
 
   private playRadioChatter(): void {
     if (!this.enabled || !this.numbersStation) return;
+    // Respect global audio mute state
+    if (AudioManager.isGloballyMuted()) return;
 
     // Play a random segment (5-15 seconds) of the numbers station
     const audio = this.numbersStation;
@@ -234,6 +236,8 @@ export class FractureAtmosphere {
    */
   playRandomGlitch(volume = 0.2): void {
     if (!this.enabled || this.glitchSounds.length === 0) return;
+    // Respect global audio mute state
+    if (AudioManager.isGloballyMuted()) return;
     const sound = this.glitchSounds[Math.floor(Math.random() * this.glitchSounds.length)];
     sound.volume = volume;
     sound.currentTime = 0;

@@ -2,7 +2,6 @@ import express from 'express';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import * as http from 'http';
 import * as path from 'path';
-import * as _ from 'lodash';
 import {Utils} from './utils';
 import { getIntroService } from './ai/intro.service';
 
@@ -197,7 +196,7 @@ export class Server {
   }
 
   forEachConnection(callback: (connection: Connection) => void): void {
-    _.each(this._connections, callback);
+    Object.values(this._connections).forEach(callback);
   }
 
   addConnection(connection: Connection): void {

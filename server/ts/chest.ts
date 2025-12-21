@@ -1,7 +1,6 @@
 import {Item} from './item';
 import {Types} from '../../shared/ts/gametypes';
 import {Utils} from './utils';
-import * as _ from 'lodash';
 
 export class Chest extends Item {
   items: number[] = []; // Item kinds
@@ -15,7 +14,7 @@ export class Chest extends Item {
   }
 
   getRandomItem(): number | null {
-    var nbItems = _.size(this.items),
+    var nbItems = this.items.length,
       item: number | null = null;
 
     if (nbItems > 0) {

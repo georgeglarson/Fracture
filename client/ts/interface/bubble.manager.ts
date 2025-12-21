@@ -1,11 +1,9 @@
 import {Bubble} from './bubble';
 
-import * as _ from 'lodash';
-
 export class BubbleManager {
 
   container;
-  bubbles = {};
+  bubbles: Record<string, Bubble> = {};
 
   constructor(container) {
     this.container = container;
@@ -33,30 +31,30 @@ export class BubbleManager {
 
   update(time) {
     var self = this,
-      bubblesToDelete = [];
+      bubblesToDelete: string[] = [];
 
-    _.each(this.bubbles, function (bubble: Bubble) {
+    Object.values(this.bubbles).forEach(function (bubble: Bubble) {
       if (bubble.isOver(time)) {
         bubble.destroy();
         bubblesToDelete.push(bubble.id);
       }
     });
 
-    _.each(bubblesToDelete, function (id) {
+    bubblesToDelete.forEach(function (id) {
       delete self.bubbles[id];
     });
   }
 
   clean() {
     var self = this,
-      bubblesToDelete = [];
+      bubblesToDelete: string[] = [];
 
-    _.each(this.bubbles, function (bubble: Bubble) {
+    Object.values(this.bubbles).forEach(function (bubble: Bubble) {
       bubble.destroy();
       bubblesToDelete.push(bubble.id);
     });
 
-    _.each(bubblesToDelete, function (id) {
+    bubblesToDelete.forEach(function (id) {
       delete self.bubbles[id];
     });
 
@@ -73,7 +71,7 @@ export class BubbleManager {
   }
 
   forEachBubble(callback) {
-    _.each(this.bubbles, function (bubble) {
+    Object.values(this.bubbles).forEach(function (bubble) {
       callback(bubble);
     });
   }

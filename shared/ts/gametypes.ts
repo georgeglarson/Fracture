@@ -8,7 +8,6 @@
  * - Helper functions for type checking and lookups
  */
 
-import * as _ from 'lodash';
 import type {
   GameTypes,
   EntityCategory,
@@ -524,11 +523,11 @@ function getChestKindForZone(zone: string): number {
 }
 
 function getWeaponRank(weaponKind: number): number {
-  return _.indexOf(rankedWeapons as unknown as number[], weaponKind);
+  return (rankedWeapons as readonly number[]).indexOf(weaponKind);
 }
 
 function getArmorRank(armorKind: number): number {
-  return _.indexOf(rankedArmors as unknown as number[], armorKind);
+  return (rankedArmors as readonly number[]).indexOf(armorKind);
 }
 
 function forEachKind(callback: (kind: number, kindName: string) => void): void {
@@ -572,9 +571,11 @@ function getOrientationAsString(orientation: number): string | undefined {
 }
 
 function getRandomItemKind(): number {
-  const all = _.union(rankedWeapons as unknown as number[], rankedArmors as unknown as number[]);
-  const forbidden = [Entities.SWORD1, Entities.CLOTHARMOR];
-  const itemKinds = _.difference(all, forbidden);
+  const weapons = rankedWeapons as readonly number[];
+  const armors = rankedArmors as readonly number[];
+  const all: number[] = [...weapons, ...armors];
+  const forbidden: number[] = [Entities.SWORD1, Entities.CLOTHARMOR];
+  const itemKinds = all.filter(item => !forbidden.includes(item));
   const i = Math.floor(Math.random() * itemKinds.length);
   return itemKinds[i];
 }
