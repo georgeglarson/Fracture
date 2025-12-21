@@ -32,6 +32,9 @@ export class Character extends Entity {
   hitPoints = 0;
   maxHitPoints = 0;
 
+  // Level (for mobs - determines difficulty color)
+  level = 0;
+
   // Modes
   isDead = false;
   attackingMode = false;

@@ -16,6 +16,7 @@ export class Mob extends Character {
   area: MobArea | ChestArea | null = null;
   spawningX: number;
   spawningY: number;
+  level: number;  // Mob's level for difficulty scaling
   armorLevel: number;
   weaponLevel: number;
   aggroRange: number;
@@ -30,6 +31,7 @@ export class Mob extends Character {
 
     this.spawningX = x;
     this.spawningY = y;
+    this.level = Properties.getMobLevel(this.kind);  // Get level from properties
     this.armorLevel = Properties.getArmorLevel(this.kind) ?? 1;
     this.weaponLevel = Properties.getWeaponLevel(this.kind) ?? 1;
     this.aggroRange = Properties.getAggroRange(this.kind);
@@ -153,8 +155,8 @@ export class Mob extends Character {
   }
 
   /**
-   * Override getState to include HP for health bar display
-   * Mob spawns: [id, kind, x, y, orientation, hitPoints, maxHitPoints, target?]
+   * Override getState to include HP and level for health bar and difficulty display
+   * Mob spawns: [id, kind, x, y, orientation, hitPoints, maxHitPoints, level, target?]
    */
   getState(): unknown[] {
     const basestate = this._getBaseState();
@@ -164,6 +166,8 @@ export class Mob extends Character {
     // Add HP info at fixed positions for client parsing
     state.push(this.hitPoints);
     state.push(this.maxHitPoints);
+    // Add level for difficulty color-coding
+    state.push(this.level);
     // Target is optional, always last
     if (this.target) {
       state.push(this.target);

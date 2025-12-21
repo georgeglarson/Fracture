@@ -777,8 +777,8 @@ export class Renderer {
     // Name shadow
     this.context.fillStyle = '#000';
     this.context.fillText(displayName, (entity.x + 8) * s + 1, y - 2 + 1);
-    // Name text (color based on mob type)
-    const nameColor = this.getMobNameColor(entity.kind);
+    // Name text (color based on level differential)
+    const nameColor = this.getMobNameColor(entity.kind, entity.level);
     this.context.fillStyle = nameColor;
     this.context.fillText(displayName, (entity.x + 8) * s, y - 2);
 
@@ -834,20 +834,46 @@ export class Renderer {
     return specialNames[name] || name.charAt(0).toUpperCase() + name.slice(1);
   }
 
-  // Get color for mob name based on difficulty
-  getMobNameColor(kind: number): string {
-    // Boss mobs get special colors
-    const kindName = Types.getKindAsString(kind);
-    if (kindName === 'boss' || kindName === 'deathknight') {
-      return '#ff6666';  // Red for bosses
+  /**
+   * Get color for mob name based on level differential
+   * Gray: 10+ levels below (trivial, no XP)
+   * Green: 5-9 levels below (easy)
+   * Yellow/White: ±4 levels (appropriate)
+   * Orange: 5-9 levels above (challenging)
+   * Red: 10+ levels above (dangerous)
+   */
+  getMobNameColor(kind: number, mobLevel?: number): string {
+    // Get player level from storage (default to 1)
+    const playerLevel = this.game?.storage?.data?.progression?.level ?? 1;
+
+    // If we don't have mob level, fall back to type-based coloring
+    if (!mobLevel || mobLevel === 0) {
+      const kindName = Types.getKindAsString(kind);
+      if (kindName === 'boss' || kindName === 'deathknight') {
+        return '#ff6666';  // Red for bosses
+      }
+      if (kindName === 'skeleton2' || kindName === 'eye' || kindName === 'spectre') {
+        return '#ffaa66';  // Orange for elites
+      }
+      return '#ffffff';  // White for unknown
     }
-    if (kindName === 'skeleton2' || kindName === 'eye' || kindName === 'spectre') {
-      return '#ffaa66';  // Orange for elites
+
+    // Calculate level differential
+    const diff = mobLevel - playerLevel;
+
+    if (diff <= -10) {
+      return '#888888';  // Gray - trivial (no XP)
     }
-    if (kindName === 'ogre' || kindName === 'snake') {
-      return '#ffff66';  // Yellow for medium
+    if (diff <= -5) {
+      return '#66ff66';  // Green - easy
     }
-    return '#ffffff';  // White for normal mobs
+    if (diff <= 4) {
+      return '#ffffff';  // White/Yellow - appropriate level
+    }
+    if (diff <= 9) {
+      return '#ffaa66';  // Orange - challenging
+    }
+    return '#ff6666';    // Red - dangerous
   }
 
   // AI Thought Bubbles - "Ant Farm" feature

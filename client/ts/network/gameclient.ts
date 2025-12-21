@@ -300,11 +300,12 @@ export class GameClient extends EventEmitter {
       }
       else if (Types.isMob(kind)) {
         orientation = data[5];
-        // Mob spawn format: [id, kind, x, y, orientation, hitPoints, maxHitPoints, target?]
+        // Mob spawn format: [id, kind, x, y, orientation, hitPoints, maxHitPoints, level, target?]
         var hitPoints = data[6];
         var maxHitPoints = data[7];
-        if (data.length > 8) {
-          target = data[8];
+        var mobLevel = data[8];
+        if (data.length > 9) {
+          target = data[9];
         }
       }
 
@@ -315,10 +316,13 @@ export class GameClient extends EventEmitter {
         character.spriteName = Types.getKindAsString(armor);
       }
 
-      // Set mob HP from spawn message for health bar display
+      // Set mob HP and level from spawn message for health bar and difficulty display
       if (Types.isMob(kind) && hitPoints !== undefined && maxHitPoints !== undefined) {
         character.hitPoints = hitPoints;
         character.maxHitPoints = maxHitPoints;
+        if (mobLevel !== undefined) {
+          character.level = mobLevel;
+        }
       }
 
       this.emit(ClientEvents.SPAWN_CHARACTER, character, x, y, orientation, target);

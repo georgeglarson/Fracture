@@ -1,54 +1,48 @@
 import {Types} from '../../shared/ts/gametypes';
+import {Formulas} from './formulas';
 
 /**
- * Drop Tables by Tier
+ * Mob Properties with Level-Based Scaling
  *
- * Tier 1 (rat): Starter zone - flasks, food, very rare starter gear
- * Tier 2 (bat, crab, goblin): Early zone - leather armor, axes
- * Tier 3 (skeleton, wizard, snake): Mid zone - mail armor, morningstars
- * Tier 4 (ogre, skeleton2, eye): Late zone - plate armor, blueswords
- * Tier 5 (spectre, deathknight): Endgame - red gear, firepotion
- * Tier 6 (boss): Boss - golden gear guaranteed
+ * Each mob now has an explicit level that determines its stats via formulas:
+ * - HP: Formulas.mobHP(level)
+ * - Weapon: Formulas.mobWeaponLevel(level)
+ * - Armor: Formulas.mobArmorLevel(level)
+ *
+ * Level tiers roughly correspond to:
+ * - Levels 1-5: Starter zone (rats, crabs)
+ * - Levels 6-10: Early zone (bats, goblins)
+ * - Levels 11-20: Mid zone (skeletons, zombies, wizards)
+ * - Levels 21-30: Late zone (ogres, skeleton2, eye)
+ * - Levels 31-45: Endgame zone (spectres, deathknights)
+ * - Level 50: Boss
  *
  * Drop rates are percentages. Multiple items can drop.
  * Zone modifiers in zone-manager.ts add rarity bonuses.
  */
 
-export const Properties = {
+export const Properties: Record<string, any> = {
   // ============================================
   // TIER 1 - Starter Area (Village outskirts)
+  // Level 1-2
   // ============================================
   rat: {
+    level: 1,
     drops: {
       flask: 60,        // Common healing
       burger: 15,       // Food drop
       sword2: 3,        // Rare upgrade from starter
       leatherarmor: 2   // Very rare armor
     },
-    hp: 25,
-    armor: 1,
-    weapon: 1,
     aggro: 3            // Weak - only attacks very close players
   },
 
   // ============================================
   // TIER 2 - Early Areas (Beach, Forest edge)
+  // Level 3-6
   // ============================================
-  bat: {
-    drops: {
-      flask: 50,
-      burger: 10,
-      axe: 12,          // Axe drops here
-      leatherarmor: 8,
-      firepotion: 3
-    },
-    hp: 80,
-    armor: 2,
-    weapon: 1,
-    aggro: 4            // Slightly aggressive
-  },
-
   crab: {
+    level: 3,
     drops: {
       flask: 45,
       burger: 12,
@@ -56,13 +50,23 @@ export const Properties = {
       leatherarmor: 10,
       firepotion: 4
     },
-    hp: 60,
-    armor: 2,
-    weapon: 1,
+    aggro: 4            // Slightly aggressive
+  },
+
+  bat: {
+    level: 4,
+    drops: {
+      flask: 50,
+      burger: 10,
+      axe: 12,          // Axe drops here
+      leatherarmor: 8,
+      firepotion: 3
+    },
     aggro: 4            // Slightly aggressive
   },
 
   goblin: {
+    level: 6,
     drops: {
       flask: 40,
       burger: 8,
@@ -71,16 +75,15 @@ export const Properties = {
       morningstar: 5,   // Rare upgrade
       firepotion: 4
     },
-    hp: 90,
-    armor: 2,
-    weapon: 1,
     aggro: 5            // More aggressive - territorial
   },
 
   // ============================================
   // TIER 3 - Mid Areas (Graveyard, Desert edge)
+  // Level 10-18
   // ============================================
   skeleton: {
+    level: 10,
     drops: {
       flask: 35,
       axe: 10,
@@ -91,13 +94,49 @@ export const Properties = {
       tentacle: 4,      // Rare void weapon
       voidcloak: 3      // Rare void armor
     },
-    hp: 110,
-    armor: 2,
-    weapon: 2,
     aggro: 5            // Undead sense the living
   },
 
+  zombie: {
+    level: 11,
+    drops: {
+      flask: 40,
+      burger: 15,       // Brains... er, burgers
+      morningstar: 12,
+      mailarmor: 15,
+      firepotion: 5
+    },
+    aggro: 5            // Zombies shamble toward the living
+  },
+
+  zombiegirl: {
+    level: 12,
+    drops: {
+      flask: 35,
+      burger: 12,
+      morningstar: 15,
+      mailarmor: 18,
+      platearmor: 8,    // Slightly better drops
+      firepotion: 6
+    },
+    aggro: 5            // Just as relentless
+  },
+
+  zomagent: {
+    level: 14,
+    drops: {
+      flask: 30,
+      burger: 10,
+      morningstar: 10,
+      platearmor: 15,   // Leader drops plate
+      bluesword: 12,    // Rare bluesword
+      firepotion: 8
+    },
+    aggro: 6            // The leader - more dangerous
+  },
+
   wizard: {
+    level: 15,
     drops: {
       flask: 30,
       burger: 5,
@@ -109,13 +148,11 @@ export const Properties = {
       crystalstaff: 5,  // Wizards can drop arcane weapons
       crystalshell: 3   // Rare mystic armor
     },
-    hp: 100,
-    armor: 2,
-    weapon: 6,
     aggro: 6            // Wizards attack from distance
   },
 
   snake: {
+    level: 18,
     drops: {
       flask: 35,
       morningstar: 12,
@@ -126,63 +163,15 @@ export const Properties = {
       raygun: 4,        // Desert snakes guard tech relics
       mp5: 5            // More common tech weapon
     },
-    hp: 150,
-    armor: 3,
-    weapon: 2,
     aggro: 4            // Snakes are sneaky but patient
   },
 
   // ============================================
-  // TIER 3.5 - Zombie Zone (Haunted graveyard)
-  // ============================================
-  zombie: {
-    drops: {
-      flask: 40,
-      burger: 15,       // Brains... er, burgers
-      morningstar: 12,
-      mailarmor: 15,
-      firepotion: 5
-    },
-    hp: 130,
-    armor: 2,
-    weapon: 2,
-    aggro: 5            // Zombies shamble toward the living
-  },
-
-  zombiegirl: {
-    drops: {
-      flask: 35,
-      burger: 12,
-      morningstar: 15,
-      mailarmor: 18,
-      platearmor: 8,    // Slightly better drops
-      firepotion: 6
-    },
-    hp: 150,
-    armor: 2,
-    weapon: 2,
-    aggro: 5            // Just as relentless
-  },
-
-  zomagent: {
-    drops: {
-      flask: 30,
-      burger: 10,
-      morningstar: 10,
-      platearmor: 15,   // Leader drops plate
-      bluesword: 12,    // Rare bluesword
-      firepotion: 8
-    },
-    hp: 180,
-    armor: 3,
-    weapon: 3,
-    aggro: 6            // The leader - more dangerous
-  },
-
-  // ============================================
   // TIER 4 - Late Areas (Deep caves, Lava edge)
+  // Level 22-28
   // ============================================
   ogre: {
+    level: 22,
     drops: {
       flask: 30,
       burger: 8,
@@ -195,13 +184,11 @@ export const Properties = {
       raygun: 6,
       mecharmor: 4      // Rare tech armor
     },
-    hp: 200,
-    armor: 3,
-    weapon: 2,
     aggro: 6            // Ogres are big and angry
   },
 
   skeleton2: {
+    level: 25,
     drops: {
       flask: 28,
       platearmor: 18,
@@ -213,13 +200,11 @@ export const Properties = {
       voidblade: 5,     // Rare void weapon
       voidcloak: 6      // Void armor
     },
-    hp: 200,
-    armor: 3,
-    weapon: 3,
     aggro: 6            // Elite undead - aggressive
   },
 
   eye: {
+    level: 28,
     drops: {
       flask: 25,
       platearmor: 15,
@@ -231,16 +216,15 @@ export const Properties = {
       plasmahelix: 6,   // Energy beings carry plasma
       shieldbubble: 8   // Force field armor
     },
-    hp: 200,
-    armor: 3,
-    weapon: 3,
     aggro: 7            // All-seeing eye - spots you from afar
   },
 
   // ============================================
   // TIER 5 - Endgame Areas (Lava, Death zones)
+  // Level 35-40
   // ============================================
   spectre: {
+    level: 35,
     drops: {
       flask: 20,
       bluesword: 10,
@@ -254,13 +238,11 @@ export const Properties = {
       voidcloak: 12,    // Primary voidcloak source
       shieldbubble: 6   // Force field armor
     },
-    hp: 250,
-    armor: 2,
-    weapon: 4,
     aggro: 7            // Spectres hunt the living
   },
 
   deathknight: {
+    level: 40,
     drops: {
       flask: 15,
       burger: 5,
@@ -276,16 +258,15 @@ export const Properties = {
       mecharmor: 10,    // Best mecharmor source
       crystalshell: 8   // Best crystal armor source
     },
-    hp: 250,
-    armor: 3,
-    weapon: 3,
     aggro: 8            // Elite hunter - maximum aggro range
   },
 
   // ============================================
   // TIER 6 - Boss (Unique encounter)
+  // Level 50
   // ============================================
   boss: {
+    level: 50,
     drops: {
       goldensword: 100, // Guaranteed golden sword
       goldenarmor: 80,  // High chance golden armor
@@ -297,15 +278,31 @@ export const Properties = {
       mecharmor: 40,    // Rare mech armor
       crystalshell: 35  // Rare crystal armor
     },
-    hp: 700,
-    armor: 6,
-    weapon: 7,
     aggro: 8            // Boss has maximum aggro range
   },
+
+  // ============================================
+  // GETTER FUNCTIONS - Now use Formulas
+  // ============================================
+
+  /**
+   * Get mob's level (or 1 if not defined)
+   */
+  getMobLevel: (kind: number): number => {
+    const kindStr = Types.getKindAsString(kind);
+    if (!kindStr) return 1;
+    const props = Properties[kindStr];
+    return props?.level || 1;
+  },
+
+  /**
+   * Get armor level - for mobs, derived from level via formula
+   */
   getArmorLevel: (kind: number): number | undefined => {
     try {
       if (Types.isMob(kind)) {
-        return (Properties as Record<string, any>)[Types.getKindAsString(kind) as string].armor;
+        const mobLevel = Properties.getMobLevel(kind);
+        return Formulas.mobArmorLevel(mobLevel);
       } else {
         return Types.getArmorRank(kind) + 1;
       }
@@ -314,10 +311,15 @@ export const Properties = {
       return undefined;
     }
   },
+
+  /**
+   * Get weapon level - for mobs, derived from level via formula
+   */
   getWeaponLevel: (kind: number): number | undefined => {
     try {
       if (Types.isMob(kind)) {
-        return (Properties as Record<string, any>)[Types.getKindAsString(kind) as string].weapon;
+        const mobLevel = Properties.getMobLevel(kind);
+        return Formulas.mobWeaponLevel(mobLevel);
       } else {
         return Types.getWeaponRank(kind) + 1;
       }
@@ -326,12 +328,22 @@ export const Properties = {
       return undefined;
     }
   },
+
+  /**
+   * Get hit points - for mobs, derived from level via formula
+   */
   getHitPoints: (kind: number): number => {
-    return (Properties as Record<string, any>)[Types.getKindAsString(kind) as string].hp;
+    const mobLevel = Properties.getMobLevel(kind);
+    return Formulas.mobHP(mobLevel);
   },
+
+  /**
+   * Get aggro range (unchanged - still hand-tuned per mob)
+   */
   getAggroRange: (kind: number): number => {
-    const props = (Properties as Record<string, any>)[Types.getKindAsString(kind) as string];
-    return props?.aggro || 0; // Default to 0 (no aggro) if not defined
+    const kindStr = Types.getKindAsString(kind);
+    if (!kindStr) return 0;
+    const props = Properties[kindStr];
+    return props?.aggro || 0;
   }
 };
-
