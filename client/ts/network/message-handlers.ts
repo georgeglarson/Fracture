@@ -25,6 +25,35 @@ import * as SkillUIHandler from '../handlers/skill-ui.handler';
 import * as RiftUIHandler from '../handlers/rift-ui.handler';
 import * as ProgressionUIHandler from '../handlers/progression-ui.handler';
 
+/** Melee auto-retaliation range in tiles (Chebyshev distance) */
+const MELEE_RANGE_TILES = 3;
+
+/**
+ * Auto-retaliate: attack nearest attacker within melee range if player is idle.
+ * Shared by HEALTH (hurt) and ATTACK handlers to avoid duplication.
+ */
+function autoRetaliate(game: Game): void {
+  const player = game.player;
+  if (!player || player.isDying || player.isDead) return;
+  if (player.isAttacking()) return;
+
+  let nearestAttacker: any = null;
+  let nearestDist = Infinity;
+  player.forEachAttacker((attacker: any) => {
+    if (attacker && !attacker.isDead && !attacker.isDying) {
+      const dist = player.getDistanceToEntity(attacker);
+      if (dist <= MELEE_RANGE_TILES && dist < nearestDist) {
+        nearestDist = dist;
+        nearestAttacker = attacker;
+      }
+    }
+  });
+  if (nearestAttacker) {
+    console.debug('[Auto-retaliate] Fighting back against', nearestAttacker.id, 'at distance', nearestDist);
+    game.makePlayerAttack(nearestAttacker);
+  }
+}
+
 // Kill notification batching system
 const killBuffer: Map<string, number> = new Map();
 let killBufferTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -293,7 +322,10 @@ function setupEntityHandlers(game: Game, client: GameClient): void {
             attacker.hit();
           }
         });
-        entity.die();
+        // Guard against double-death (DAMAGE handler may have already triggered isDying)
+        if (!entity.isDying) {
+          entity.die();
+        }
 
         // Failsafe: ensure entity is removed even if death animation fails
         setTimeout(function () {
@@ -389,27 +421,8 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
           game.showNotification('Health critical!');
         }
 
-        // Auto-retaliate: fight back when hurt if not already attacking
-        // Only retaliate against attackers within melee range (3 tiles)
-        const MELEE_RANGE_TILES = 3;
-        if (!player.isAttacking()) {
-          let nearestAttacker: any = null;
-          let nearestDist = Infinity;
-          player.forEachAttacker((attacker: any) => {
-            if (attacker && !attacker.isDead) {
-              const dist = player.getDistanceToEntity(attacker);
-              // Only consider attackers within melee range
-              if (dist <= MELEE_RANGE_TILES && dist < nearestDist) {
-                nearestDist = dist;
-                nearestAttacker = attacker;
-              }
-            }
-          });
-          if (nearestAttacker) {
-            console.debug('[Auto-retaliate] Fighting back against', nearestAttacker.id, 'at distance', nearestDist);
-            game.makePlayerAttack(nearestAttacker);
-          }
-        }
+        // Auto-retaliate when hurt
+        autoRetaliate(game);
 
         if (game.playerhurt_callback) {
           game.playerhurt_callback();
@@ -509,16 +522,8 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
     }
 
     // Auto-retaliate: if player is attacked while idle, fight back
-    // Only retaliate if attacker is within melee range (3 tiles)
-    const MELEE_RANGE_TILES = 3;
-    if (targetId === game.playerId && attacker && game.player && !game.player.target) {
-      const distance = game.player.getDistanceToEntity(attacker);
-      if (distance <= MELEE_RANGE_TILES) {
-        console.debug('[Auto-retaliate] Player attacked by ' + attacker.id + ' at distance ' + distance + ', fighting back');
-        game.makePlayerAttack(attacker);
-      } else {
-        console.debug('[Auto-retaliate] Attacker ' + attacker.id + ' too far away (' + distance + ' tiles), ignoring');
-      }
+    if (targetId === game.playerId && attacker && game.player) {
+      autoRetaliate(game);
     }
 
     if (attacker && attacker.id !== game.playerId) {
@@ -579,6 +584,9 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
             if (nextTarget) {
               console.debug('[Auto-retarget] Switching to next attacker:', nextTarget.id);
               game.makePlayerAttack(nextTarget);
+            } else {
+              // No more attackers — fade out combat music
+              game.audioManager.exitCombat();
             }
           }
         }

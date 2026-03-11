@@ -228,4 +228,29 @@ export class SpatialManager {
   getPlayersInGroup(groupId: string): (string | number)[] {
     return this.groups[groupId]?.players ?? [];
   }
+
+  /**
+   * Get all unique player entities in a group and its adjacent groups.
+   * Used by the aggro tick to avoid O(n*m) all-players scan.
+   */
+  getPlayersNearGroup(groupId: string): any[] {
+    if (!groupId || !this.map) return [];
+
+    const seen = new Set<string | number>();
+    const players: any[] = [];
+
+    this.map.forEachAdjacentGroup(groupId, (adjId) => {
+      const group = this.groups[adjId];
+      if (!group) return;
+      for (const playerId of group.players) {
+        if (!seen.has(playerId)) {
+          seen.add(playerId);
+          const entity = group.entities[playerId];
+          if (entity) players.push(entity);
+        }
+      }
+    });
+
+    return players;
+  }
 }

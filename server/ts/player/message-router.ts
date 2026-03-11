@@ -386,7 +386,7 @@ export function createMessageHandlers(
       // Phase shift makes player immune to damage
       // Stunned mobs (War Cry) can't deal damage
       const isStunned = mob?.stunUntil && Date.now() < mob.stunUntil;
-      if (mob && !mob.isDead && mob.hitPoints > 0 && ctx.hitPoints > 0 && !ctx.isPhased() && !isStunned) {
+      if (mob && !mob.isDead && mob.hitPoints > 0 && !ctx.isDead && ctx.hitPoints > 0 && !ctx.isPhased() && !isStunned) {
         // Range check: mob must be adjacent (melee range) to deal damage
         const dx = Math.abs(ctx.x - mob.x);
         const dy = Math.abs(ctx.y - mob.y);

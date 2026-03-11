@@ -1,46 +1,56 @@
-Fracture server documentation
-===============================
+# Fracture Server
 
-The game server requires nodejs 6.x or greater.
+Node.js game server for Fracture. Handles all authoritative game state: combat, movement, inventory, persistence, and AI.
 
-- lodash
-- log
-- express
-- socket.io
-- sanitizer
-- memcache (only if you want metrics)
+## Requirements
 
-All of them can be installed via `npm install -d` (this will install a local copy of all the dependencies in the node_modules directory)
+- Node.js 18+
+- pnpm
 
+## Dependencies
 
-Configuration
--------------
+- **Socket.IO 4** — WebSocket transport (105 message types)
+- **better-sqlite3** — Player persistence (characters, inventory, achievements, progression)
+- **Venice AI SDK** — NPC dialogue generation (llama-3.3-70b)
+- **Fish Audio** — TTS voice synthesis for narration
+- **pino** — Structured logging
 
-The server settings (number of worlds, number of players per world, etc.) can be configured.
-Modify `config.json` or create a new file and specify the path when running the server with the second argument, e.g: `yarn watch:server ./config-prod.json`
+## Configuration
 
-Development
------------
+Server settings are in `config.json` (player capacity, world count, port). AI keys are loaded from environment variables — see `../.env.example`.
 
-To launch the application for development, simply run `yarn watch:servr`
+## Build & Run
 
+```bash
+pnpm run build:server     # TypeScript compilation
+node dist/server/ts/main.js   # Start on port 8000
+pnpm run watch:server     # Dev mode with auto-rebuild
+```
 
-Deployment
-----------
+## Architecture
 
-In order to deploy the server, simply run `yarn build:server` and copy the `dist/server` and `dist/shared` directories to the staging/production server.
+The server is organized into focused modules following SRP:
 
-Then run `node server/ts/main.js` in order to start the server.
+| Module | Responsibility |
+|--------|---------------|
+| `combat/` | AggroPolicy, CombatTracker, CombatSystem, kill streaks, nemesis |
+| `player/` | MessageRouter, handler modules (one per game system) |
+| `world/` | SpatialManager, SpawnManager, GameLoop |
+| `storage/` | SQLite persistence layer |
+| `ai/` | Venice AI integration, narration, TTS |
+| `party/` | PartyService (invite, XP sharing, proximity) |
+| `inventory/` | Inventory management and serialization |
+| `zones/` | ZoneManager (boundaries, bonuses, level warnings) |
 
+See [ARCHITECTURE_SRP.md](../ARCHITECTURE_SRP.md) for the full decomposition story.
 
-Note: the `shared` directory is the only one in the project which is a server dependency.
+## Tests
 
+```bash
+pnpm test                 # 42 test files, 2,229 tests
+pnpm test:coverage        # v8 coverage report
+```
 
-Monitoring
-----------
+## Monitoring
 
-The server has a status URL which can be used as a health check or simply as a way to monitor player population.
-
-Send a GET request to: `http://[host]:[port]/status`
-
-It will return a JSON array containing the number of players in all instanced worlds on this game server.
+`GET /status` returns player population as JSON.

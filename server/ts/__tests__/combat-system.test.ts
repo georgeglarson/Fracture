@@ -188,6 +188,38 @@ describe('CombatSystem', () => {
       expect(mockWorld.pushToAdjacentGroups).toHaveBeenCalled();
     });
 
+    it('should switch target when mob.target differs from chosen player', () => {
+      // Mob is currently targeting player 2, but chooseMobTarget picks player 1
+      const player2 = { ...mockPlayer, id: 2, removeAttacker: vi.fn(), addAttacker: vi.fn() };
+      mockWorld.getEntityById = vi.fn((id) => {
+        if (id === 1) return mockPlayer;
+        if (id === 2) return player2;
+        if (id === 100) return mockMob;
+        return undefined;
+      });
+      mockMob.target = 2; // Currently targeting player 2
+      mockMob.getHatedPlayerId = vi.fn(() => 1); // Hate rank picks player 1
+
+      combatSystem.chooseMobTarget(mockMob);
+
+      // Should clear old link (remove mob from player 2's attackers)
+      expect(player2.removeAttacker).toHaveBeenCalledWith(mockMob);
+      // Should set new target to player 1
+      expect(mockMob.setTarget).toHaveBeenCalledWith(mockPlayer);
+      expect(mockPlayer.addAttacker).toHaveBeenCalledWith(mockMob);
+    });
+
+    it('should not re-register when mob already targets the chosen player', () => {
+      mockMob.target = 1; // Already targeting player 1
+      mockMob.getHatedPlayerId = vi.fn(() => 1);
+
+      combatSystem.chooseMobTarget(mockMob);
+
+      // Should NOT re-set target or re-add attacker
+      expect(mockMob.setTarget).not.toHaveBeenCalled();
+      expect(mockPlayer.addAttacker).not.toHaveBeenCalled();
+    });
+
     it('should do nothing if no hated player exists', () => {
       mockMob.getHatedPlayerId = vi.fn(() => null);
 

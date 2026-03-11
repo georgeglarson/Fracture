@@ -535,6 +535,28 @@ describe('Mob', () => {
   });
 
   // =========================================================================
+  // isStunned
+  // =========================================================================
+  describe('isStunned', () => {
+    it('should return false when stunUntil is 0 (default)', () => {
+      const mob = createMob();
+      expect(mob.isStunned()).toBe(false);
+    });
+
+    it('should return true when stunUntil is in the future', () => {
+      const mob = createMob();
+      mob.stunUntil = Date.now() + 10000;
+      expect(mob.isStunned()).toBe(true);
+    });
+
+    it('should return false when stunUntil is in the past', () => {
+      const mob = createMob();
+      mob.stunUntil = Date.now() - 1000;
+      expect(mob.isStunned()).toBe(false);
+    });
+  });
+
+  // =========================================================================
   // distanceToSpawningPoint
   // =========================================================================
   describe('distanceToSpawningPoint', () => {

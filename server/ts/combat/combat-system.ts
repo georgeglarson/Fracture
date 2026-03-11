@@ -157,8 +157,8 @@ export class CombatSystem {
       return;
     }
 
-    // If the mob is not already attacking the player, create an attack link
-    if (player && player.attackers && !(mob.id in player.attackers)) {
+    // If the mob's current target differs from the chosen player, switch targets
+    if (player && mob.target !== playerId) {
       this.clearMobAggroLink(mob);
 
       mob.setTarget?.(player);

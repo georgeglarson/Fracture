@@ -164,6 +164,11 @@ export class World {
             } else {
               mob.move(pos.x, pos.y);
             }
+          } else {
+            // Target disappeared (disconnect, death, etc.) — clean up aggro links
+            mob.clearTarget();
+            mob.forgetEveryone();
+            player.removeAttacker(mob);
           }
         });
       };
@@ -308,7 +313,7 @@ export class World {
         if (mob.isDead || !mob.aggroRange || mob.aggroRange <= 0) return;
 
         // Skip stunned mobs (War Cry effect)
-        if ((mob as any).stunUntil && Date.now() < (mob as any).stunUntil) return;
+        if (mob.isStunned()) return;
 
         const leashDistance = getLeashDistance(mob.aggroRange);
 
@@ -316,12 +321,17 @@ export class World {
         if (mob.hasTarget()) {
           const target = self.getEntityById(mob.target!);
           if (!target || (target as any).isDead) {
+            // Remove mob from target's attacker list before clearing
+            if (target) (target as Character).removeAttacker(mob);
             mob.clearTarget();
             mob.forgetEveryone();
             return;
           }
-          const targetDist = mob.distanceToSpawningPoint((target as any).x, (target as any).y);
-          if (targetDist > leashDistance) {
+          // Leash based on mob's own position (consistent with move_callback leash)
+          const mobDist = mob.distanceToSpawningPoint(mob.x, mob.y);
+          if (mobDist > leashDistance) {
+            // Remove mob from target's attacker list before leashing
+            (target as Character).removeAttacker(mob);
             mob.clearTarget();
             mob.forgetEveryone();
             return;
@@ -334,19 +344,21 @@ export class World {
           return;
         }
 
-        // No target — scan for nearby players using AggroPolicy
+        // No target — scan for nearby players using spatial query + AggroPolicy
+        // Only check players in mob's group + adjacent groups (O(M*Padj) vs O(M*P))
         let closestPlayer: Player | null = null;
         let closestDistance = mob.aggroRange; // tiles
         let closestDecision: { hateModifier: number } | null = null;
 
-        self.forEachPlayer(function(player: Player) {
-          if (!player || player.isDead) return;
+        const nearbyPlayers = mob.group ? self.getPlayersNearGroup(mob.group) : [];
+        for (const player of nearbyPlayers) {
+          if (!player || player.isDead) continue;
 
           // Spawn protection (first 10 seconds after entering)
-          if (player.spawnProtectionUntil && Date.now() < player.spawnProtectionUntil) return;
+          if (player.spawnProtectionUntil && Date.now() < player.spawnProtectionUntil) continue;
 
           // Phase Shift invisibility
-          if (player.isPhased && player.isPhased()) return;
+          if (player.isPhased && player.isPhased()) continue;
 
           const distance = Utils.distanceTo(mob.x, mob.y, player.x, player.y);
 
@@ -371,7 +383,7 @@ export class World {
             closestPlayer = player;
             closestDecision = decision;
           }
-        });
+        }
 
         if (closestPlayer && closestDecision) {
           const hateBase = Math.max(1, Math.floor((mob.aggroRange - closestDistance) * 10));
@@ -857,6 +869,10 @@ export class World {
 
   processGroups() {
     this.spatialManager?.processGroups();
+  }
+
+  getPlayersNearGroup(groupId: string) {
+    return this.spatialManager?.getPlayersNearGroup(groupId) ?? [];
   }
 
   moveEntity(entity: Entity, x: number, y: number) {

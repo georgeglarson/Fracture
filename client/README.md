@@ -1,27 +1,37 @@
-Fracture client documentation
-===============================
+# Fracture Client
 
-The client side for Fracture has been converted to a modern development toolset.
+HTML5 Canvas game client. Renders the game world, handles player input, and communicates with the server via Socket.IO.
 
-Current technologies used are:
+## Tech Stack
 
-- Typescript 2.5
-- Webpack 3.6
-- jQuery 2.2.4(Will eventually get rid of this dependency)
-- Lodash 3.10.1 (Will eventually get rid of this dependency)
+- **TypeScript 5.8**
+- **HTML5 Canvas** — Sprite-based rendering with camera, particles, and animation
+- **Webpack 5** — Module bundling with production optimization
+- **Socket.IO 4** — Real-time server communication
 
+## Configuration
 
-### Configuration
+- `config/config.json` — Development (`localhost:8000`)
+- `config/config.prod.json` — Production (`fracture.georgelarson.me:443`)
 
-Copy the current working environment from `client/config/config.{env}.json` to `client/config/config.json`.
+## Build
 
-### Development
+```bash
+pnpm run build:client     # Webpack production build → dist/client/
+pnpm run watch:client     # Dev server with hot reload
+```
 
-Running the local development environment is easy. Just run `yarn watch:client` and a browser window will open. 
+## Architecture
 
-To configure the port your local dev server runs on, just change the environment variable `PORT` to your desired port.
+| Directory | Responsibility |
+|-----------|---------------|
+| `entity/` | Entity hierarchy — Character, Player, Mob, NPC with sprites and animation |
+| `handlers/` | Server message handlers (combat, inventory, party, achievements, etc.) |
+| `network/` | GameClient (Socket.IO adapter), message dispatch, event system |
+| `renderer/` | Canvas rendering pipeline, camera, particle effects |
+| `ui/` | HUD panels, inventory UI, shop, achievement display |
+| `controllers/` | Input handling, movement, targeting |
 
+## Browser Support
 
-### Serving for production
-
-Just run `yarn build:client` and copy your `dist/client` directory to your webservers root.
+Firefox, Chrome, Safari, Edge. Mobile-responsive.

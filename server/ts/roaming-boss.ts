@@ -18,6 +18,8 @@ import {
   getZoneSpawnPosition
 } from './zone-boss-config';
 import { ZONE_DATA } from '../../shared/ts/zones/zone-data';
+import { evaluateAggro } from './combat/aggro-policy';
+import { getCombatTracker } from './combat/combat-tracker';
 import type { Player } from './player';
 
 // Minimal World interface for RoamingBoss needs
@@ -257,13 +259,15 @@ export class RoamingBoss extends Mob {
   }
 
   /**
-   * Check for players within aggro range and attack closest one
+   * Check for players within aggro range and attack closest one.
+   * Uses evaluateAggro() to respect density cap and zone-aware policy.
    */
   checkProximityAggro() {
     if (!this.world || this.hasTarget()) return;
 
     let closestPlayer: PlayerLike | null = null;
     let closestDistance = this.aggroRange; // tiles
+    const combatTracker = getCombatTracker();
 
     // Check all players
     const players = this.world.players;
@@ -273,7 +277,23 @@ export class RoamingBoss extends Mob {
 
       const distance = Utils.distanceTo(this.x, this.y, player.x, player.y);
 
-      if (distance < closestDistance) {
+      // Use AggroPolicy to evaluate (respects density cap, zone rules, level scaling)
+      const decision = evaluateAggro({
+        mobX: this.x,
+        mobY: this.y,
+        mobSpawnX: this.spawningX,
+        mobSpawnY: this.spawningY,
+        mobLevel: this.level,
+        mobAggroRange: this.aggroRange,
+        mobZoneId: this.zoneId,
+        playerX: player.x,
+        playerY: player.y,
+        playerLevel: (player as any).level ?? 1,
+        distance,
+        currentAggroOnPlayer: combatTracker.getPlayerAggroCount(player.id),
+      });
+
+      if (decision.shouldAggro && distance < closestDistance) {
         closestDistance = distance;
         closestPlayer = player;
       }

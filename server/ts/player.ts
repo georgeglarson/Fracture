@@ -184,6 +184,10 @@ export class Player extends Character {
 
     this.forEachAttacker(function (mob) {
       mob.clearTarget();
+      // Tell each attacking mob to forget this player so it returns to spawn
+      if ('forgetPlayer' in mob && typeof (mob as any).forgetPlayer === 'function') {
+        (mob as any).forgetPlayer(self.id);
+      }
     });
     this.attackers = {};
 

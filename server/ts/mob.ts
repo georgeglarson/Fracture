@@ -22,6 +22,7 @@ export class Mob extends Character {
   weaponLevel: number;
   aggroRange: number;
   zoneId: string | null;  // Cached zone from spawn position
+  stunUntil: number = 0;  // Timestamp when stun expires (War Cry effect)
   respawnTimeout: ReturnType<typeof setTimeout> | null = null;
   returnTimeout: ReturnType<typeof setTimeout> | null = null;
   isDead: boolean = false;
@@ -156,6 +157,10 @@ export class Mob extends Character {
 
   updateHitPoints(): void {
     this.resetHitPoints(Properties.getHitPoints(this.kind));
+  }
+
+  isStunned(): boolean {
+    return this.stunUntil > 0 && Date.now() < this.stunUntil;
   }
 
   distanceToSpawningPoint(x: number, y: number): number {
