@@ -635,6 +635,7 @@ describe('MessageRouter', () => {
       expect(mockFormulas.dmg).toHaveBeenCalledWith(
         ctx.weaponLevel,
         mob.armorLevel,
+        ctx.level,
       );
       expect(mob.receiveDamage).toHaveBeenCalledWith(10, ctx.id);
       expect(ctx.world.handleMobHate).toHaveBeenCalledWith(
@@ -715,6 +716,17 @@ describe('MessageRouter', () => {
       await router.route(ctx, [Msg.HIT, 42]);
 
       expect(ctx.consumePowerStrike).toHaveBeenCalled();
+    });
+
+    it('should pass player level to damage formula', async () => {
+      ctx.level = 25;
+      await router.route(ctx, [Msg.HIT, 42]);
+
+      expect(mockFormulas.dmg).toHaveBeenCalledWith(
+        ctx.weaponLevel,
+        mob.armorLevel,
+        25,
+      );
     });
   });
 
@@ -833,6 +845,30 @@ describe('MessageRouter', () => {
       await router.route(ctx, [Msg.HURT, 42]);
 
       expect(ctx.hitPoints).toBe(100);
+    });
+
+    it('should pass mob level to damage formula', async () => {
+      mob.level = 15;
+
+      await router.route(ctx, [Msg.HURT, 42]);
+
+      expect(mockFormulas.dmg).toHaveBeenCalledWith(
+        mob.weaponLevel,
+        ctx.armorLevel,
+        15,
+      );
+    });
+
+    it('should default mob level to 1 when not set', async () => {
+      mob.level = undefined;
+
+      await router.route(ctx, [Msg.HURT, 42]);
+
+      expect(mockFormulas.dmg).toHaveBeenCalledWith(
+        mob.weaponLevel,
+        ctx.armorLevel,
+        1,
+      );
     });
   });
 

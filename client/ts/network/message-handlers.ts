@@ -24,35 +24,7 @@ import * as GameEventHandler from '../handlers/game-event.handler';
 import * as SkillUIHandler from '../handlers/skill-ui.handler';
 import * as RiftUIHandler from '../handlers/rift-ui.handler';
 import * as ProgressionUIHandler from '../handlers/progression-ui.handler';
-
-/** Melee auto-retaliation range in tiles (Chebyshev distance) */
-const MELEE_RANGE_TILES = 3;
-
-/**
- * Auto-retaliate: attack nearest attacker within melee range if player is idle.
- * Shared by HEALTH (hurt) and ATTACK handlers to avoid duplication.
- */
-function autoRetaliate(game: Game): void {
-  const player = game.player;
-  if (!player || player.isDying || player.isDead) return;
-  if (player.isAttacking()) return;
-
-  let nearestAttacker: any = null;
-  let nearestDist = Infinity;
-  player.forEachAttacker((attacker: any) => {
-    if (attacker && !attacker.isDead && !attacker.isDying) {
-      const dist = player.getDistanceToEntity(attacker);
-      if (dist <= MELEE_RANGE_TILES && dist < nearestDist) {
-        nearestDist = dist;
-        nearestAttacker = attacker;
-      }
-    }
-  });
-  if (nearestAttacker) {
-    console.debug('[Auto-retaliate] Fighting back against', nearestAttacker.id, 'at distance', nearestDist);
-    game.makePlayerAttack(nearestAttacker);
-  }
-}
+import * as CombatHandler from '../handlers/combat.handler';
 
 // Kill notification batching system
 const killBuffer: Map<string, number> = new Map();
@@ -283,9 +255,7 @@ function setupCharacterCallbacks(game: Game, entity: Character): void {
       attacker.disengage();
     });
 
-    if (game.player && game.player.target && game.player.target.id === entity.id) {
-      game.player.disengage();
-    }
+    CombatHandler.handleTargetDeath(game, entity.id);
 
     game.removeFromEntityGrid(entity, entity.gridX, entity.gridY);
     game.removeFromPathingGrid(entity.gridX, entity.gridY);
@@ -326,6 +296,9 @@ function setupEntityHandlers(game: Game, client: GameClient): void {
         if (!entity.isDying) {
           entity.die();
         }
+
+        // Bug A fix: retarget if player was targeting this entity
+        CombatHandler.handleTargetDeath(game, entity.id);
 
         // Failsafe: ensure entity is removed even if death animation fails
         setTimeout(function () {
@@ -422,7 +395,7 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
         }
 
         // Auto-retaliate when hurt
-        autoRetaliate(game);
+        CombatHandler.autoRetaliate(game);
 
         if (game.playerhurt_callback) {
           game.playerhurt_callback();
@@ -517,13 +490,11 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
     var target = game.getEntityById(targetId);
 
     // Trigger combat music if player is involved
-    if (attackerId === game.playerId || targetId === game.playerId) {
-      game.audioManager.enterCombat();
-    }
+    CombatHandler.handleCombatMusicOnAttack(game, attackerId, targetId);
 
     // Auto-retaliate: if player is attacked while idle, fight back
     if (targetId === game.playerId && attacker && game.player) {
-      autoRetaliate(game);
+      CombatHandler.autoRetaliate(game);
     }
 
     if (attacker && attacker.id !== game.playerId) {
@@ -565,30 +536,7 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
         // before DESPAWN message arrives (fixes "immortal mob" race condition)
         if (hp <= 0 && !mob.isDying) {
           mob.isDying = true;
-          // If player is targeting this mob, disengage and retarget next attacker
-          if (game.player && game.player.target && game.player.target.id === mob.id) {
-            game.player.disengage();
-
-            // Auto-retarget: attack next nearest attacker
-            let nextTarget: any = null;
-            let nearestDist = Infinity;
-            game.player.forEachAttacker((attacker: any) => {
-              if (attacker && !attacker.isDead && !attacker.isDying && attacker.id !== mob.id) {
-                const dist = game.player.getDistanceToEntity(attacker);
-                if (dist < nearestDist) {
-                  nearestDist = dist;
-                  nextTarget = attacker;
-                }
-              }
-            });
-            if (nextTarget) {
-              console.debug('[Auto-retarget] Switching to next attacker:', nextTarget.id);
-              game.makePlayerAttack(nextTarget);
-            } else {
-              // No more attackers — fade out combat music
-              game.audioManager.exitCombat();
-            }
-          }
+          CombatHandler.handleTargetDeath(game, mob.id);
         }
       }
       // Refresh combat timer when dealing damage
@@ -610,9 +558,6 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
       // Batch regular kills to reduce spam
       addKillToBuffer(mobName, game);
     }
-
-    // Start fading out combat music after kill
-    game.audioManager.exitCombat();
 
     game.storage.incrementTotalKills();
     game.tryUnlockingAchievement('HUNTER');

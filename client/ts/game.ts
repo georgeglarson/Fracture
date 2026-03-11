@@ -1276,29 +1276,23 @@ export class Game {
 
       if (character.canAttack(time)) {
         if (!isMoving) { // don't hit target if moving to a different tile.
-          if (character.hasTarget() && character.getOrientationTo(character.target) !== character.orientation) {
-            character.lookAtTarget();
-          }
-
-          character.hit();
-
           if (character.id === this.playerId) {
-            // Don't send HIT for dying/dead targets
-            if (character.target && !character.target.isDying && !character.target.isDead) {
-              this.client.sendHit(character.target);
-            } else if (character.target && (character.target.isDying || character.target.isDead)) {
-              // Target died, disengage
+            // Bug B fix: check target alive BEFORE playing hit animation
+            if (character.target && (character.target.isDying || character.target.isDead)) {
+              // Target died — disengage, stop pathing (Bug C fix), reset animation
               character.disengage();
-            }
-          }
+              character.stop();
+              character.idle();
+            } else if (character.target) {
+              if (character.getOrientationTo(character.target) !== character.orientation) {
+                character.lookAtTarget();
+              }
+              character.hit();
+              this.client.sendHit(character.target);
 
-          if (character instanceof Player && this.camera.isVisible(character)) {
-            this.audioManager.playSound('hit' + Math.floor(Math.random() * 2 + 1));
-            // Small screen shake on hit for punch feedback
-            if (character.id === this.playerId) {
-              this.renderer.camera.shake(2, 50);
-              // Spawn hit particles at target position
-              if (character.target) {
+              if (this.camera.isVisible(character)) {
+                this.audioManager.playSound('hit' + Math.floor(Math.random() * 2 + 1));
+                this.renderer.camera.shake(2, 50);
                 this.renderer.particles.spawnHitParticles(
                   character.target.x,
                   character.target.y - 8,
@@ -1307,13 +1301,24 @@ export class Game {
                 );
               }
             }
-          }
+          } else {
+            // Non-player (mobs): hit unconditionally — server controls their state
+            if (character.hasTarget() && character.getOrientationTo(character.target) !== character.orientation) {
+              character.lookAtTarget();
+            }
 
-          // Only send HURT if the attacking mob is still alive (not dying/dead)
-          if (character.hasTarget() && character.target.id === this.playerId &&
-              this.player && !this.player.invincible &&
-              !character.isDying && !character.isDead) {
-            this.client.sendHurt(character);
+            character.hit();
+
+            if (character instanceof Player && this.camera.isVisible(character)) {
+              this.audioManager.playSound('hit' + Math.floor(Math.random() * 2 + 1));
+            }
+
+            // Only send HURT if the attacking mob is still alive (not dying/dead)
+            if (character.hasTarget() && character.target.id === this.playerId &&
+                this.player && !this.player.invincible &&
+                !character.isDying && !character.isDead) {
+              this.client.sendHurt(character);
+            }
           }
         }
       } else {

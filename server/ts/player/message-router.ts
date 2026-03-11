@@ -366,7 +366,7 @@ export function createMessageHandlers(
       if (mob && !mob.isDead) {
         // Apply Power Strike multiplier (consumes the buff if active)
         const powerStrikeMultiplier = ctx.consumePowerStrike();
-        const baseDmg = Formulas.dmg(ctx.weaponLevel, mob.armorLevel);
+        const baseDmg = Formulas.dmg(ctx.weaponLevel, mob.armorLevel, ctx.level);
         const dmg = Math.floor(baseDmg * powerStrikeMultiplier);
         if (dmg > 0) {
           mob.receiveDamage(dmg, ctx.id);
@@ -407,7 +407,7 @@ export function createMessageHandlers(
           ctx.world.broadcastAttacker(mob);
         }
 
-        ctx.hitPoints -= Formulas.dmg(mob.weaponLevel, ctx.armorLevel);
+        ctx.hitPoints -= Formulas.dmg(mob.weaponLevel, ctx.armorLevel, mob.level ?? 1);
         ctx.world.handleHurtEntity(ctx);
 
         if (ctx.hitPoints <= 0) {

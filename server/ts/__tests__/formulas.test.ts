@@ -48,8 +48,19 @@ describe('Formulas', () => {
       // dealt = 1 * 5 + 0 = 5
       // absorbed = 10 * 3 = 30
       // damage = 5 - 30 = -25 (negative)
-      // returns randomInt(0, 3) = 2
+      // returns randomInt(1, 3) = 2
       expect(damage).toBe(2);
+    });
+
+    it('should never return 0 damage (minimum damage guarantee)', () => {
+      // When damage formula goes negative, randomInt(1,3) ensures minimum 1
+      vi.spyOn(Utils, 'randomInt')
+        .mockReturnValueOnce(5)   // weapon multiplier
+        .mockReturnValueOnce(3)   // armor absorption
+        .mockReturnValueOnce(1);  // minimum fallback: was 0, now 1
+
+      const damage = Formulas.dmg(1, 10, 1);
+      expect(damage).toBeGreaterThanOrEqual(1);
     });
 
     it('should handle default player level of 1', () => {

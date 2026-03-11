@@ -336,9 +336,9 @@ export class World {
             mob.forgetEveryone();
             return;
           }
-          // Re-broadcast attack when mob is adjacent — keeps the client combat loop alive
-          const mobToTarget = Utils.distanceTo(mob.x, mob.y, (target as any).x, (target as any).y);
-          if (mobToTarget <= 2 && mob.group) {
+          // Re-broadcast attack every aggro tick — keeps client combat state synchronized
+          // during chase (mob already has valid target; leash/dead checks above handle invalid states)
+          if (mob.group) {
             self.pushToAdjacentGroups(mob.group, mob.attack());
           }
           return;

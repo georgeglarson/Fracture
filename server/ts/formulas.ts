@@ -49,7 +49,7 @@ export class Formulas {
     const dmg = dealt - absorbed;
 
     if (dmg <= 0) {
-      return Utils.randomInt(0, 3);
+      return Utils.randomInt(1, 3);
     } else {
       return dmg;
     }
