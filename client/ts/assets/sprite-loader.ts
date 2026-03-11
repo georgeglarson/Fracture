@@ -106,7 +106,7 @@ export class SpriteLoader {
    */
   initHurtSprites(): void {
     const sprites = this.sprites;
-    Types.forEachArmorKind((kind, kindName) => {
+    Types.forEachArmor((kind, kindName) => {
       if (sprites[kindName]) {
         sprites[kindName].createHurtSprite();
       }

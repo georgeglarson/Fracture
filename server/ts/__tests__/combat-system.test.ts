@@ -39,14 +39,18 @@ vi.mock('./kill-streak.service.js', () => ({
   }),
 }));
 
-// Track mock function for forEachPlayerHated
+// Track mock functions for CombatTracker
 const mockForEachPlayerHated = vi.fn();
 const mockClearMobAggro = vi.fn();
+const mockGetMobsAttacking = vi.fn(() => [] as number[]);
+const mockClearPlayerAggro = vi.fn();
 
 vi.mock('../combat/combat-tracker.js', () => ({
   getCombatTracker: () => ({
     forEachPlayerHated: mockForEachPlayerHated,
     clearMobAggro: mockClearMobAggro,
+    getMobsAttacking: mockGetMobsAttacking,
+    clearPlayerAggro: mockClearPlayerAggro,
   }),
 }));
 
@@ -59,7 +63,7 @@ describe('CombatSystem', () => {
   let mockMob: Entity;
 
   beforeEach(() => {
-    // Create mock entities
+    // Create mock entities - both at same position for melee range
     mockPlayer = {
       id: 1,
       type: 'player',
@@ -90,6 +94,8 @@ describe('CombatSystem', () => {
       armorLevel: 3,
       group: 'zone1',
       target: null,
+      x: 100, // Same position as player = within melee range
+      y: 100,
       increaseHateFor: vi.fn(),
       getHatedPlayerId: vi.fn(() => 1),
       setTarget: vi.fn(),
@@ -103,6 +109,8 @@ describe('CombatSystem', () => {
     // Reset CombatTracker mocks
     mockForEachPlayerHated.mockReset();
     mockClearMobAggro.mockReset();
+    mockGetMobsAttacking.mockReset().mockReturnValue([]);
+    mockClearPlayerAggro.mockReset();
 
     // Create mock world context
     mockWorld = {
@@ -147,22 +155,36 @@ describe('CombatSystem', () => {
   });
 
   describe('chooseMobTarget', () => {
-    it('should set mob target to most hated player', () => {
+    it('should set mob target and register attacker when in melee range', () => {
       mockMob.getHatedPlayerId = vi.fn(() => 1);
       mockPlayer.attackers = {};
 
       combatSystem.chooseMobTarget(mockMob);
 
-      expect(mockPlayer.addAttacker).toHaveBeenCalledWith(mockMob);
       expect(mockMob.setTarget).toHaveBeenCalledWith(mockPlayer);
+      expect(mockPlayer.addAttacker).toHaveBeenCalledWith(mockMob);
     });
 
-    it('should broadcast attack when target is set', () => {
+    it('should broadcast attack when in melee range', () => {
       mockMob.getHatedPlayerId = vi.fn(() => 1);
       mockPlayer.attackers = {};
 
       combatSystem.chooseMobTarget(mockMob);
 
+      expect(mockWorld.pushToAdjacentGroups).toHaveBeenCalled();
+    });
+
+    it('should register attacker and broadcast attack even when out of melee range', () => {
+      mockMob.getHatedPlayerId = vi.fn(() => 1);
+      mockMob.x = 0;  // Far from player at (100, 100)
+      mockMob.y = 0;
+      mockPlayer.attackers = {};
+
+      combatSystem.chooseMobTarget(mockMob);
+
+      expect(mockMob.setTarget).toHaveBeenCalledWith(mockPlayer);
+      expect(mockPlayer.addAttacker).toHaveBeenCalledWith(mockMob);
+      // Attack always broadcast so client knows mob is hostile
       expect(mockWorld.pushToAdjacentGroups).toHaveBeenCalled();
     });
 
@@ -172,6 +194,25 @@ describe('CombatSystem', () => {
       combatSystem.chooseMobTarget(mockMob);
 
       expect(mockPlayer.addAttacker).not.toHaveBeenCalled();
+    });
+
+    it('should skip phased players and try next target', () => {
+      mockPlayer.isPhased = vi.fn(() => true);
+      mockMob.getHatedPlayerId = vi.fn()
+        .mockReturnValueOnce(1)   // First call: phased player
+        .mockReturnValueOnce(null); // Second call: no one else
+
+      combatSystem.chooseMobTarget(mockMob);
+
+      expect(mockMob.setTarget).not.toHaveBeenCalled();
+    });
+
+    it('should not target during stun', () => {
+      mockMob.stunUntil = Date.now() + 10000; // Stunned for 10s
+
+      combatSystem.chooseMobTarget(mockMob);
+
+      expect(mockMob.getHatedPlayerId).not.toHaveBeenCalled();
     });
   });
 
@@ -241,25 +282,34 @@ describe('CombatSystem', () => {
 
       expect(mockWorld.removeEntity).toHaveBeenCalledWith(mockMob);
     });
+
+    it('should skip already-dead entities (isDead flag)', () => {
+      mockMob.hitPoints = 0;
+      mockMob.isDead = true;
+
+      combatSystem.handleHurtEntity(mockMob, mockPlayer, 50);
+
+      expect(mockWorld.removeEntity).not.toHaveBeenCalled();
+    });
   });
 
   describe('handlePlayerVanish', () => {
-    it('should redirect all attackers to next target', () => {
-      const attackingMobs = [mockMob];
-      mockPlayer.forEachAttacker = vi.fn((cb) => attackingMobs.forEach(cb));
+    it('should clear aggro for all mobs attacking the player via CombatTracker', () => {
+      mockGetMobsAttacking.mockReturnValue([100]);
 
       combatSystem.handlePlayerVanish(mockPlayer);
 
+      expect(mockGetMobsAttacking).toHaveBeenCalledWith(1);
       expect(mockMob.clearTarget).toHaveBeenCalled();
       expect(mockMob.forgetPlayer).toHaveBeenCalledWith(1, 1000);
-      expect(mockPlayer.removeAttacker).toHaveBeenCalledWith(mockMob);
     });
 
-    it('should update entity group membership', () => {
-      mockPlayer.forEachAttacker = vi.fn();
+    it('should clear player aggro in CombatTracker and update groups', () => {
+      mockGetMobsAttacking.mockReturnValue([]);
 
       combatSystem.handlePlayerVanish(mockPlayer);
 
+      expect(mockClearPlayerAggro).toHaveBeenCalledWith(1);
       expect(mockWorld.handleEntityGroupMembership).toHaveBeenCalledWith(mockPlayer);
     });
   });
@@ -307,7 +357,6 @@ describe('CombatSystem', () => {
     it('should send kill message to attacker', () => {
       combatSystem.handleHurtEntity(mockMob, mockPlayer, 50);
 
-      // Verify pushToPlayer was called with Kill message
       expect(mockWorld.pushToPlayer).toHaveBeenCalled();
     });
 
@@ -342,9 +391,10 @@ describe('CombatSystem', () => {
       mockPlayer.group = 'zone1';
       mockPlayer.despawn = vi.fn(() => ({ serialize: () => [3, 1] }));
       mockPlayer.forEachAttacker = vi.fn();
+      mockGetMobsAttacking.mockReturnValue([]);
     });
 
-    it('should call handlePlayerVanish on death', () => {
+    it('should call handlePlayerVanish on death (updates group membership)', () => {
       combatSystem.handleHurtEntity(mockPlayer, mockMob, 100);
 
       expect(mockWorld.handleEntityGroupMembership).toHaveBeenCalledWith(mockPlayer);
@@ -360,6 +410,28 @@ describe('CombatSystem', () => {
       combatSystem.handleHurtEntity(mockPlayer, mockMob, 100);
 
       expect(mockWorld.removeEntity).toHaveBeenCalledWith(mockPlayer);
+    });
+
+    it('should clear player aggro in CombatTracker', () => {
+      combatSystem.handleHurtEntity(mockPlayer, mockMob, 100);
+
+      expect(mockClearPlayerAggro).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('isMobStunned', () => {
+    it('should return false for unstunned mobs', () => {
+      expect(combatSystem.isMobStunned(mockMob)).toBe(false);
+    });
+
+    it('should return true for actively stunned mobs', () => {
+      mockMob.stunUntil = Date.now() + 10000;
+      expect(combatSystem.isMobStunned(mockMob)).toBe(true);
+    });
+
+    it('should return false when stun has expired', () => {
+      mockMob.stunUntil = Date.now() - 1000;
+      expect(combatSystem.isMobStunned(mockMob)).toBe(false);
     });
   });
 });

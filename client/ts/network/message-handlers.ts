@@ -16,6 +16,14 @@ import { Npc } from '../entity/character/npc/npc';
 import type { Game } from '../game';
 import type { GameClient } from './gameclient';
 import { ClientEvents } from './client-events';
+import * as PartyHandler from '../handlers/party.handler';
+import * as InventoryHandler from '../handlers/inventory.handler';
+import * as ShopHandler from '../handlers/shop.handler';
+import * as AchievementHandler from '../handlers/achievement.handler';
+import * as GameEventHandler from '../handlers/game-event.handler';
+import * as SkillUIHandler from '../handlers/skill-ui.handler';
+import * as RiftUIHandler from '../handlers/rift-ui.handler';
+import * as ProgressionUIHandler from '../handlers/progression-ui.handler';
 
 // Kill notification batching system
 const killBuffer: Map<string, number> = new Map();
@@ -779,20 +787,20 @@ function setupProgressionHandlers(game: Game, client: GameClient): void {
 
     const today = new Date().toISOString().split('T')[0];
     game.storage.saveDailyLogin(today, streak);
-    game.showDailyRewardPopup(gold, xp, streak);
+    GameEventHandler.showDailyRewardPopup(gold, xp, streak);
   });
 
   // Efficiency/rested/ascension handlers
   client.on(ClientEvents.PROGRESSION_INIT, function (data) {
-    game.handleProgressionInit(data);
+    ProgressionUIHandler.handleProgressionInit(game, data);
   });
 
   client.on(ClientEvents.PROGRESSION_ASCEND, function (ascensionCount, title) {
-    game.handleProgressionAscend(ascensionCount, title);
+    ProgressionUIHandler.handleProgressionAscend(game, ascensionCount, title);
   });
 
   client.on(ClientEvents.PROGRESSION_UPDATE, function (data) {
-    game.handleProgressionUpdate(data);
+    ProgressionUIHandler.handleProgressionUpdate(game, data);
   });
 }
 
@@ -802,23 +810,23 @@ function setupMiscHandlers(game: Game, client: GameClient): void {
 
 function setupRiftHandlers(game: Game, client: GameClient): void {
   client.on(ClientEvents.RIFT_START, function (data: any) {
-    game.handleRiftStart(data);
+    RiftUIHandler.handleRiftStart(game, data);
   });
 
   client.on(ClientEvents.RIFT_PROGRESS, function (data: any) {
-    game.handleRiftProgress(data);
+    RiftUIHandler.handleRiftProgress(game, data);
   });
 
   client.on(ClientEvents.RIFT_ADVANCE, function (data: any) {
-    game.handleRiftAdvance(data);
+    RiftUIHandler.handleRiftAdvance(game, data);
   });
 
   client.on(ClientEvents.RIFT_END, function (data: any) {
-    game.handleRiftEnd(data);
+    RiftUIHandler.handleRiftEnd(game, data);
   });
 
   client.on(ClientEvents.RIFT_LEADERBOARD, function (data: any) {
-    game.handleRiftLeaderboard(data);
+    RiftUIHandler.handleRiftLeaderboard(game, data);
   });
 }
 
@@ -828,145 +836,147 @@ function setupShopHandlers(game: Game, client: GameClient): void {
   });
 
   client.on(ClientEvents.SHOP_BUY_RESULT, function (success, itemKind, newGold, message) {
-    game.handleShopBuyResult(success, itemKind, newGold, message);
+    ShopHandler.handleShopBuyResult(game, success, itemKind, newGold, message);
   });
 
   client.on(ClientEvents.SHOP_SELL_RESULT, function (success, goldGained, newGold, message) {
-    game.handleShopSellResult(success, goldGained, newGold, message);
+    ShopHandler.handleShopSellResult(game, success, goldGained, newGold, message);
   });
 }
 
 function setupAchievementHandlers(game: Game, client: GameClient): void {
   client.on(ClientEvents.ACHIEVEMENT_INIT, function (unlocked, progress, selectedTitle) {
-    game.handleAchievementInit(unlocked, progress, selectedTitle);
+    AchievementHandler.handleAchievementInit(game, unlocked, progress, selectedTitle);
   });
 
   client.on(ClientEvents.ACHIEVEMENT_UNLOCK, function (achievementId) {
-    game.handleAchievementUnlock(achievementId);
+    AchievementHandler.handleAchievementUnlock(game, achievementId);
     game.audioManager.playSound('quest');
   });
 
   client.on(ClientEvents.ACHIEVEMENT_PROGRESS, function (achievementId, current, target) {
-    game.handleAchievementProgress(achievementId, current, target);
+    AchievementHandler.handleAchievementProgress(game, achievementId, current, target);
   });
 
   client.on(ClientEvents.PLAYER_TITLE_UPDATE, function (playerId, title) {
-    game.handlePlayerTitleUpdate(playerId, title);
+    AchievementHandler.handlePlayerTitleUpdate(game, playerId, title);
   });
 }
 
 function setupPartyHandlers(game: Game, client: GameClient): void {
   client.on(ClientEvents.PARTY_INVITE_RECEIVED, function (inviterId, inviterName) {
-    game.handlePartyInvite(inviterId, inviterName);
+    PartyHandler.handlePartyInvite(game, inviterId, inviterName);
   });
 
   client.on(ClientEvents.PARTY_JOIN, function (partyId, members, leaderId) {
-    game.handlePartyJoin(partyId, members, leaderId);
+    PartyHandler.handlePartyJoin(game, partyId, members, leaderId);
   });
 
   client.on(ClientEvents.PARTY_LEAVE, function (playerId) {
-    game.handlePartyLeave(playerId);
+    PartyHandler.handlePartyLeave(game, playerId);
   });
 
   client.on(ClientEvents.PARTY_DISBAND, function () {
-    game.handlePartyDisband();
+    PartyHandler.handlePartyDisband(game);
   });
 
   client.on(ClientEvents.PARTY_UPDATE, function (members) {
-    game.handlePartyUpdate(members);
+    PartyHandler.handlePartyUpdate(game, members);
   });
 
   client.on(ClientEvents.PARTY_CHAT, function (senderId, senderName, message) {
-    game.handlePartyChat(senderId, senderName, message);
+    PartyHandler.handlePartyChat(game, senderId, senderName, message);
   });
 
   client.on(ClientEvents.PLAYER_INSPECT_RESULT, function (playerId, name, title, level, weapon, armor) {
-    game.handlePlayerInspectResult(playerId, name, title, level, weapon, armor);
+    PartyHandler.handlePlayerInspectResult(game, playerId, name, title, level, weapon, armor);
   });
 }
 
 function setupInventoryHandlers(game: Game, client: GameClient): void {
   client.on(ClientEvents.INVENTORY_INIT, function (slots) {
-    game.handleInventoryInit(slots);
+    InventoryHandler.handleInventoryInit(game, slots);
+    // Update equipment display with current player equipment
+    game.updateEquippedDisplay();
   });
 
   client.on(ClientEvents.INVENTORY_ADD, function (slotIndex, kind, properties, count) {
-    game.handleInventoryAdd(slotIndex, kind, properties, count);
+    InventoryHandler.handleInventoryAdd(game, slotIndex, kind, properties, count);
     // Play loot sound when server confirms item was picked up
     game.audioManager?.playSound('loot');
   });
 
   client.on(ClientEvents.INVENTORY_REMOVE, function (slotIndex) {
-    game.handleInventoryRemove(slotIndex);
+    InventoryHandler.handleInventoryRemove(game, slotIndex);
   });
 
   client.on(ClientEvents.INVENTORY_UPDATE, function (slotIndex, count) {
-    game.handleInventoryUpdate(slotIndex, count);
+    InventoryHandler.handleInventoryUpdate(game, slotIndex, count);
   });
 }
 
 function setupZoneHandlers(game: Game, client: GameClient): void {
   // Zone enter notification - show zone name and level range
   client.on(ClientEvents.ZONE_ENTER, function (zoneId, zoneName, minLevel, maxLevel, warning) {
-    game.handleZoneEnter(zoneId, zoneName, minLevel, maxLevel, warning);
+    game.currentZone = GameEventHandler.handleZoneEnter(game, zoneId, zoneName, minLevel, maxLevel, warning);
   });
 
   // Zone info - update UI with bonus percentages
   client.on(ClientEvents.ZONE_INFO, function (zoneId, rarityBonus, goldBonus, xpBonus) {
-    game.handleZoneInfo(zoneId, rarityBonus, goldBonus, xpBonus);
+    GameEventHandler.handleZoneInfo(game, zoneId, rarityBonus, goldBonus, xpBonus);
   });
 }
 
 function setupBossHandlers(game: Game, client: GameClient): void {
   // Leaderboard response - show boss kill rankings
   client.on(ClientEvents.LEADERBOARD_RESPONSE, function (entries) {
-    game.handleLeaderboardResponse(entries);
+    GameEventHandler.handleLeaderboardResponse(game, entries);
   });
 
   // Boss kill announcement - show notification when boss is killed
   client.on(ClientEvents.BOSS_KILL, function (bossName, killerName) {
-    game.handleBossKill(bossName, killerName);
+    GameEventHandler.handleBossKill(game, bossName, killerName);
   });
 
   // Kill streak announcement - show when player reaches a new tier
   client.on(ClientEvents.KILL_STREAK, function (playerId, playerName, streakCount, tierTitle, announcement) {
-    game.handleKillStreak(playerId, playerName, streakCount, tierTitle, announcement);
+    GameEventHandler.handleKillStreak(game, playerId, playerName, streakCount, tierTitle, announcement);
   });
 
   // Kill streak ended - show when a player's streak is broken
   client.on(ClientEvents.KILL_STREAK_ENDED, function (playerId, playerName, streakCount, endedByName) {
-    game.handleKillStreakEnded(playerId, playerName, streakCount, endedByName);
+    GameEventHandler.handleKillStreakEnded(game, playerId, playerName, streakCount, endedByName);
   });
 
   // Nemesis power up - show when a mob becomes more powerful after killing players
   client.on(ClientEvents.NEMESIS_POWER_UP, function (mobId, originalName, nemesisName, title, powerLevel, kills, victimName) {
-    game.handleNemesisPowerUp(mobId, originalName, nemesisName, title, powerLevel, kills, victimName);
+    GameEventHandler.handleNemesisPowerUp(game, mobId, originalName, nemesisName, title, powerLevel, kills, victimName);
   });
 
   // Nemesis killed - show when a nemesis is slain (possibly revenge)
   client.on(ClientEvents.NEMESIS_KILLED, function (mobId, nemesisName, title, kills, killerName, isRevenge) {
-    game.handleNemesisKilled(mobId, nemesisName, title, kills, killerName, isRevenge);
+    GameEventHandler.handleNemesisKilled(game, mobId, nemesisName, title, kills, killerName, isRevenge);
   });
 }
 
 function setupSkillHandlers(game: Game, client: GameClient): void {
   // Skill init - receive unlocked skills on login
   client.on(ClientEvents.SKILL_INIT, function (skills) {
-    game.handleSkillInit(skills);
+    SkillUIHandler.handleSkillInit(game, skills);
   });
 
   // Skill effect - visual feedback for skill usage
   client.on(ClientEvents.SKILL_EFFECT, function (playerId, skillId, x, y, orientation) {
-    game.handleSkillEffect(playerId, skillId, x, y, orientation);
+    SkillUIHandler.handleSkillEffect(game, playerId, skillId, x, y, orientation);
   });
 
   // Skill cooldown - start cooldown timer
   client.on(ClientEvents.SKILL_COOLDOWN, function (skillId, duration) {
-    game.handleSkillCooldown(skillId, duration);
+    SkillUIHandler.handleSkillCooldown(game, skillId, duration);
   });
 
   // Skill unlock - new skill available
   client.on(ClientEvents.SKILL_UNLOCK, function (skill) {
-    game.handleSkillUnlock(skill);
+    SkillUIHandler.handleSkillUnlock(game, skill);
   });
 }

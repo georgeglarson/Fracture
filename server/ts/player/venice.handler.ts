@@ -30,7 +30,7 @@ async function generateTTS(text: string, npcType: string): Promise<string | null
   try {
     const result = await fishAudio.textToSpeech(text, npcType);
     if (result) {
-      console.log(`[FishAudio] Generated TTS for ${npcType}: ${result.audioUrl} (cached: ${result.cached})`);
+      console.debug(`[FishAudio] Generated TTS for ${npcType}: ${result.audioUrl} (cached: ${result.cached})`);
       return result.audioUrl;
     }
   } catch (error) {
@@ -43,23 +43,21 @@ async function generateTTS(text: string, npcType: string): Promise<string | null
  * Handle NPC dialogue request
  */
 export async function handleNpcTalk(ctx: VenicePlayerContext, npcKind: number): Promise<void> {
-  console.log(`[Venice] handleNpcTalk called with npcKind: ${npcKind}`);
+  console.debug(`[Venice] handleNpcTalk npcKind=${npcKind}`);
   const venice = getVeniceService();
   const npcType = Types.getKindAsString(npcKind);
-  console.log(`[Venice] npcType resolved to: ${npcType}, venice service: ${venice ? 'available' : 'null'}`);
 
   // Check if this NPC is a merchant - if so, send shop data too
   if (isMerchant(npcKind)) {
     const shop = getShopInventory(npcKind);
     if (shop) {
-      console.log(`[Shop] Opening shop: ${shop.name}`);
+      console.debug(`[Shop] Opening shop: ${shop.name}`);
       const items = shopService.getInventoryWithStock(npcKind);
       ctx.send(new Messages.ShopOpen(npcKind, shop.name, items || []).serialize());
     }
   }
 
   if (!npcType) {
-    console.log('[Venice] Unknown NPC type, sending fallback');
     ctx.send(new Messages.NpcTalkResponse(npcKind, '...', null).serialize());
     return;
   }
@@ -69,20 +67,19 @@ export async function handleNpcTalk(ctx: VenicePlayerContext, npcKind: number): 
     const { NPC_PERSONALITIES } = await import('../ai/npc-personalities.js');
     const personality = NPC_PERSONALITIES[npcType.toLowerCase()];
     const fallback = personality ? personality.greeting : '...';
-    console.log(`[Venice] No AI service, using static greeting: ${fallback}`);
     const audioUrl = await generateTTS(fallback, npcType);
     ctx.send(new Messages.NpcTalkResponse(npcKind, fallback, audioUrl).serialize());
     return;
   }
 
   try {
-    console.log(`[Venice] Generating dialogue for ${npcType}...`);
+    console.debug(`[Venice] Generating dialogue for ${npcType}...`);
     const response = await venice.generateNpcDialogue(
       npcType,
       ctx.name,
       ctx.id.toString()
     );
-    console.log(`[Venice] Got response: ${response}`);
+    console.debug(`[Venice] Got response: ${response}`);
 
     const audioUrl = await generateTTS(response, npcType);
     ctx.send(new Messages.NpcTalkResponse(npcKind, response, audioUrl).serialize());
@@ -239,24 +236,21 @@ export function cleanupVenice(playerId: string): void {
  * Handle news request (Town Crier)
  */
 export async function handleNewsRequest(ctx: VenicePlayerContext): Promise<void> {
-  console.log('[TownCrier] handleNewsRequest called for player:', ctx.name);
+  console.debug('[TownCrier] handleNewsRequest for player:', ctx.name);
   const venice = getVeniceService();
   if (!venice) {
-    console.log('[TownCrier] No Venice service, sending empty response');
     ctx.send(new Messages.NewsResponse([]).serialize());
     return;
   }
 
   try {
-    console.log('[TownCrier] Generating newspaper...');
     const newspaper = await venice.generateNewspaper();
-    console.log('[TownCrier] Generated', newspaper.headlines.length, 'headlines');
+    console.debug('[TownCrier] Generated', newspaper.headlines.length, 'headlines');
     const response = new Messages.NewsResponse(newspaper.headlines).serialize();
-    console.log('[TownCrier] Sending response:', JSON.stringify(response));
     ctx.send(response);
   } catch (error) {
     console.error('[TownCrier] Venice newspaper error:', error);
-    ctx.send(new Messages.NewsResponse(['📰 No news today...']).serialize());
+    ctx.send(new Messages.NewsResponse(['No news today...']).serialize());
   }
 }
 
@@ -284,7 +278,7 @@ export async function triggerNarration(
     return;
   }
 
-  console.log(`[Narrator] Triggering narration for event: ${event}`);
+  console.debug(`[Narrator] Triggering narration: ${event}`);
 
   try {
     // Try AI narration first
@@ -296,13 +290,11 @@ export async function triggerNarration(
     );
 
     if (narration) {
-      console.log(`[Narrator] AI response: "${narration.text}"${narration.audioUrl ? ' [with audio]' : ''}`);
       ctx.send(new Messages.Narrator(narration.text, narration.style, narration.audioUrl).serialize());
       narrationState.set(ctx.id, { lastTime: now });
     } else {
       // Fallback to static narration (no audio for fallbacks)
       const fallback = venice.getStaticNarration(event, ctx.name, details);
-      console.log(`[Narrator] Using fallback: "${fallback.text}"`);
       ctx.send(new Messages.Narrator(fallback.text, fallback.style).serialize());
       narrationState.set(ctx.id, { lastTime: now });
     }

@@ -151,7 +151,7 @@ export class RoamingBoss extends Mob {
       // Scale current HP proportionally
       this.hitPoints = Math.floor(this.maxHitPoints * hpPercent);
 
-      console.log(`[${this.config.id}] Dynamic difficulty: ${playerCount} players → ${Math.round(hpMultiplier * 100)}% HP, ${Math.round(dmgMultiplier * 100)}% damage`);
+      console.debug(`[${this.config.id}] Dynamic difficulty: ${playerCount} players → ${Math.round(hpMultiplier * 100)}% HP, ${Math.round(dmgMultiplier * 100)}% damage`);
     }
   }
 
@@ -263,9 +263,7 @@ export class RoamingBoss extends Mob {
     if (!this.world || this.hasTarget()) return;
 
     let closestPlayer: PlayerLike | null = null;
-    // this.aggroRange is in TILES, convert to PIXELS (16 pixels per tile)
-    const aggroRangePixels = this.aggroRange * 16;
-    let closestDistance = aggroRangePixels;
+    let closestDistance = this.aggroRange; // tiles
 
     // Check all players
     const players = this.world.players;
@@ -273,7 +271,6 @@ export class RoamingBoss extends Mob {
       const player = players[playerId];
       if (!player || player.isDead) continue;
 
-      // Utils.distanceTo returns Chebyshev distance in PIXELS
       const distance = Utils.distanceTo(this.x, this.y, player.x, player.y);
 
       if (distance < closestDistance) {
@@ -300,7 +297,7 @@ export class RoamingBoss extends Mob {
       this.world.handleMobHate(this.id, player.id, 100);
     }
 
-    console.log(`[${this.config.id}] ${this.bossName} is hunting ${player.name}!`);
+    console.debug(`[${this.config.id}] ${this.bossName} is hunting ${player.name}!`);
   }
 
   /**
@@ -311,17 +308,7 @@ export class RoamingBoss extends Mob {
     super.destroy();
   }
 
-  /**
-   * Get state for client (same as regular mob)
-   */
-  getState() {
-    return [
-      this.id,
-      this.kind,
-      this.x,
-      this.y
-    ];
-  }
+  // getState() removed - inherits Mob.getState() which includes HP/level for client health bars
 }
 
 /**
@@ -332,6 +319,7 @@ export class ZoneBossManager {
   private bosses: Map<number, RoamingBoss> = new Map();
   private bossIdCounter = 200000; // Reserved ID range for zone bosses
   private respawnTimers: Map<string, NodeJS.Timeout> = new Map();
+  private spawnTimers: NodeJS.Timeout[] = [];
 
   // Leaderboard: bossId -> Map<playerId, {name, kills}>
   private bossKills: Map<string, Map<number, { name: string; kills: number }>> = new Map();
@@ -375,9 +363,10 @@ export class ZoneBossManager {
     // Spawn initial bosses after 10 seconds (staggered)
     const configs = getAllBossConfigs();
     configs.forEach((config, index) => {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         this.spawnBoss(config);
       }, 10000 + index * 5000); // Stagger spawns by 5 seconds each
+      this.spawnTimers.push(timer);
     });
 
     console.log(`[ZoneBossManager] Initialized - ${configs.length} zone bosses configured!`);

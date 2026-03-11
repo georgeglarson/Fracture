@@ -31,6 +31,7 @@ export class IntroSequence {
   private gameReady = false;
   private gameReadyResolver: (() => void) | null = null;
   private glitchIntroAudio: HTMLAudioElement | null = null;
+  private audioFinished: Promise<void> | null = null;
 
   constructor() {
     // Preload glitch intro sound
@@ -67,7 +68,7 @@ export class IntroSequence {
   }
 
   /**
-   * Wait for game to be ready
+   * Wait for game to be ready (with timeout to prevent permanent freeze)
    */
   private waitForGameReady(): Promise<void> {
     if (this.gameReady) {
@@ -75,6 +76,14 @@ export class IntroSequence {
     }
     return new Promise(resolve => {
       this.gameReadyResolver = resolve;
+      // Safety timeout - don't hang forever if connection is slow
+      setTimeout(() => {
+        if (!this.gameReady) {
+          console.warn('[IntroSequence] Game ready timeout, proceeding anyway');
+          this.gameReady = true;
+          resolve();
+        }
+      }, 15000);
     });
   }
 
@@ -335,8 +344,6 @@ export class IntroSequence {
     });
   }
 
-  private audioFinished: Promise<void> | null = null;
-
   /**
    * Animate the intro sequence using anime.js
    */
@@ -492,7 +499,15 @@ export class IntroSequence {
     const handler = (e: KeyboardEvent) => {
       if (e.key === ' ' || e.key === 'Enter' || e.key === 'Escape') {
         e.preventDefault();
-        this.complete();
+        // If complete() already ran and is waiting for game ready, force-resolve it
+        if (!this.isPlaying && this.gameReadyResolver) {
+          console.log('[IntroSequence] User forced past game-ready wait');
+          this.gameReady = true;
+          this.gameReadyResolver();
+          this.gameReadyResolver = null;
+        } else {
+          this.complete();
+        }
         document.removeEventListener('keydown', handler);
       }
     };
@@ -526,10 +541,8 @@ export class IntroSequence {
     if (!this.isPlaying) return;
     this.isPlaying = false;
 
-    if (this.audio) {
-      this.audio.pause();
-      this.audio = null;
-    }
+    // Let audio finish naturally during the transition - don't cut it off
+    // It will be cleaned up in cleanup()
 
     // Fade out and stop glitch intro audio
     if (this.glitchIntroAudio) {
@@ -761,9 +774,13 @@ export class IntroSequence {
   }
 
   /**
-   * Cleanup DOM elements
+   * Cleanup DOM elements and audio
    */
   private cleanup(): void {
+    if (this.audio) {
+      this.audio.pause();
+      this.audio = null;
+    }
     if (this.overlay) {
       this.overlay.remove();
       this.overlay = null;

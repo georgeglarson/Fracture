@@ -9,21 +9,34 @@ import { getIntroService } from './ai/intro.service';
 type MessagePayload = { serialize(): unknown[] } | unknown[];
 
 /**
- * Get CORS origins from environment or use defaults
- * Set CORS_ORIGINS env var as comma-separated list: "http://localhost:8008,https://game.example.com"
+ * Get CORS origin handler from environment or use permissive same-origin policy.
+ * Since the client is served by this same Express server, the WebSocket
+ * connection always comes from the same origin. We validate dynamically
+ * rather than maintaining a hardcoded list of domains.
+ * Override with CORS_ORIGINS env var as comma-separated list if needed.
  */
-function getCorsOrigins(): string[] {
+function getCorsOrigins(): string[] | ((origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => void) {
   const envOrigins = process.env.CORS_ORIGINS;
   if (envOrigins) {
     return envOrigins.split(',').map(o => o.trim());
   }
-  // Default origins for development and production
-  return [
-    'http://localhost:8008',
-    'http://45.77.216.118:8008',
-    'https://fracture.venice.guru',
-    'https://fracture.georgelarson.me'
-  ];
+  // Dynamic: allow same-origin and common dev/prod patterns
+  return (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (same-origin, server-to-server, mobile apps)
+    if (!origin) {
+      return callback(null, true);
+    }
+    // Allow localhost for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
+    }
+    // Allow georgelarson.me and venice.guru subdomains
+    if (origin.includes('georgelarson.me') || origin.includes('venice.guru')) {
+      return callback(null, true);
+    }
+    // Reject unknown origins
+    callback(new Error('CORS not allowed for origin: ' + origin));
+  };
 }
 
 export class Server {

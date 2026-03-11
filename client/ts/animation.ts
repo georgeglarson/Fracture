@@ -18,7 +18,6 @@ export class Animation {
     this.width = width;
     this.height = height;
     this.reset();
-    // hi
   }
 
   tick() {

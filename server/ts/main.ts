@@ -11,6 +11,11 @@ if (result.error) {
 } else {
   console.info(`[ENV] Loaded environment from ${envPath}`);
 }
+// Catch unhandled promise rejections to prevent silent server crashes
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server] Unhandled promise rejection:', reason);
+});
+
 import {World} from './world';
 import {Server, Connection} from './ws';
 import {Metrics} from './metrics';

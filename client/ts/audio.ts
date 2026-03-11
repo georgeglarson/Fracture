@@ -320,7 +320,7 @@ export class AudioManager {
     }, { once: true });
 
     this.npcVoiceAudio.load();
-    console.log('[Audio] Playing NPC voice:', audioUrl);
+    console.debug('[Audio] Playing NPC voice:', audioUrl);
   }
 
   /**

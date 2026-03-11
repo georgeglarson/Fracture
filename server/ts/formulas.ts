@@ -219,7 +219,7 @@ export class Formulas {
    * Includes random variance for excitement
    */
   static goldFromMob(mobArmorLevel: number): number {
-    const baseGold = mobArmorLevel * 5;
-    return baseGold + Utils.randomInt(1, mobArmorLevel * 2);
+    const baseGold = Math.max(1, mobArmorLevel) * 5;
+    return baseGold + Utils.randomInt(1, Math.max(1, mobArmorLevel * 2));
   }
 }

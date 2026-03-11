@@ -19,17 +19,20 @@ export interface ContextMenuCallbacks {
 export class ContextMenu {
   private callbacks: ContextMenuCallbacks | null = null;
   private isInParty: () => boolean = () => false;
+  private boundClickHandler: () => void;
+  private boundContextHandler: (e: MouseEvent) => void;
 
   constructor() {
     // Close menu on any click outside
-    document.addEventListener('click', () => this.hide());
-    document.addEventListener('contextmenu', (e) => {
-      // Don't close if right-clicking on canvas (we'll handle that separately)
+    this.boundClickHandler = () => this.hide();
+    this.boundContextHandler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest('#container')) {
         this.hide();
       }
-    });
+    };
+    document.addEventListener('click', this.boundClickHandler);
+    document.addEventListener('contextmenu', this.boundContextHandler);
   }
 
   /**
@@ -208,9 +211,11 @@ export class ContextMenu {
   }
 
   /**
-   * Cleanup
+   * Cleanup - remove document-level listeners
    */
   cleanup(): void {
     this.hide();
+    document.removeEventListener('click', this.boundClickHandler);
+    document.removeEventListener('contextmenu', this.boundContextHandler);
   }
 }

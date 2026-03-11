@@ -205,12 +205,12 @@ export interface RiftEntranceLocation {
  * Fixed rift entrance locations in the world
  */
 export const RIFT_ENTRANCES: RiftEntranceLocation[] = [
-  { zone: 'village', x: 50, y: 50, minLevel: 5 },
-  { zone: 'forest', x: 120, y: 80, minLevel: 10 },
-  { zone: 'beach', x: 40, y: 140, minLevel: 15 },
-  { zone: 'cave', x: 90, y: 110, minLevel: 20 },
-  { zone: 'desert', x: 160, y: 50, minLevel: 25 },
-  { zone: 'lavaland', x: 200, y: 100, minLevel: 30 }
+  { zone: 'village', x: 50, y: 220, minLevel: 5 },      // y: 195-253
+  { zone: 'forest', x: 85, y: 170, minLevel: 10 },      // y: 145-195
+  { zone: 'beach', x: 40, y: 280, minLevel: 15 },       // y: 253-314
+  { zone: 'cave', x: 90, y: 120, minLevel: 20 },        // y: 100-145
+  { zone: 'desert', x: 85, y: 80, minLevel: 25 },       // y: 60-100
+  { zone: 'lavaland', x: 85, y: 30, minLevel: 30 }      // y: 0-60
 ];
 
 /**

@@ -1,4 +1,4 @@
 {
-  "host": "bq.venice.guru",
-  "port": 443
+  "host": "localhost",
+  "port": 8000
 }

@@ -415,9 +415,13 @@ export class AchievementUI {
   }
 
   /**
-   * Cleanup
+   * Cleanup - remove document-level listeners
    */
   cleanup(): void {
     this.hide();
+    if (this.keydownHandler) {
+      document.removeEventListener('keydown', this.keydownHandler);
+      this.keydownHandler = null;
+    }
   }
 }

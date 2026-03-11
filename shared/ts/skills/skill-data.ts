@@ -99,7 +99,7 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
   [SkillId.WAR_CRY]: {
     id: SkillId.WAR_CRY,
     name: 'War Cry',
-    description: 'Stun all enemies within 2 tiles for 1.5 seconds',
+    description: 'Stun all enemies within 3 tiles for 3 seconds',
     type: SkillType.UTILITY,
     unlockLevel: 15,
     cooldown: 20,

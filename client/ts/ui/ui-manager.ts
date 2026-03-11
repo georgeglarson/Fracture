@@ -80,7 +80,10 @@ export class UIManager {
     this.applyNarratorStyle(narratorEl, style);
 
     // Set text with dramatic quotes
-    narratorEl.innerHTML = `<em>"${text}"</em>`;
+    const em = document.createElement('em');
+    em.textContent = `"${text}"`;
+    narratorEl.textContent = '';
+    narratorEl.appendChild(em);
 
     // Fade in
     narratorEl.style.opacity = '1';

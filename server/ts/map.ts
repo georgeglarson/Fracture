@@ -284,6 +284,21 @@ export class Map {
 
     return area.getRandomPosition();
   }
+
+  /**
+   * Get a random position from non-starting checkpoints (for AI players)
+   * Falls back to starting position if no other checkpoints exist
+   */
+  getRandomNonStartingPosition() {
+    var nonStarting = Object.values(this.checkpoints).filter(
+      (cp: Checkpoint) => !this.startingAreas.includes(cp)
+    );
+    if (nonStarting.length === 0) {
+      return this.getRandomStartingPosition();
+    }
+    var i = Utils.randomInt(0, nonStarting.length - 1);
+    return nonStarting[i].getRandomPosition();
+  }
 }
 
 var pos = function (x: number, y: number): Position {

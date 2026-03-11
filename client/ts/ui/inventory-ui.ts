@@ -40,21 +40,23 @@ export class InventoryUI {
   private tooltip: HTMLDivElement | null = null;
   private equipped: EquippedItems = { weapon: null, armor: null, weaponProps: null, armorProps: null };
   private isShopOpenFn: (() => boolean) | null = null;
+  private boundClickHandler: () => void;
+  private eventBusSubs: { unsubscribe: () => void }[] = [];
 
   constructor(eventBus?: EventBus) {
     this.eventBus = eventBus || null;
 
     // Close context menu on click outside
-    document.addEventListener('click', () => this.hideContextMenu());
+    this.boundClickHandler = () => this.hideContextMenu();
+    document.addEventListener('click', this.boundClickHandler);
 
     // If using EventBus, subscribe to state changes
     if (this.eventBus) {
-      this.eventBus.on('state:inventory', ({ slots }) => {
-        this.updateSlots(slots);
-      });
-      this.eventBus.on('state:equipment', ({ weapon, armor, weaponProps, armorProps }) => {
-        this.updateEquipped(weapon, armor, weaponProps, armorProps);
-      });
+      this.eventBusSubs.push(
+        this.eventBus.on('state:inventory', ({ slots }: any) => this.updateSlots(slots)),
+        this.eventBus.on('state:equipment', ({ weapon, armor, weaponProps, armorProps }: any) =>
+          this.updateEquipped(weapon, armor, weaponProps, armorProps))
+      );
     }
   }
 
@@ -1181,9 +1183,14 @@ export class InventoryUI {
   }
 
   /**
-   * Cleanup
+   * Cleanup - remove document listeners and EventBus subscriptions
    */
   cleanup(): void {
     this.hide();
+    document.removeEventListener('click', this.boundClickHandler);
+    for (const sub of this.eventBusSubs) {
+      sub.unsubscribe();
+    }
+    this.eventBusSubs = [];
   }
 }

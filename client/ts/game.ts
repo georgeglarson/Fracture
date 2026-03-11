@@ -28,7 +28,7 @@ import {EntityManager} from './entities/entity-manager';
 import {InputManager} from './input/input-manager';
 import {UIManager} from './ui/ui-manager';
 import {ItemTooltip} from './ui/item-tooltip';
-import {PartyUI, PartyMember} from './ui/party-ui';
+import {PartyUI} from './ui/party-ui';
 import {PlayerInspect} from './ui/player-inspect';
 import {ContextMenu} from './ui/context-menu';
 import {InventoryUI} from './ui/inventory-ui';
@@ -42,7 +42,6 @@ import {SkillBarUI} from './ui/skill-bar-ui';
 import {RiftUI} from './ui/rift-ui';
 import {SkillId} from '../../shared/ts/skills';
 import {InventoryManager} from './inventory/inventory-manager';
-import {deserializeInventory, InventorySlot, SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
 import {setupNetworkHandlers} from './network/message-handlers';
 import {ZoningManager} from './world/zoning-manager';
 import {SpriteLoader} from './assets/sprite-loader';
@@ -1527,23 +1526,6 @@ export class Game {
     this.playertitleupdate_callback = callback;
   }
 
-  // Achievement handlers - Delegated to AchievementHandler
-  handleAchievementInit(unlockedIds: string[], progressMap: Record<string, { current: number; target: number }>, selectedTitle: string | null) {
-    AchievementHandler.handleAchievementInit(this, unlockedIds, progressMap, selectedTitle);
-  }
-
-  handleAchievementUnlock(achievementId: string) {
-    AchievementHandler.handleAchievementUnlock(this, achievementId);
-  }
-
-  handleAchievementProgress(achievementId: string, current: number, target: number) {
-    AchievementHandler.handleAchievementProgress(this, achievementId, current, target);
-  }
-
-  handlePlayerTitleUpdate(playerId: number, title: string | null) {
-    AchievementHandler.handlePlayerTitleUpdate(this, playerId, title);
-  }
-
   selectTitle(achievementId: string) {
     if (this.client) {
       this.client.sendSelectTitle(achievementId);
@@ -1748,34 +1730,7 @@ export class Game {
    * Shows the daily reward popup with streak flames
    */
   showDailyRewardPopup(gold: number, xp: number, streak: number) {
-    const popup = document.getElementById('daily-reward-popup');
-    if (!popup) return;
-
-    // Update the popup content
-    const streakEl = document.getElementById('daily-streak');
-    const goldEl = document.getElementById('daily-gold-amount');
-    const xpEl = document.getElementById('daily-xp-amount');
-    const flamesEl = document.getElementById('streak-flames');
-
-    if (streakEl) streakEl.textContent = streak.toString();
-    if (goldEl) goldEl.textContent = gold.toString();
-    if (xpEl) xpEl.textContent = xp.toString();
-
-    // Add flames based on streak (cap at 7)
-    if (flamesEl) {
-      const flameCount = Math.min(streak, 7);
-      flamesEl.innerHTML = Array(flameCount).fill('🔥').join('');
-    }
-
-    // Show the popup
-    popup.classList.add('show');
-
-    // Hide after 3 seconds
-    setTimeout(() => {
-      popup.classList.remove('show');
-    }, 3000);
-
-    console.info('[Daily] Reward popup shown: +' + gold + 'g, +' + xp + ' XP, streak: ' + streak);
+    GameEventHandler.showDailyRewardPopup(gold, xp, streak);
   }
 
   // Shop system - Delegated to ShopHandler
@@ -1793,52 +1748,12 @@ export class Game {
     ShopHandler.hideShop(this);
   }
 
-  handleShopBuyResult(success: boolean, itemKind: number, newGold: number, message: string) {
-    ShopHandler.handleShopBuyResult(this, success, itemKind, newGold, message);
-  }
-
-  handleShopSellResult(success: boolean, goldGained: number, newGold: number, message: string) {
-    ShopHandler.handleShopSellResult(this, success, goldGained, newGold, message);
-  }
-
   // Party System - Delegated to PartyHandler
   initPartyUI() {
     const result = PartyHandler.initPartyUI(this);
     this.partyUI = result.partyUI;
     this.playerInspect = result.playerInspect;
     this.contextMenu = result.contextMenu;
-  }
-
-  handlePartyInvite(inviterId: number, inviterName: string) {
-    PartyHandler.handlePartyInvite(this, inviterId, inviterName);
-  }
-
-  handlePartyJoin(partyId: string, members: PartyMember[], leaderId: number) {
-    PartyHandler.handlePartyJoin(this, partyId, members, leaderId);
-  }
-
-  handlePartyLeave(playerId: number) {
-    PartyHandler.handlePartyLeave(this, playerId);
-  }
-
-  handlePartyDisband() {
-    PartyHandler.handlePartyDisband(this);
-  }
-
-  handlePartyUpdate(members: PartyMember[]) {
-    PartyHandler.handlePartyUpdate(this, members);
-  }
-
-  handlePartyChat(senderId: number, senderName: string, message: string) {
-    PartyHandler.handlePartyChat(this, senderId, senderName, message);
-  }
-
-  handlePlayerInspectResult(playerId: number, name: string, title: string | null, level: number, weapon: number, armor: number) {
-    PartyHandler.handlePlayerInspectResult(this, playerId, name, title, level, weapon, armor);
-  }
-
-  showPlayerContextMenu(playerId: number, playerName: string, screenX: number, screenY: number) {
-    PartyHandler.showPlayerContextMenu(this, playerId, playerName, screenX, screenY);
   }
 
   rightClick(screenX: number, screenY: number): boolean {
@@ -1916,24 +1831,6 @@ export class Game {
     this.minimapUI?.toggle();
   }
 
-  handleInventoryInit(serializedSlots: (SerializedInventorySlot | null)[]) {
-    InventoryHandler.handleInventoryInit(this, serializedSlots);
-    // Update equipment display with current player equipment
-    this.updateEquippedDisplay();
-  }
-
-  handleInventoryAdd(slotIndex: number, kind: number, properties: Record<string, unknown> | null, count: number) {
-    InventoryHandler.handleInventoryAdd(this, slotIndex, kind, properties, count);
-  }
-
-  handleInventoryRemove(slotIndex: number) {
-    InventoryHandler.handleInventoryRemove(this, slotIndex);
-  }
-
-  handleInventoryUpdate(slotIndex: number, count: number) {
-    InventoryHandler.handleInventoryUpdate(this, slotIndex, count);
-  }
-
   pickupItemToInventory(item: Item) {
     InventoryHandler.pickupItemToInventory(this, item?.id);
   }
@@ -1945,282 +1842,8 @@ export class Game {
   // Current zone tracking
   currentZone: { id: string; name: string; minLevel: number; maxLevel: number } | null = null;
 
-  // Zone System - Delegated to GameEventHandler
-  handleZoneEnter(zoneId: string, zoneName: string, minLevel: number, maxLevel: number, warning: string | null) {
-    this.currentZone = GameEventHandler.handleZoneEnter(this, zoneId, zoneName, minLevel, maxLevel, warning);
-  }
-
-  handleZoneInfo(zoneId: string, rarityBonus: number, goldBonus: number, xpBonus: number) {
-    GameEventHandler.handleZoneInfo(this, zoneId, rarityBonus, goldBonus, xpBonus);
-  }
-
-  // Boss/Kill Events - Delegated to GameEventHandler
-  handleLeaderboardResponse(entries: Array<{ rank: number; name: string; kills: number }>) {
-    GameEventHandler.handleLeaderboardResponse(this, entries);
-  }
-
-  handleBossKill(bossName: string, killerName: string) {
-    GameEventHandler.handleBossKill(this, bossName, killerName);
-  }
-
-  handleKillStreak(playerId: number, playerName: string, streakCount: number, tierTitle: string, announcement: string) {
-    GameEventHandler.handleKillStreak(this, playerId, playerName, streakCount, tierTitle, announcement);
-  }
-
-  handleKillStreakEnded(playerId: number, playerName: string, streakCount: number, endedByName: string) {
-    GameEventHandler.handleKillStreakEnded(this, playerId, playerName, streakCount, endedByName);
-  }
-
-  handleNemesisPowerUp(mobId: number, originalName: string, nemesisName: string, title: string, powerLevel: number, kills: number, victimName: string) {
-    GameEventHandler.handleNemesisPowerUp(this, mobId, originalName, nemesisName, title, powerLevel, kills, victimName);
-  }
-
-  handleNemesisKilled(mobId: number, nemesisName: string, title: string, kills: number, killerName: string, isRevenge: boolean) {
-    GameEventHandler.handleNemesisKilled(this, mobId, nemesisName, title, kills, killerName, isRevenge);
-  }
-
-  // ============================================================================
-  // SKILL SYSTEM
-  // ============================================================================
-
-  initSkillBar() {
-    if (this.skillBarUI) return;
-
-    this.skillBarUI = new SkillBarUI();
-    this.skillBarUI.setCallbacks({
-      onSkillUse: (skillId: SkillId) => {
-        if (this.client) {
-          this.client.sendSkillUse(skillId);
-        }
-      }
-    });
-
-    console.info('[Skills] Skill bar initialized');
-  }
-
-  handleSkillInit(skills: Array<{ id: string; name: string; description: string; cooldown: number; hotkey: number; icon: string; remainingCooldown: number }>) {
-    if (!this.skillBarUI) {
-      this.initSkillBar();
-    }
-    this.skillBarUI?.initSkills(skills as any);
-    this.skillBarUI?.setVisible(true);
-  }
-
-  handleSkillEffect(playerId: number, skillId: string, x: number, y: number, orientation: number) {
-    const entity = this.entityManager?.getEntityById(playerId);
-    if (!entity) return;
-
-    const isLocalPlayer = playerId === this.playerId;
-    console.log(`[Skills] Visual effect for ${skillId} at ${x},${y}`);
-
-    // Handle Phase Shift - make player translucent and mark as phased
-    if (skillId === 'phase_shift') {
-      // Set entity as phased (for visual translucency)
-      (entity as any).isPhased = true;
-      (entity as any).phaseExpires = Date.now() + 2000; // 2 seconds
-
-      // Clear phase after duration
-      setTimeout(() => {
-        (entity as any).isPhased = false;
-        (entity as any).phaseExpires = 0;
-        if (isLocalPlayer) {
-          console.log('[Skills] Phase Shift ended');
-        }
-      }, 2000);
-
-      if (isLocalPlayer) {
-        // Disengage from any target - can't attack while phased
-        if (this.player?.hasTarget()) {
-          this.player.removeTarget();
-        }
-        this.showNotification('Phase Shift active!');
-        this.audioManager?.playSound('glitch1');
-      }
-    }
-
-    // Handle Power Strike - visual buff indicator
-    if (skillId === 'power_strike') {
-      if (isLocalPlayer) {
-        this.showNotification('Power Strike ready! Next attack deals 2x damage');
-        this.audioManager?.playSound('equip');
-      }
-      // Flash the entity
-      this.renderer?.particles.spawnHitParticles(entity.x, entity.y - 8, 8, '#ff8800');
-    }
-
-    // Handle War Cry - visual stun effect
-    if (skillId === 'war_cry') {
-      if (isLocalPlayer) {
-        this.showNotification('War Cry! Enemies stunned');
-        this.audioManager?.playSound('hurt');
-      }
-      // Spawn particles in a ring around player - more particles for visibility
-      this.renderer?.particles.spawnHitParticles(entity.x, entity.y - 8, 24, '#ffff00');
-      this.renderer?.particles.spawnHitParticles(entity.x, entity.y - 8, 12, '#ffaa00');
-      // Stronger camera shake for impact
-      this.renderer?.camera.shake(8, 300);
-    }
-
-    // Handle Whirlwind - visual spin/damage effect
-    if (skillId === 'whirlwind') {
-      if (isLocalPlayer) {
-        this.showNotification('Whirlwind!');
-        this.audioManager?.playSound('hurt');
-      }
-      // Spawn particles around player
-      this.renderer?.particles.spawnHitParticles(entity.x, entity.y - 8, 16, '#ff4444');
-      this.renderer?.camera.shake(6, 200);
-    }
-  }
-
-  handleSkillCooldown(skillId: string, duration: number) {
-    this.skillBarUI?.startCooldown(skillId as SkillId, duration);
-  }
-
-  handleSkillUnlock(skill: { id: string; name: string; description: string; cooldown: number; hotkey: number; icon: string }) {
-    this.skillBarUI?.unlockSkill(skill as any);
-    // Play unlock sound
-    this.audioManager?.playSound('loot');
-  }
-
-  // Progression efficiency state
+  // Progression efficiency state (used by ProgressionUIHandler)
   progressionData: { ascensionCount: number; restedXp: number; efficiency: number; title: string; canAscend: boolean } | null = null;
-
-  handleProgressionInit(data: { ascensionCount: number; restedXp: number; efficiency: number; title: string; canAscend: boolean; maxLevel: number; bonuses: { xp: number; damage: number; hp: number } }) {
-    console.log('[Progression] Initialized:', data);
-    this.progressionData = {
-      ascensionCount: data.ascensionCount,
-      restedXp: data.restedXp,
-      efficiency: data.efficiency,
-      title: data.title,
-      canAscend: data.canAscend
-    };
-
-    // Initialize and update progression UI
-    if (!this.progressionUI) {
-      this.progressionUI = initProgressionUI({
-        onAscend: () => {
-          if (this.client) {
-            this.client.sendAscendRequest();
-          }
-        }
-      });
-    }
-    this.progressionUI.update({
-      ...this.progressionData,
-      bonuses: data.bonuses
-    });
-
-    // Show notification if there's rested XP or ascension bonuses
-    if (data.restedXp > 0) {
-      this.showNotification(`Rested XP: +${data.restedXp.toFixed(1)}% bonus`);
-    }
-    if (data.ascensionCount > 0) {
-      this.showNotification(`${data.title} (+${data.bonuses.xp}% XP, +${data.bonuses.damage}% DMG)`);
-    }
-    if (data.efficiency < 100) {
-      this.showNotification(`Session efficiency: ${data.efficiency}%`);
-    }
-  }
-
-  handleProgressionAscend(ascensionCount: number, title: string) {
-    console.log('[Progression] ASCENDED!', ascensionCount, title);
-    this.progressionData = {
-      ...this.progressionData!,
-      ascensionCount,
-      title,
-      canAscend: false
-    };
-    this.showNotification(`ASCENDED! You are now ${title}`);
-    this.audioManager?.playSound('loot');
-
-    // Update UI
-    if (this.progressionUI && this.progressionData) {
-      this.progressionUI.update(this.progressionData);
-    }
-  }
-
-  handleProgressionUpdate(data: { efficiency: number; restedXp: number }) {
-    console.log('[Progression] Update:', data);
-    if (this.progressionData) {
-      this.progressionData.efficiency = data.efficiency;
-      this.progressionData.restedXp = data.restedXp;
-
-      // Update UI
-      if (this.progressionUI) {
-        this.progressionUI.update(this.progressionData);
-      }
-    }
-  }
-
-  // Fracture Rift handlers
-  handleRiftStart(data: { runId: string; depth: number; modifiers: Array<{ id: string; name: string; description: string; color: string }>; requiredKills: number; killCount: number }) {
-    console.log('[Rift] Starting rift:', data);
-
-    // Create rift UI if it doesn't exist
-    if (!this.riftUI) {
-      this.riftUI = new RiftUI();
-    }
-
-    this.riftUI.onRiftStart(data);
-    this.audioManager?.playSound('glitch1');
-    this.showNotification(`Entering Fracture Rift - Depth ${data.depth}`);
-  }
-
-  handleRiftProgress(data: { killCount: number; requiredKills: number }) {
-    console.log('[Rift] Progress:', data);
-    this.riftUI?.onRiftProgress(data);
-  }
-
-  handleRiftAdvance(data: { newDepth: number; killCount: number; requiredKills: number; rewards?: { xp: number; gold: number } }) {
-    console.log('[Rift] Advancing to depth:', data.newDepth);
-    this.riftUI?.onRiftAdvance(data);
-    this.audioManager?.playSound('levelup');
-
-    if (data.rewards) {
-      this.showNotification(`Depth ${data.newDepth}! +${data.rewards.xp} XP, +${data.rewards.gold} Gold`);
-    }
-  }
-
-  handleRiftEnd(data: { success: boolean; reason: string; completedDepth?: number; totalKills?: number; rewards?: { xp: number; gold: number }; leaderboardRank?: number | null }) {
-    console.log('[Rift] Ended:', data);
-    this.riftUI?.onRiftEnd(data);
-
-    if (data.reason === 'death') {
-      this.showNotification(`Rift Failed at Depth ${data.completedDepth || 0}`);
-      this.audioManager?.playSound('hurt');
-    } else if (data.success) {
-      let msg = `Rift Complete! Depth ${data.completedDepth}, ${data.totalKills} kills`;
-      if (data.leaderboardRank) {
-        msg += ` - Rank #${data.leaderboardRank}`;
-      }
-      this.showNotification(msg);
-      this.audioManager?.playSound('quest');
-    }
-  }
-
-  handleRiftLeaderboard(data: { entries: Array<{ rank: number; playerName: string; maxDepth: number; totalKills: number; completionTime: number }>; playerRank: number | null }) {
-    console.log('[Rift] Leaderboard:', data);
-    this.riftUI?.showLeaderboard(data.entries, data.playerRank);
-  }
-
-  enterRift() {
-    if (this.client) {
-      this.client.sendRiftEnter();
-    }
-  }
-
-  exitRift() {
-    if (this.client) {
-      this.client.sendRiftExit();
-    }
-  }
-
-  requestRiftLeaderboard() {
-    if (this.client) {
-      this.client.sendRiftLeaderboardRequest();
-    }
-  }
 
   // Achievement Panel UI
   initAchievementsUI() {

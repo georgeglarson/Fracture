@@ -190,3 +190,37 @@ export function handleNemesisKilled(
   ctx.showNotification(message);
   console.info(`[Nemesis] ${message}`);
 }
+
+/**
+ * Show daily reward popup
+ */
+export function showDailyRewardPopup(gold: number, xp: number, streak: number): void {
+  const popup = document.getElementById('daily-reward-popup');
+  if (!popup) return;
+
+  // Update the popup content
+  const streakEl = document.getElementById('daily-streak');
+  const goldEl = document.getElementById('daily-gold-amount');
+  const xpEl = document.getElementById('daily-xp-amount');
+  const flamesEl = document.getElementById('streak-flames');
+
+  if (streakEl) streakEl.textContent = streak.toString();
+  if (goldEl) goldEl.textContent = gold.toString();
+  if (xpEl) xpEl.textContent = xp.toString();
+
+  // Add flames based on streak (cap at 7)
+  if (flamesEl) {
+    const flameCount = Math.min(streak, 7);
+    flamesEl.innerHTML = Array(flameCount).fill('\uD83D\uDD25').join('');
+  }
+
+  // Show the popup
+  popup.classList.add('show');
+
+  // Hide after 3 seconds
+  setTimeout(() => {
+    popup.classList.remove('show');
+  }, 3000);
+
+  console.info('[Daily] Reward popup shown: +' + gold + 'g, +' + xp + ' XP, streak: ' + streak);
+}

@@ -552,14 +552,6 @@ function forEachMobOrNpcKind(callback: (kind: number, kindName: string) => void)
   });
 }
 
-function forEachArmorKind(callback: (kind: number, kindName: string) => void): void {
-  forEachKind((kind, kindName) => {
-    if (isArmor(kind)) {
-      callback(kind, kindName);
-    }
-  });
-}
-
 function getOrientationAsString(orientation: number): string | undefined {
   switch (orientation) {
     case Orientations.LEFT: return 'left';
@@ -624,7 +616,7 @@ export const Types: GameTypes = {
   forEachKind,
   forEachArmor,
   forEachMobOrNpcKind,
-  forEachArmorKind,
+  forEachArmorKind: forEachArmor, // Alias for backward compat
   getOrientationAsString,
   getRandomItemKind,
   getMessageTypeAsString

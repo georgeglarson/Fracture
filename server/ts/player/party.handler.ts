@@ -36,8 +36,8 @@ function createMemberRef(player: any) {
     level: player.level,
     hitPoints: player.hitPoints,
     maxHitPoints: player.maxHitPoints,
-    gridX: Math.floor(player.x / 16),
-    gridY: Math.floor(player.y / 16),
+    gridX: player.x,
+    gridY: player.y,
     send: (msg: any[]) => player.send(msg)
   };
 }
@@ -247,7 +247,7 @@ export function cleanupParty(ctx: PartyPlayerContext): void {
  */
 export function updatePartyPosition(ctx: PartyPlayerContext): void {
   const partyService = PartyService.getInstance();
-  partyService.updateMemberPosition(ctx.id, Math.floor(ctx.x / 16), Math.floor(ctx.y / 16));
+  partyService.updateMemberPosition(ctx.id, ctx.x, ctx.y);
 }
 
 /**

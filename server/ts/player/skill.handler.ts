@@ -228,15 +228,12 @@ function getDistance(x1: number, y1: number, x2: number, y2: number): number {
 function executeWarCry(ctx: SkillPlayerContext, radius: number, stunDuration: number): boolean {
   let stunCount = 0;
 
-  // Convert tile radius to pixels (16 pixels per tile)
-  const pixelRadius = radius * 16;
-
   ctx.getWorld().forEachMob((mob: any) => {
     // Skip dead mobs
     if (mob.isDead) return;
 
     const dist = getDistance(ctx.x, ctx.y, mob.x, mob.y);
-    if (dist <= pixelRadius) {
+    if (dist <= radius) {
       // Stun the mob - clear target and prevent re-aggro
       if (mob.clearTarget) {
         mob.clearTarget();
@@ -261,14 +258,11 @@ function executeWhirlwind(ctx: SkillPlayerContext, radius: number, damagePercent
   const avgDamage = (weaponDmg.min + weaponDmg.max) / 2;
   const damage = Math.floor(avgDamage * (damagePercent / 100));
 
-  // Convert tile radius to pixels (16 pixels per tile)
-  const pixelRadius = radius * 16;
-
   let hitCount = 0;
 
   ctx.getWorld().forEachMob((mob: any) => {
     const dist = getDistance(ctx.x, ctx.y, mob.x, mob.y);
-    if (dist <= pixelRadius && !mob.isDead) {
+    if (dist <= radius && !mob.isDead) {
       // Deal damage directly
       mob.receiveDamage(damage);
       hitCount++;

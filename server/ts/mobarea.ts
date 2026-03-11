@@ -54,6 +54,7 @@ export class MobArea extends Area {
       mob.spawningX = pos.x;
       mob.spawningY = pos.y;
       mob.isDead = false;
+      mob.updateHitPoints();
       // Ensure clean state on respawn - no target or attackers
       mob.clearTarget();
       mob.attackers = {};

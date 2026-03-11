@@ -25,12 +25,10 @@ export default defineConfig({
         '**/node_modules/**',
       ],
       thresholds: {
-        // Start with minimal thresholds, increase as coverage grows
-        // Target: 60%+ for critical paths (spec 020)
-        statements: 1,
-        branches: 0,
-        functions: 1,
-        lines: 1,
+        statements: 10,
+        branches: 5,
+        functions: 10,
+        lines: 10,
       },
     },
     testTimeout: 10000,

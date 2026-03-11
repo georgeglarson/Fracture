@@ -27,7 +27,7 @@ export class Renderer {
   FPS;
   maxFPS;
   realFPS = 0;
-  isDebugInfoVisible = true;
+  isDebugInfoVisible = false;
 
   animatedTileCount = 0;
   highTileCount = 0;

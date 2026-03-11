@@ -274,18 +274,18 @@ export class GameClient extends EventEmitter {
     console.log('[SPAWN] Received spawn message: id=' + id + ' kind=' + kind + ' x=' + x + ' y=' + y);
 
     if (Types.isItem(kind)) {
-      console.log('[SPAWN] Creating item entity for kind=' + kind);
+      console.debug('[SPAWN] Creating item entity for kind=' + kind);
       var item = EntityFactory.createEntity(kind, id);
-      var properties = data[5];
-      if (properties && item.setProperties) {
-        console.log('[SPAWN] Setting item properties:', properties);
-        item.setProperties(properties);
+      if (item) {
+        var properties = data[5];
+        if (properties && item.setProperties) {
+          item.setProperties(properties);
+        }
+        this.emit(ClientEvents.SPAWN_ITEM, item, x, y);
       }
-      console.log('[SPAWN] Emitting spawnItem for item ' + id);
-      this.emit(ClientEvents.SPAWN_ITEM, item, x, y);
     } else if (Types.isChest(kind)) {
       var chest = EntityFactory.createEntity(kind, id);
-      this.emit(ClientEvents.SPAWN_CHEST, chest, x, y);
+      if (chest) this.emit(ClientEvents.SPAWN_CHEST, chest, x, y);
     } else {
       var name, orientation, target, weapon, armor;
 

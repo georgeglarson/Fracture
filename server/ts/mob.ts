@@ -5,6 +5,7 @@ import {ChestArea} from './chestarea';
 import {MobArea} from './mobarea';
 import {Utils} from './utils';
 import {getCombatTracker} from './combat/combat-tracker';
+import {resolveZoneId} from './combat/aggro-policy';
 import type {Item} from './item';
 
 // Message return type
@@ -20,6 +21,7 @@ export class Mob extends Character {
   armorLevel: number;
   weaponLevel: number;
   aggroRange: number;
+  zoneId: string | null;  // Cached zone from spawn position
   respawnTimeout: ReturnType<typeof setTimeout> | null = null;
   returnTimeout: ReturnType<typeof setTimeout> | null = null;
   isDead: boolean = false;
@@ -35,11 +37,17 @@ export class Mob extends Character {
     this.armorLevel = Properties.getArmorLevel(this.kind) ?? 1;
     this.weaponLevel = Properties.getWeaponLevel(this.kind) ?? 1;
     this.aggroRange = Properties.getAggroRange(this.kind);
+    this.zoneId = resolveZoneId(x, y);
     this.updateHitPoints();
   }
 
   destroy(): void {
     this.isDead = true;
+    // Clear pending return-to-spawn timer (prevents move() on dead mob)
+    if (this.returnTimeout) {
+      clearTimeout(this.returnTimeout);
+      this.returnTimeout = null;
+    }
     // Clear all aggro relationships in CombatTracker
     getCombatTracker().clearMobAggro(this.id as number);
     this.clearTarget();

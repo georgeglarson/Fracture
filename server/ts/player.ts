@@ -18,7 +18,6 @@ interface SerializableMessage {
   serialize(): unknown[];
 }
 type MessagePayload = SerializableMessage | unknown[];
-import {Properties} from './properties';
 import {Chest} from './chest';
 import {EquipmentManager} from './equipment/equipment-manager';
 import {PlayerAchievements} from '../../shared/ts/achievements';
@@ -27,19 +26,18 @@ import {SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types
 import {MessageRouter, MessageHandlerContext} from './player/message-router';
 import {getDailyRewardService} from './player/daily-reward.service';
 import {ProgressionService, createProgressionService} from './player/progression.service';
-import {IStorageService, CharacterData, DailyData, PlayerSaveState} from './storage/storage.interface';
+import {IStorageService, PlayerSaveState} from './storage/storage.interface';
 import * as VeniceHandler from './player/venice.handler';
 import * as PartyHandler from './player/party.handler';
 import * as InventoryHandler from './player/inventory.handler';
 import * as AchievementHandler from './player/achievement.handler';
-import * as ShopHandler from './player/shop.handler';
 import * as PersistenceHandler from './player/persistence.handler';
 import * as EquipmentHandler from './player/equipment.handler';
 import * as ZoneHandler from './player/zone.handler';
 import * as SkillHandler from './player/skill.handler';
 import * as ProgressionHandler from './player/progression.handler';
 import * as RiftHandler from './player/rift.handler';
-import { PlayerSkillState, createInitialSkillState, SkillId } from '../../shared/ts/skills';
+import { PlayerSkillState, createInitialSkillState } from '../../shared/ts/skills';
 
 export class Player extends Character {
   // Shared message router instance (singleton pattern)
@@ -54,6 +52,7 @@ export class Player extends Character {
 
   hasEnteredGame = false;
   isDead = false;
+  spawnProtectionUntil = 0; // Timestamp until which player is immune to mob aggro
   lastCheckpoint: Checkpoint | null = null;
   disconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   formatChecker: FormatChecker;
@@ -133,32 +132,35 @@ export class Player extends Character {
     });
 
     this.connection.listen(async function (message: unknown[]) {
-      var action = parseInt(String(message[0]));
+      try {
+        var action = parseInt(String(message[0]));
 
-      console.debug('Received: ' + message);
-      if (!self.formatChecker.check(message)) {
-        self.connection.close('Invalid ' + Types.getMessageTypeAsString(action) + ' message format: ' + message);
-        return;
-      }
+        if (!self.formatChecker.check(message)) {
+          self.connection.close('Invalid ' + Types.getMessageTypeAsString(action) + ' message format: ' + message);
+          return;
+        }
 
-      if (!self.hasEnteredGame && action !== Types.Messages.HELLO) { // HELLO must be the first message
-        self.connection.close('Invalid handshake message: ' + message);
-        return;
-      }
-      if (self.hasEnteredGame && !self.isDead && action === Types.Messages.HELLO) { // HELLO can be sent only once
-        self.connection.close('Cannot initiate handshake twice: ' + message);
-        return;
-      }
+        if (!self.hasEnteredGame && action !== Types.Messages.HELLO) { // HELLO must be the first message
+          self.connection.close('Invalid handshake message: ' + message);
+          return;
+        }
+        if (self.hasEnteredGame && !self.isDead && action === Types.Messages.HELLO) { // HELLO can be sent only once
+          self.connection.close('Cannot initiate handshake twice: ' + message);
+          return;
+        }
 
-      self.resetTimeout();
+        self.resetTimeout();
 
-      // Route message through MessageRouter - delegates to appropriate handler
-      // Cast needed because Player has private world but MessageHandlerContext expects public
-      const handled = await Player.getMessageRouter().route(self as unknown as MessageHandlerContext, message);
+        // Route message through MessageRouter - delegates to appropriate handler
+        // Cast needed because Player has private world but MessageHandlerContext expects public
+        const handled = await Player.getMessageRouter().route(self as unknown as MessageHandlerContext, message);
 
-      // If not handled by router, pass to message callback
-      if (!handled && self.message_callback) {
-        self.message_callback(message);
+        // If not handled by router, pass to message callback
+        if (!handled && self.message_callback) {
+          self.message_callback(message);
+        }
+      } catch (error) {
+        console.error(`[Player] Error handling message from ${self.name}:`, error);
       }
     });
 
@@ -191,6 +193,14 @@ export class Player extends Character {
     });
     // CombatTracker is the single source of truth - clear all aggro for this player
     getCombatTracker().clearPlayerAggro(this.id as number);
+
+    // Clear any active firepotion timeout
+    if (this.firepotionTimeout) {
+      clearTimeout(this.firepotionTimeout);
+      this.firepotionTimeout = null;
+    }
+
+    this.cleanupParty();
   }
 
   getState() {
@@ -548,23 +558,15 @@ export class Player extends Character {
   }
 
   // ============================================================================
-  // VENICE AI HANDLERS - Delegated to VeniceHandler
+  // VENICE AI - External callers (combat-system, zone handler)
   // ============================================================================
 
-  async handleNpcTalk(npcKind: number) {
-    await VeniceHandler.handleNpcTalk(this, npcKind);
-  }
-
-  async handleRequestQuest(npcKind: number) {
-    await VeniceHandler.handleRequestQuest(this, npcKind);
-  }
-
   handleKill(mobType: string) {
-    VeniceHandler.handleKill(this, mobType, (event, details) => this.triggerNarration(event, details));
+    VeniceHandler.handleKill(this, mobType, (event, details) => VeniceHandler.triggerNarration(this, event, details));
   }
 
   async handleAreaChange(area: string) {
-    await VeniceHandler.handleAreaChange(this, area, (event, details) => this.triggerNarration(event, details));
+    await VeniceHandler.handleAreaChange(this, area, (event, details) => VeniceHandler.triggerNarration(this, event, details));
   }
 
   async handleItemPickup(itemKind: number) {
@@ -576,7 +578,7 @@ export class Player extends Character {
   }
 
   async handleDeath(killerType: string) {
-    await VeniceHandler.handleDeath(this, killerType, (event, details) => this.triggerNarration(event, details));
+    await VeniceHandler.handleDeath(this, killerType, (event, details) => VeniceHandler.triggerNarration(this, event, details));
   }
 
   cleanupVenice() {
@@ -585,45 +587,8 @@ export class Player extends Character {
   }
 
   // ============================================================================
-  // SHOP SYSTEM - Delegated to ShopHandler
+  // ACHIEVEMENT SYSTEM - External callers (combat-system, progression)
   // ============================================================================
-
-  handleShopBuy(npcKind: number, itemKind: number) {
-    ShopHandler.handleShopBuy(this, npcKind, itemKind);
-  }
-
-  handleShopSell(slotIndex: number) {
-    ShopHandler.handleShopSell(this, slotIndex);
-  }
-
-  // Town Crier: Handle newspaper request - delegated to VeniceHandler
-  async handleNewsRequest() {
-    await VeniceHandler.handleNewsRequest(this);
-  }
-
-  handleDropItem(itemType: string) {
-    EquipmentHandler.handleDropItem(this, itemType);
-  }
-
-  // ============================================================================
-  // AI NARRATOR - Delegated to VeniceHandler
-  // ============================================================================
-
-  async triggerNarration(event: string, details?: Record<string, unknown>) {
-    await VeniceHandler.triggerNarration(this, event, details);
-  }
-
-  // ============================================================================
-  // ACHIEVEMENT SYSTEM - Delegated to AchievementHandler
-  // ============================================================================
-
-  initAchievements(savedData?: PlayerAchievements) {
-    AchievementHandler.initAchievements(this, savedData);
-  }
-
-  handleSelectTitle(achievementId: string | null) {
-    AchievementHandler.handleSelectTitle(this, achievementId);
-  }
 
   checkKillAchievements(mobKind: number) {
     AchievementHandler.checkKillAchievements(this, mobKind);
@@ -654,45 +619,8 @@ export class Player extends Character {
   }
 
   // ============================================================================
-  // PARTY SYSTEM - Delegated to PartyHandler
+  // PARTY SYSTEM - Cleanup + external callers
   // ============================================================================
-
-  handlePartyInvite(targetId: number) {
-    PartyHandler.handlePartyInvite(this, targetId);
-  }
-
-  handlePartyAccept(inviterId: number) {
-    PartyHandler.handlePartyAccept(this, inviterId);
-  }
-
-  handlePartyDecline(inviterId: number) {
-    PartyHandler.handlePartyDecline(this, inviterId);
-  }
-
-  handlePartyLeave() {
-    PartyHandler.handlePartyLeave(this);
-  }
-
-  handlePartyKick(targetId: number) {
-    PartyHandler.handlePartyKick(this, targetId);
-  }
-
-  handlePartyChat(message: string) {
-    PartyHandler.handlePartyChat(this, message);
-  }
-
-  handlePlayerInspect(targetId: number) {
-    PartyHandler.handlePlayerInspect(this, targetId);
-  }
-
-  handleLeaderboardRequest() {
-    if (!this.world.roamingBossManager) {
-      this.send(new Messages.LeaderboardResponse([]).serialize());
-      return;
-    }
-    const leaderboard = this.world.roamingBossManager.getLeaderboard();
-    this.send(new Messages.LeaderboardResponse(leaderboard).serialize());
-  }
 
   cleanupParty() {
     PartyHandler.cleanupParty(this);
@@ -707,42 +635,8 @@ export class Player extends Character {
   }
 
   // ============================================================================
-  // INVENTORY SYSTEM - Delegated to InventoryHandler
+  // INVENTORY & PERSISTENCE - External callers (persistence handler)
   // ============================================================================
-
-  sendInventoryInit() {
-    InventoryHandler.sendInventoryInit(this);
-  }
-
-  handleInventoryPickup(itemId: number) {
-    InventoryHandler.handleInventoryPickup(this, itemId);
-    this.persistInventory();
-  }
-
-  handleInventoryUse(slotIndex: number) {
-    InventoryHandler.handleInventoryUse(this, slotIndex);
-    this.persistInventory();
-  }
-
-  handleInventoryEquip(slotIndex: number) {
-    InventoryHandler.handleInventoryEquip(this, slotIndex);
-    this.persistInventory();
-  }
-
-  handleInventoryDrop(slotIndex: number) {
-    InventoryHandler.handleInventoryDrop(this, slotIndex);
-    this.persistInventory();
-  }
-
-  handleInventorySwap(fromSlot: number, toSlot: number) {
-    InventoryHandler.handleInventorySwap(this, fromSlot, toSlot);
-    this.persistInventory();
-  }
-
-  handleUnequipToInventory(slot: string) {
-    InventoryHandler.handleUnequipToInventory(this, slot);
-    this.persistInventory();
-  }
 
   getInventoryState(): (SerializedInventorySlot | null)[] {
     return InventoryHandler.getInventoryState(this);
@@ -752,30 +646,9 @@ export class Player extends Character {
     InventoryHandler.loadInventory(this, data);
   }
 
-  /**
-   * Persist inventory to storage immediately (prevents data loss on reload)
-   */
-  private persistInventory(): void {
-    if (!this.characterId) return;
-    try {
-      const storage = this.world.getStorageService();
-      storage.saveInventory(this.characterId, this.inventory.getSerializedSlots());
-    } catch (e) {
-      console.error(`[Inventory] Failed to persist inventory for ${this.name}:`, e);
-    }
-  }
-
   // ============================================================================
-  // SKILL SYSTEM - Delegated to SkillHandler
+  // SKILL SYSTEM - External callers (combat-system, persistence)
   // ============================================================================
-
-  sendSkillInit() {
-    SkillHandler.sendSkillInit(this);
-  }
-
-  handleSkillUse(skillId: string) {
-    SkillHandler.handleSkillUse(this, skillId);
-  }
 
   getSkillState(): PlayerSkillState {
     return this.skillState;

@@ -161,24 +161,9 @@ export class CombatSystem {
     if (player && player.attackers && !(mob.id in player.attackers)) {
       this.clearMobAggroLink(mob);
 
-      // Always set the target so the mob chases the player
       mob.setTarget?.(player);
-
-      // Only register as attacker and broadcast attack when in melee range
-      // This prevents clients from auto-retaliating to far-away mobs
-      // Positions are in pixels (16 pixels per tile), melee range is ~2 tiles
-      const MELEE_RANGE_PIXELS = 32;
-      const dx = Math.abs((mob.x || 0) - (player.x || 0));
-      const dy = Math.abs((mob.y || 0) - (player.y || 0));
-      const distance = Math.max(dx, dy); // Chebyshev distance
-
-      if (distance <= MELEE_RANGE_PIXELS) {
-        player.addAttacker?.(mob);
-        this.broadcastAttacker(mob);
-        console.debug(mob.id + ' is now attacking ' + player.id + ' (in melee range)');
-      } else {
-        console.debug(mob.id + ' is chasing ' + player.id + ' (distance: ' + distance + 'px)');
-      }
+      player.addAttacker?.(mob);
+      this.broadcastAttacker(mob);
     }
   }
 
@@ -396,8 +381,6 @@ export class CombatSystem {
     const attackerId = attacker.id as number;
     const attackerX = attacker.x ?? 0;
     const attackerY = attacker.y ?? 0;
-    const attackerGridX = Math.floor(attackerX / 16);
-    const attackerGridY = Math.floor(attackerY / 16);
 
     // Apply streak multipliers to base rewards
     const baseXp = Math.floor(Formulas.xpFromMob(mob.armorLevel!) * xpMultiplier);
@@ -406,7 +389,7 @@ export class CombatSystem {
     // Check if attacker is in a party
     if (partyService.isInParty(attackerId)) {
       // Get nearby party members (within 15 tiles)
-      const nearbyMembers = partyService.getMembersInRange(attackerId, attackerGridX, attackerGridY, 15);
+      const nearbyMembers = partyService.getMembersInRange(attackerId, attackerX, attackerY, 15);
 
       if (nearbyMembers.length > 1) {
         // Calculate party bonus

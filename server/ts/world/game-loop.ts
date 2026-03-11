@@ -122,17 +122,25 @@ export class GameLoop {
    * Main tick function - called every frame
    */
   private tick(): void {
-    // Process spatial groups (spawns, despawns)
-    this.spatialContext?.processGroups();
+    try {
+      // Process spatial groups (spawns, despawns)
+      this.spatialContext?.processGroups();
+    } catch (e) {
+      console.error('[GameLoop] Error in spatial processing:', e);
+    }
 
-    // Process message queues
-    this.broadcasterContext?.processQueues();
+    try {
+      // Process message queues
+      this.broadcasterContext?.processQueues();
+    } catch (e) {
+      console.error('[GameLoop] Error in broadcaster processing:', e);
+    }
 
     // Regeneration timer
     if (this.updateCount < this.regenCount) {
       this.updateCount += 1;
     } else {
-      this.regenCallback?.();
+      try { this.regenCallback?.(); } catch (e) { console.error('[GameLoop] Error in regen callback:', e); }
       this.updateCount = 0;
     }
 
@@ -140,7 +148,7 @@ export class GameLoop {
     if (this.thoughtUpdateCount < this.thoughtCount) {
       this.thoughtUpdateCount += 1;
     } else {
-      this.thoughtCallback?.();
+      try { this.thoughtCallback?.(); } catch (e) { console.error('[GameLoop] Error in thought callback:', e); }
       this.thoughtUpdateCount = 0;
     }
 
@@ -148,7 +156,7 @@ export class GameLoop {
     if (this.aggroUpdateCount < this.aggroCount) {
       this.aggroUpdateCount += 1;
     } else {
-      this.aggroCallback?.();
+      try { this.aggroCallback?.(); } catch (e) { console.error('[GameLoop] Error in aggro callback:', e); }
       this.aggroUpdateCount = 0;
     }
   }

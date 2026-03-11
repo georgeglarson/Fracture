@@ -149,6 +149,9 @@ export class AIPlayer extends Character {
   private lastDamageFromAttacker: Map<number | string, number> = new Map();
   private static readonly ATTACKER_HIT_COOLDOWN = 900; // ms between hits (matches game animation speed)
 
+  // Respawn timer (stored for cleanup)
+  respawnTimer: ReturnType<typeof setTimeout> | null = null;
+
   // Required Player-like properties
   hasEnteredGame = true;
   isDead = false;
@@ -180,7 +183,7 @@ export class AIPlayer extends Character {
     this.moveCooldown = 300 + Math.random() * 200;     // 300-500ms per tile (fast like real players)
     this.actionCooldown = 800 + Math.random() * 400;   // 0.8-1.2 seconds between attacks
 
-    console.log(`[AIPlayer] Created "${this.name}" (${this.personality}) at (${this.x}, ${this.y})`);
+    console.debug(`[AIPlayer] Created "${this.name}" (${this.personality}) at (${this.x}, ${this.y})`);
   }
 
   private generateName(usedNames?: Set<string>): string {
@@ -245,7 +248,10 @@ export class AIPlayer extends Character {
   private setRandomPosition(): void {
     const map = this.world?.map as any;
     if (map) {
-      const pos = map.getRandomStartingPosition();
+      // Use non-starting checkpoints to avoid cluttering the player spawn area
+      const pos = map.getRandomNonStartingPosition
+        ? map.getRandomNonStartingPosition()
+        : map.getRandomStartingPosition();
       this.setPosition(pos.x, pos.y);
     }
   }
@@ -266,6 +272,7 @@ export class AIPlayer extends Character {
     // Cleanup
     this.nearbyPlayers.clear();
     this.lastGreetedPlayers.clear();
+    this.lastDamageFromAttacker.clear();
   }
 
   // ============================================================================
@@ -660,7 +667,7 @@ export class AIPlayer extends Character {
       // Fight back! Set the attacker as target and switch to fighting state
       this.target = attackerId;
       this.behaviorState = 'fighting';
-      console.log(`[AIPlayer] ${this.name} is now fighting back against attacker ${attackerId}`);
+      console.debug(`[AIPlayer] ${this.name} is now fighting back against attacker ${attackerId}`);
     }
   }
 
@@ -684,10 +691,11 @@ export class AIPlayer extends Character {
     // Remove from world entities temporarily
     this.world.removeEntity(this);
 
-    console.log(`[AIPlayer] ${this.name} died (death #${this.deathCount})`);
+    console.debug(`[AIPlayer] ${this.name} died (death #${this.deathCount})`);
 
-    // Respawn after delay
-    setTimeout(() => {
+    // Respawn after delay (store handle for cleanup)
+    this.respawnTimer = setTimeout(() => {
+      this.respawnTimer = null;
       this.respawn();
     }, 5000 + Math.random() * 10000); // 5-15 seconds
   }
@@ -704,7 +712,7 @@ export class AIPlayer extends Character {
     // Re-add to world
     this.world.handleEntityGroupMembership(this);
 
-    console.log(`[AIPlayer] ${this.name} respawned at (${this.x}, ${this.y})`);
+    console.debug(`[AIPlayer] ${this.name} respawned at (${this.x}, ${this.y})`);
   }
 
   /**
@@ -765,7 +773,7 @@ export class AIPlayerManager {
   }
 
   start(): void {
-    console.log(`[AIPlayerManager] Starting with ${this.maxAIPlayers} AI players...`);
+    console.info(`[AIPlayerManager] Starting with ${this.maxAIPlayers} AI players...`);
 
     // Spawn initial AI players
     for (let i = 0; i < this.maxAIPlayers; i++) {
@@ -786,11 +794,16 @@ export class AIPlayerManager {
       this.tickInterval = null;
     }
 
-    // Remove all AI players
-    this.aiPlayers.forEach((ai, id) => {
+    // Remove all AI players and clear their respawn timers
+    this.aiPlayers.forEach((ai) => {
+      if (ai.respawnTimer) {
+        clearTimeout(ai.respawnTimer);
+        ai.respawnTimer = null;
+      }
       this.world.removeEntity(ai);
     });
     this.aiPlayers.clear();
+    this.usedNames.clear();
   }
 
   private spawnAIPlayer(): void {
@@ -808,7 +821,7 @@ export class AIPlayerManager {
 
     this.aiPlayers.set(ai.id, ai);
 
-    console.log(`[AIPlayerManager] Spawned AI player: ${ai.name}`);
+    console.debug(`[AIPlayerManager] Spawned AI player: ${ai.name}`);
   }
 
   private tick(): void {

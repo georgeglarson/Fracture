@@ -27,6 +27,8 @@ import {Entity} from './entity';
 import {Character} from './character';
 import {MobArea} from './mobarea';
 import {ChestArea} from './chestarea';
+import {evaluateAggro} from './combat/aggro-policy';
+import {getLeashDistance} from './combat/combat-constants';
 import type {Player} from './player'; // Type-only import to avoid circular dep
 
 // Message type for push methods - can be an object with serialize() or a raw array
@@ -100,6 +102,9 @@ export class World {
   // Zone Boss Manager (Thunderdome feature)
   roamingBossManager: ZoneBossManager | null = null;
 
+  // Startup timeouts (stored for cleanup)
+  private startupTimers: ReturnType<typeof setTimeout>[] = [];
+
   // Storage service for player persistence
   private storageService: IStorageService | null = null;
 
@@ -150,12 +155,14 @@ export class World {
           var target = self.getEntityById(mob.target);
           if (target) {
             var pos = self.findPositionNextTo(mob, target);
-            if (mob.distanceToSpawningPoint(pos.x, pos.y) > 50) {
+            // Leash: mob gives up if next position is too far from spawn
+            var leashDist = getLeashDistance(mob.aggroRange);
+            if (mob.distanceToSpawningPoint(pos.x, pos.y) > leashDist) {
               mob.clearTarget();
               mob.forgetEveryone();
               player.removeAttacker(mob);
             } else {
-              self.moveEntity(mob, pos.x, pos.y);
+              mob.move(pos.x, pos.y);
             }
           }
         });
@@ -212,7 +219,7 @@ export class World {
       var target = self.getEntityById(attacker.target!);
       if (target && attacker.type === 'mob') {
         var pos = self.findPositionNextTo(attacker, target);
-        self.moveEntity(attacker, pos.x, pos.y);
+        (attacker as Mob).move(pos.x, pos.y);
       }
     });
 
@@ -291,50 +298,88 @@ export class World {
       console.log('[Thoughts] Processed', groupsWithPlayers, 'groups,', totalEntities, 'entities');
     });
 
-    // Mob Proximity Aggro - Check for players within aggro range
+    // Mob Proximity Aggro — zone-aware aggro with density capping
+    // Uses AggroPolicy for per-mob decisions based on zone, level, and density.
+    // Also enforces leash: mobs drop aggro when target is too far from spawn.
     this.onAggroTick(function() {
-      // Iterate all mobs
+      const combatTracker = getCombatTracker();
+
       self.forEachMob(function(mob: Mob) {
-        // Skip if mob is dead, already has a target, or has no aggro range
-        if (mob.isDead || mob.hasTarget() || !mob.aggroRange || mob.aggroRange <= 0) {
+        if (mob.isDead || !mob.aggroRange || mob.aggroRange <= 0) return;
+
+        // Skip stunned mobs (War Cry effect)
+        if ((mob as any).stunUntil && Date.now() < (mob as any).stunUntil) return;
+
+        const leashDistance = getLeashDistance(mob.aggroRange);
+
+        // Leash check: if mob already has a target, verify it's still in chase range
+        if (mob.hasTarget()) {
+          const target = self.getEntityById(mob.target!);
+          if (!target || (target as any).isDead) {
+            mob.clearTarget();
+            mob.forgetEveryone();
+            return;
+          }
+          const targetDist = mob.distanceToSpawningPoint((target as any).x, (target as any).y);
+          if (targetDist > leashDistance) {
+            mob.clearTarget();
+            mob.forgetEveryone();
+            return;
+          }
+          // Re-broadcast attack when mob is adjacent — keeps the client combat loop alive
+          const mobToTarget = Utils.distanceTo(mob.x, mob.y, (target as any).x, (target as any).y);
+          if (mobToTarget <= 2 && mob.group) {
+            self.pushToAdjacentGroups(mob.group, mob.attack());
+          }
           return;
         }
 
-        // Skip if mob is stunned (War Cry effect)
-        if ((mob as any).stunUntil && Date.now() < (mob as any).stunUntil) {
-          return;
-        }
-
+        // No target — scan for nearby players using AggroPolicy
         let closestPlayer: Player | null = null;
-        // mob.aggroRange is in TILES, convert to PIXELS (16 pixels per tile)
-        const aggroRangePixels = mob.aggroRange * 16;
-        let closestDistance = aggroRangePixels;
+        let closestDistance = mob.aggroRange; // tiles
+        let closestDecision: { hateModifier: number } | null = null;
 
-        // Check all players
         self.forEachPlayer(function(player: Player) {
           if (!player || player.isDead) return;
 
-          // Skip phased players (Phase Shift effect) - they are invisible
+          // Spawn protection (first 10 seconds after entering)
+          if (player.spawnProtectionUntil && Date.now() < player.spawnProtectionUntil) return;
+
+          // Phase Shift invisibility
           if (player.isPhased && player.isPhased()) return;
 
-          // Utils.distanceTo returns Chebyshev distance in PIXELS
           const distance = Utils.distanceTo(mob.x, mob.y, player.x, player.y);
 
-          if (distance < closestDistance) {
+          // AggroPolicy evaluates zone, transition, level, and density
+          const decision = evaluateAggro({
+            mobX: mob.x,
+            mobY: mob.y,
+            mobSpawnX: mob.spawningX,
+            mobSpawnY: mob.spawningY,
+            mobLevel: mob.level,
+            mobAggroRange: mob.aggroRange,
+            mobZoneId: mob.zoneId,
+            playerX: player.x,
+            playerY: player.y,
+            playerLevel: (player as any).level ?? 1,
+            distance,
+            currentAggroOnPlayer: combatTracker.getPlayerAggroCount(player.id),
+          });
+
+          if (decision.shouldAggro && distance < closestDistance) {
             closestDistance = distance;
             closestPlayer = player;
+            closestDecision = decision;
           }
         });
 
-        // Aggro closest player if found
-        if (closestPlayer) {
-          // Add initial hate points based on distance (closer = more hate)
-          const hatePoints = Math.max(1, Math.floor((aggroRangePixels - closestDistance) / 16 * 10));
-          mob.increaseHateFor(closestPlayer.id, hatePoints);
+        if (closestPlayer && closestDecision) {
+          const hateBase = Math.max(1, Math.floor((mob.aggroRange - closestDistance) * 10));
+          const hatePoints = Math.max(1, Math.round(hateBase * closestDecision.hateModifier));
           self.handleMobHate(mob.id, closestPlayer.id, hatePoints);
 
           const mobName = Types.getKindAsString(mob.kind);
-          console.debug(`[Aggro] ${mobName} (range ${mob.aggroRange}) targeting ${closestPlayer.name} at distance ${closestDistance.toFixed(1)}`);
+          console.debug(`[Aggro] ${mobName} (range ${mob.aggroRange}, zone ${mob.zoneId}) targeting ${closestPlayer.name} at distance ${closestDistance.toFixed(1)}`);
         }
       });
     });
@@ -453,16 +498,16 @@ export class World {
     console.info('' + this.id + ' created (capacity: ' + this.maxPlayers + ' players).');
 
     // Start AI Players (Westworld feature) - after a delay to let the world settle
-    setTimeout(() => {
+    this.startupTimers.push(setTimeout(() => {
       this.aiPlayerManager = new AIPlayerManager(this, 5); // 5 AI players
       this.aiPlayerManager.start();
-    }, 3000);
+    }, 3000));
 
     // Start Roaming Bosses (Thunderdome feature) - after world is settled
-    setTimeout(() => {
+    this.startupTimers.push(setTimeout(() => {
       this.roamingBossManager = new ZoneBossManager(this);
       this.roamingBossManager.init();
-    }, 5000);
+    }, 5000));
   }
 
   setUpdatesPerSecond(ups: number) {

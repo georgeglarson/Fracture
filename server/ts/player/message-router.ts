@@ -14,6 +14,14 @@ import {
   RateLimitResult
 } from '../middleware/rate-limiter.js';
 import { createModuleLogger } from '../utils/logger.js';
+import * as VeniceHandler from './venice.handler';
+import * as PartyHandler from './party.handler';
+import * as InventoryHandler from './inventory.handler';
+import * as AchievementHandler from './achievement.handler';
+import * as ShopHandler from './shop.handler';
+import * as EquipmentHandler from './equipment.handler';
+import * as SkillHandler from './skill.handler';
+import { MELEE_RANGE } from '../combat/combat-constants.js';
 
 const log = createModuleLogger('MessageRouter');
 
@@ -26,11 +34,12 @@ export interface MessageHandlerContext {
   id: number;
   name: string;
   kind: number;
-  clientIp: string; // For rate limiting
+  clientIp: string;
 
   // Player state
   hasEnteredGame: boolean;
   isDead: boolean;
+  spawnProtectionUntil: number;
   hitPoints: number;
   maxHitPoints: number;
   x: number;
@@ -52,7 +61,7 @@ export interface MessageHandlerContext {
   lastCheckpoint: { id: number; x: number; y: number } | null;
 
   // World reference
-  world: any; // World type - using any to avoid circular deps
+  world: any;
 
   // Communication
   send(message: any): void;
@@ -80,79 +89,27 @@ export interface MessageHandlerContext {
   grantGold(amount: number): void;
   setGold(gold: number): void;
 
-  // Zone
+  // Zone & position
   checkZoneChange(x: number, y: number): void;
-
-  // Position update (broadcasts to zone)
   updatePosition(): void;
 
-  // Inventory initialization (sends to client)
-  sendInventoryInit(): void;
-
-  // Skill initialization (sends to client)
-  sendSkillInit(): void;
-
-  // Progression system initialization
+  // Progression system (complex state logic, stays on Player)
   initProgressionSystem(): void;
+  handleAscendRequest(): void;
+
+  // Daily reward (complex state logic, stays on Player)
+  handleDailyCheck(lastLoginDate: string | null, currentStreak: number): void;
+
+  // Fracture Rift system (complex context building, stays on Player)
+  handleRiftEnter(): void;
+  handleRiftExit(): void;
+  handleRiftLeaderboardRequest(): void;
 
   // Callbacks
   zone_callback?: () => void;
   move_callback?: (x: number, y: number) => void;
   lootmove_callback?: (x: number, y: number) => void;
   message_callback?: (message: any[]) => void;
-
-  // AI Handlers
-  handleNpcTalk(npcKind: number): Promise<void>;
-  handleRequestQuest(npcKind: number): Promise<void>;
-  handleNewsRequest(): Promise<void>;
-  triggerNarration(event: string, details?: Record<string, any>): Promise<void>;
-
-  // Daily reward
-  handleDailyCheck(lastLoginDate: string | null, currentStreak: number): void;
-
-  // Shop handlers
-  handleShopBuy(npcKind: number, itemKind: number): void;
-  handleShopSell(slotIndex: number): void;
-
-  // Equipment drop
-  handleDropItem(itemType: string): void;
-
-  // Achievement
-  handleSelectTitle(achievementId: string | null): void;
-  initAchievements(savedData?: any): void;
-
-  // Party handlers
-  handlePartyInvite(targetId: number): void;
-  handlePartyAccept(inviterId: number): void;
-  handlePartyDecline(inviterId: number): void;
-  handlePartyLeave(): void;
-  handlePartyKick(targetId: number): void;
-  handlePartyChat(message: string): void;
-
-  // Player inspect
-  handlePlayerInspect(targetId: number): void;
-
-  // Inventory handlers
-  handleInventoryUse(slotIndex: number): void;
-  handleInventoryEquip(slotIndex: number): void;
-  handleInventoryDrop(slotIndex: number): void;
-  handleInventorySwap(fromSlot: number, toSlot: number): void;
-  handleInventoryPickup(itemId: number): void;
-  handleUnequipToInventory(slot: string): void;
-
-  // Boss leaderboard
-  handleLeaderboardRequest(): void;
-
-  // Skill system
-  handleSkillUse(skillId: string): void;
-
-  // Progression system
-  handleAscendRequest(): void;
-
-  // Fracture Rift system
-  handleRiftEnter(): void;
-  handleRiftExit(): void;
-  handleRiftLeaderboardRequest(): void;
 
   // Storage persistence
   characterId: string | null;
@@ -185,6 +142,20 @@ interface HandlerConfig {
   requiresGame?: boolean; // Must have entered game (default: true)
   requiresAlive?: boolean; // Must not be dead (default: false)
   rateLimit?: RateLimitType; // Rate limit to apply (default: 'none')
+}
+
+/**
+ * Persist inventory to storage (called after inventory mutations)
+ */
+function persistInventory(ctx: MessageHandlerContext): void {
+  if (!ctx.characterId) return;
+  try {
+    const storage = ctx.world.getStorageService();
+    const inventory = (ctx as any).getInventory();
+    storage.saveInventory(ctx.characterId, inventory.getSerializedSlots());
+  } catch (e) {
+    console.error('[Inventory] Failed to persist inventory:', e);
+  }
 }
 
 /**
@@ -247,6 +218,10 @@ export function createMessageHandlers(
       ctx.updateHitPoints();
       ctx.updatePosition();
 
+      // Set spawn protection BEFORE adding to world so aggro tick can't target us
+      ctx.isDead = false;
+      ctx.spawnProtectionUntil = Date.now() + 10000; // 10 second aggro immunity on spawn
+
       ctx.world.addPlayer(ctx);
       ctx.world.enter_callback(ctx);
 
@@ -269,16 +244,15 @@ export function createMessageHandlers(
         ctx.gold || 0
       ]);
       ctx.hasEnteredGame = true;
-      ctx.isDead = false;
 
-      ctx.initAchievements();
-      await ctx.triggerNarration('join');
+      AchievementHandler.initAchievements(ctx as any);
+      await VeniceHandler.triggerNarration(ctx as any, 'join');
 
       // Send inventory state to client
-      ctx.sendInventoryInit();
+      InventoryHandler.sendInventoryInit(ctx as any);
 
       // Send skill state to client
-      ctx.sendSkillInit();
+      SkillHandler.sendSkillInit(ctx as any);
 
       // Initialize progression system (efficiency, rested XP, ascension)
       ctx.initProgressionSystem();
@@ -346,7 +320,9 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.LOOTMOVE, {
     handler: (ctx, msg) => {
       if (ctx.lootmove_callback) {
-        ctx.setPosition(msg[1], msg[2]);
+        const x = msg[1], y = msg[2];
+        if (!ctx.world.isValidPosition(x, y)) return;
+        ctx.setPosition(x, y);
 
         const item = ctx.world.getEntityById(msg[3]);
         if (item) {
@@ -382,6 +358,9 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.HIT, {
     rateLimit: 'combat', // 20 hits per second
     handler: (ctx, msg) => {
+      // Attacking clears spawn protection - you chose to fight
+      ctx.spawnProtectionUntil = 0;
+
       const mob = ctx.world.getEntityById(msg[1]);
       // Check mob exists and is not already dead (prevents hitting during death animation)
       if (mob && !mob.isDead) {
@@ -409,18 +388,14 @@ export function createMessageHandlers(
       const isStunned = mob?.stunUntil && Date.now() < mob.stunUntil;
       if (mob && !mob.isDead && mob.hitPoints > 0 && ctx.hitPoints > 0 && !ctx.isPhased() && !isStunned) {
         // Range check: mob must be adjacent (melee range) to deal damage
-        // Positions are in pixels (16 pixels per tile)
-        // Use Chebyshev distance (max of dx, dy) which is standard for grid-based games
         const dx = Math.abs(ctx.x - mob.x);
         const dy = Math.abs(ctx.y - mob.y);
-        const distancePixels = Math.max(dx, dy); // Chebyshev distance in pixels
-        const MELEE_RANGE_TILES = 2; // tiles - allows for diagonal adjacency + small desync buffer
-        const MELEE_RANGE_PIXELS = MELEE_RANGE_TILES * 16;
+        const distance = Math.max(dx, dy); // Chebyshev distance in tiles
 
-        if (distancePixels > MELEE_RANGE_PIXELS) {
-          // Mob is too far away - clear its aggro on this player
-          if (mob.clearTarget) mob.clearTarget();
-          if (mob.forgetPlayer) mob.forgetPlayer(ctx.id);
+        if (distance > MELEE_RANGE) {
+          // Mob is too far away to deal damage this tick — skip but keep aggro
+          // (clearing aggro here causes a stuck state: mob stays in player.attackers
+          // but loses its target, and chooseMobTarget won't re-acquire)
           return;
         }
 
@@ -456,7 +431,8 @@ export function createMessageHandlers(
         if (Types.isItem(kind)) {
           // Equipment goes to inventory instead of auto-equipping
           if (Types.isArmor(kind) || Types.isWeapon(kind)) {
-            ctx.handleInventoryPickup(item.id);
+            InventoryHandler.handleInventoryPickup(ctx as any, item.id);
+            persistInventory(ctx);
             return;
           }
 
@@ -532,28 +508,28 @@ export function createMessageHandlers(
   // NPCTALK - NPC dialogue
   handlers.set(Types.Messages.NPCTALK, {
     handler: async (ctx, msg) => {
-      await ctx.handleNpcTalk(msg[1]);
+      await VeniceHandler.handleNpcTalk(ctx as any, msg[1]);
     }
   });
 
   // REQUEST_QUEST - Quest request
   handlers.set(Types.Messages.REQUEST_QUEST, {
     handler: async (ctx, msg) => {
-      await ctx.handleRequestQuest(msg[1]);
+      await VeniceHandler.handleRequestQuest(ctx as any, msg[1]);
     }
   });
 
   // NEWS_REQUEST - Newspaper request
   handlers.set(Types.Messages.NEWS_REQUEST, {
     handler: async (ctx) => {
-      await ctx.handleNewsRequest();
+      await VeniceHandler.handleNewsRequest(ctx as any);
     }
   });
 
   // DROP_ITEM - Drop equipped item
   handlers.set(Types.Messages.DROP_ITEM, {
     handler: (ctx, msg) => {
-      ctx.handleDropItem(msg[1]);
+      EquipmentHandler.handleDropItem(ctx as any, msg[1]);
     }
   });
 
@@ -570,52 +546,52 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.SHOP_BUY, {
     rateLimit: 'shop', // 10 transactions per minute
     handler: (ctx, msg) => {
-      ctx.handleShopBuy(msg[1], msg[2]);
+      ShopHandler.handleShopBuy(ctx as any, msg[1], msg[2]);
     }
   });
 
   // SHOP_SELL - Shop sell
   handlers.set(Types.Messages.SHOP_SELL, {
     handler: (ctx, msg) => {
-      ctx.handleShopSell(msg[1]);
+      ShopHandler.handleShopSell(ctx as any, msg[1]);
     }
   });
 
   // ACHIEVEMENT_SELECT_TITLE - Select title
   handlers.set(Types.Messages.ACHIEVEMENT_SELECT_TITLE, {
     handler: (ctx, msg) => {
-      ctx.handleSelectTitle(msg[1] === '' ? null : msg[1]);
+      AchievementHandler.handleSelectTitle(ctx as any, msg[1] === '' ? null : msg[1]);
     }
   });
 
   // Party system messages
   handlers.set(Types.Messages.PARTY_INVITE, {
     handler: (ctx, msg) => {
-      ctx.handlePartyInvite(msg[1]);
+      PartyHandler.handlePartyInvite(ctx as any, msg[1]);
     }
   });
 
   handlers.set(Types.Messages.PARTY_ACCEPT, {
     handler: (ctx, msg) => {
-      ctx.handlePartyAccept(msg[1]);
+      PartyHandler.handlePartyAccept(ctx as any, msg[1]);
     }
   });
 
   handlers.set(Types.Messages.PARTY_DECLINE, {
     handler: (ctx, msg) => {
-      ctx.handlePartyDecline(msg[1]);
+      PartyHandler.handlePartyDecline(ctx as any, msg[1]);
     }
   });
 
   handlers.set(Types.Messages.PARTY_LEAVE, {
     handler: (ctx) => {
-      ctx.handlePartyLeave();
+      PartyHandler.handlePartyLeave(ctx as any);
     }
   });
 
   handlers.set(Types.Messages.PARTY_KICK, {
     handler: (ctx, msg) => {
-      ctx.handlePartyKick(msg[1]);
+      PartyHandler.handlePartyKick(ctx as any, msg[1]);
     }
   });
 
@@ -624,7 +600,7 @@ export function createMessageHandlers(
       let chatMsg = Utils.sanitize(msg[1]);
       if (chatMsg && chatMsg !== '') {
         chatMsg = chatMsg.substr(0, 100);
-        ctx.handlePartyChat(chatMsg);
+        PartyHandler.handlePartyChat(ctx as any, chatMsg);
       }
     }
   });
@@ -632,51 +608,58 @@ export function createMessageHandlers(
   // Player inspect
   handlers.set(Types.Messages.PLAYER_INSPECT, {
     handler: (ctx, msg) => {
-      ctx.handlePlayerInspect(msg[1]);
+      PartyHandler.handlePlayerInspect(ctx as any, msg[1]);
     }
   });
 
   // Inventory system messages
   handlers.set(Types.Messages.INVENTORY_USE, {
     handler: (ctx, msg) => {
-      ctx.handleInventoryUse(msg[1]);
+      InventoryHandler.handleInventoryUse(ctx as any, msg[1]);
+      persistInventory(ctx);
     }
   });
 
   handlers.set(Types.Messages.INVENTORY_EQUIP, {
     handler: (ctx, msg) => {
-      ctx.handleInventoryEquip(msg[1]);
+      InventoryHandler.handleInventoryEquip(ctx as any, msg[1]);
+      persistInventory(ctx);
     }
   });
 
   handlers.set(Types.Messages.INVENTORY_DROP, {
     handler: (ctx, msg) => {
-      ctx.handleInventoryDrop(msg[1]);
+      InventoryHandler.handleInventoryDrop(ctx as any, msg[1]);
+      persistInventory(ctx);
     }
   });
 
   handlers.set(Types.Messages.INVENTORY_SWAP, {
     handler: (ctx, msg) => {
-      ctx.handleInventorySwap(msg[1], msg[2]);
+      InventoryHandler.handleInventorySwap(ctx as any, msg[1], msg[2]);
+      persistInventory(ctx);
     }
   });
 
   handlers.set(Types.Messages.INVENTORY_PICKUP, {
     handler: (ctx, msg) => {
-      ctx.handleInventoryPickup(msg[1]);
+      InventoryHandler.handleInventoryPickup(ctx as any, msg[1]);
+      persistInventory(ctx);
     }
   });
 
   handlers.set(Types.Messages.UNEQUIP_TO_INVENTORY, {
     handler: (ctx, msg) => {
-      ctx.handleUnequipToInventory(msg[1]);
+      InventoryHandler.handleUnequipToInventory(ctx as any, msg[1]);
+      persistInventory(ctx);
     }
   });
 
   // Boss Leaderboard
   handlers.set(Types.Messages.LEADERBOARD_REQUEST, {
     handler: (ctx, msg) => {
-      ctx.handleLeaderboardRequest();
+      const leaderboard = ctx.world.roamingBossManager?.getLeaderboard() || [];
+      ctx.send(new Messages.LeaderboardResponse(leaderboard).serialize());
     }
   });
 
@@ -685,7 +668,7 @@ export function createMessageHandlers(
     rateLimit: 'combat',
     requiresAlive: true,
     handler: (ctx, msg) => {
-      ctx.handleSkillUse(msg[1]); // msg[1] is skillId
+      SkillHandler.handleSkillUse(ctx as any, msg[1]);
     }
   });
 
