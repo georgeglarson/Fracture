@@ -31,6 +31,7 @@ import {evaluateAggro} from './combat/aggro-policy';
 import {getLeashDistance} from './combat/combat-constants';
 import type {Player} from './player'; // Type-only import to avoid circular dep
 import { createModuleLogger } from './utils/logger.js';
+import { trace } from '@opentelemetry/api';
 
 const log = createModuleLogger('World');
 
@@ -320,6 +321,10 @@ export class World {
     // Also enforces leash: mobs drop aggro when target is too far from spawn.
     this.onAggroTick(function() {
       const combatTracker = getCombatTracker();
+      const activeSpan = trace.getActiveSpan();
+      if (activeSpan) {
+        activeSpan.setAttribute('mob_count', Object.keys(self.entityManager.mobs).length);
+      }
 
       self.forEachMob(function(mob: Mob) {
         if (mob.isDead || !mob.aggroRange || mob.aggroRange <= 0) return;
