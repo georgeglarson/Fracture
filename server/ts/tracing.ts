@@ -39,10 +39,12 @@ const traceExporter = isDev
       url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     });
 
-// AlwaysOn in dev for full visibility, 10% sampling in prod to control volume
+// OTEL_TRACES_SAMPLER_ARG controls prod sampling ratio (0.0–1.0, default 1.0)
+// Set to 0.1 for high-traffic production, leave default for demos
+const samplerRatio = parseFloat(process.env.OTEL_TRACES_SAMPLER_ARG || '1.0');
 const sampler = isDev
   ? new AlwaysOnSampler()
-  : new TraceIdRatioBasedSampler(0.1);
+  : new TraceIdRatioBasedSampler(samplerRatio);
 
 const sdk = new NodeSDK({
   resource,
