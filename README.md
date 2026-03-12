@@ -10,7 +10,7 @@
 
 Most of my career has been taking old systems and making them maintainable. Fracture is that process, condensed into a project you can read, run, and play.
 
-The starting point was [BrowserQuest](https://github.com/mozilla/BrowserQuest), Mozilla's 2012 HTML5 demo. A JavaScript prototype with no types, no tests, God-object classes, and everything coupled to everything. I picked it because it's a good stand-in for what legacy modernization actually looks like: code that works but can't scale, can't be safely changed, and has no safety net.
+The starting point was [BrowserQuest](https://github.com/mozilla/BrowserQuest), Mozilla's 2012 HTML5 demo. A vertical slice that proved HTML5 could do real-time multiplayer, but was never meant to run in production. No types, no tests, no persistence beyond localStorage, no security, no observability, no separation of concerns. I picked it because it's a good stand-in for what legacy modernization actually looks like: a prototype that worked once and now needs real supporting systems to scale.
 
 What you're looking at now is **~215 TypeScript source files** (280 including tests), **3,161 passing tests**, a real-time multiplayer game with AI-driven NPCs, zone-based combat, persistent player progression, and a production deployment behind nginx with SSL. The original codebase is still in there (every entity, every sprite, every tile) but the architecture around it is unrecognizable.
 
@@ -20,7 +20,7 @@ This is the same approach that works on enterprise software. It works on games t
 
 **1. Understand before changing.** Read every file. Map the dependency graph. Identify the blast radius. The original had circular dependencies, `var self = this` patterns, `as any` casts holding things together, and zero separation of concerns. You can't fix what you don't understand.
 
-**2. Add a safety net first.** Before refactoring anything, write tests. 3,161 of them. That's what makes the rest possible. When I decomposed the Player God-object from 1,100 lines to 720, every extracted method was verified. When I rewrote the aggro system, policy tests caught edge cases I'd have shipped as bugs.
+**2. Add a safety net first.** Before refactoring anything, write tests. 3,161 of them. That's what makes the rest possible. When I extracted the combat system, every interaction was verified. When I built the aggro policy engine, tests caught edge cases I'd have shipped as bugs.
 
 **3. Refactor incrementally.** No big rewrites. Extract a module, test it, ship it. The MessageRouter was one change. Each handler module (auth, combat, loot, inventory, equipment, skills, party, shop) was one change. The CombatTracker was one change. At every step the game kept running.
 
@@ -34,7 +34,7 @@ This is the same approach that works on enterprise software. It works on games t
 
 ### Systems architecture
 
-Decomposed an 1,100-line God-object Player class into focused modules using SRP. Introduced a MessageRouter as a pure dispatcher with 13 dedicated handler modules (auth, combat, loot, inventory, equipment, skills, party, shop, achievements, venice, progression, persistence, zones) — each with its own tests. A CombatTracker singleton replaced scattered aggro state. The server has clear boundaries now: combat, inventory, party, progression, zones, AI, persistence, each in its own module with its own tests.
+Built the supporting systems the original prototype never had. Introduced a MessageRouter as a pure dispatcher with 13 dedicated handler modules (auth, combat, loot, inventory, equipment, skills, party, shop, achievements, venice, progression, persistence, zones), each with its own tests. A CombatTracker singleton replaced scattered aggro state. The server has clear boundaries now: combat, inventory, party, progression, zones, AI, persistence, each in its own module with its own tests.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
