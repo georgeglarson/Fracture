@@ -348,6 +348,8 @@ function connect() {
         addLogLine(msg.data);
         renderLogs();
         screen.render();
+      } else if (msg.type === 'result') {
+        showCommandResult(msg.data);
       }
     } catch (e) {
       // Ignore parse errors
@@ -365,32 +367,143 @@ function connect() {
   });
 }
 
+// ─── Command Bar ─────────────────────────────────────────────
+
+const cmdBox = blessed.textbox({
+  parent: screen,
+  bottom: 0,
+  left: 0,
+  width: '100%',
+  height: 1,
+  style: { fg: 'white', bg: 'black' },
+  inputOnFocus: true,
+});
+
+const cmdPrompt = blessed.box({
+  parent: screen,
+  bottom: 0,
+  left: 0,
+  width: '100%',
+  height: 1,
+  content: ' {gray-fg}Press {:} to enter commands, q to quit, arrows/hjkl to navigate{/}',
+  tags: true,
+  style: { fg: 'gray', bg: 'black' },
+});
+
+let commandMode = false;
+let cmdHistory = [];
+let cmdHistoryIdx = -1;
+
+function enterCommandMode() {
+  commandMode = true;
+  cmdPrompt.hide();
+  cmdBox.show();
+  cmdBox.setValue('');
+  cmdBox.focus();
+  screen.render();
+}
+
+function exitCommandMode() {
+  commandMode = false;
+  cmdBox.hide();
+  cmdPrompt.show();
+  screen.render();
+}
+
+function sendCommand(input) {
+  if (!input || !ws || ws.readyState !== WebSocket.OPEN) return;
+  cmdHistory.push(input);
+  if (cmdHistory.length > 50) cmdHistory.shift();
+  cmdHistoryIdx = cmdHistory.length;
+  ws.send(JSON.stringify({ type: 'command', command: input }));
+}
+
+function showCommandResult(result) {
+  const color = result.ok ? 'green' : 'red';
+  const prefix = result.ok ? 'OK' : 'ERR';
+  const lines = (result.msg || '').split('\n');
+  for (const line of lines) {
+    addLogLine({
+      time: Date.now(),
+      level: result.ok ? 'info' : 'error',
+      module: 'CMD',
+      msg: `[${prefix}] ${line}`,
+      data: {},
+    });
+  }
+  renderLogs();
+  screen.render();
+}
+
+cmdBox.on('submit', (value) => {
+  exitCommandMode();
+  sendCommand(value);
+});
+
+cmdBox.on('cancel', () => {
+  exitCommandMode();
+});
+
 // ─── Key Bindings ────────────────────────────────────────────
 
 screen.key(['q', 'C-c'], () => {
+  if (commandMode) return;
   if (ws) ws.close();
   process.exit(0);
 });
 
-// Arrow keys + vim keys for map navigation
+screen.key(':', () => {
+  if (!commandMode) enterCommandMode();
+});
+
+// Arrow keys + vim keys for map navigation (only when not in command mode)
 screen.key(['up', 'k'], () => {
+  if (commandMode) return;
   cursorY = Math.max(0, cursorY - 1);
   renderAll();
 });
 screen.key(['down', 'j'], () => {
+  if (commandMode) return;
   cursorY = Math.min(MAP_ROWS - 1, cursorY + 1);
   renderAll();
 });
 screen.key(['left', 'h'], () => {
+  if (commandMode) return;
   cursorX = Math.max(0, cursorX - 1);
   renderAll();
 });
 screen.key(['right', 'l'], () => {
+  if (commandMode) return;
   cursorX = Math.min(MAP_COLS - 1, cursorX + 1);
   renderAll();
 });
 
+// Quick shortcuts
+screen.key('?', () => {
+  if (commandMode) return;
+  sendCommand('help');
+});
+
+screen.key('/', () => {
+  if (commandMode) return;
+  enterCommandMode();
+  cmdBox.setValue('find ');
+  screen.render();
+});
+
+screen.key('i', () => {
+  if (commandMode) return;
+  // Inspect first entity in selected group
+  if (!lastSnapshot) return;
+  const gid = `${cursorX}-${cursorY}`;
+  const player = (lastSnapshot.players || []).find(p => p.group === gid);
+  const mob = (lastSnapshot.mobs || []).find(m => m.group === gid && !m.isDead);
+  const id = player?.id || mob?.id;
+  if (id) sendCommand(`inspect ${id}`);
+});
+
 // ─── Start ───────────────────────────────────────────────────
 
+cmdBox.hide();
 renderAll();
 connect();
