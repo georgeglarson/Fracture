@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "tui": "node tools/tui.js"
+    "tui": "node tools/tui.js",
+    "debug": "node tools/debug-cli.js"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",

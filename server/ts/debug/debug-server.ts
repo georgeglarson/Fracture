@@ -12,6 +12,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { createModuleLogger, setDebugLogHook } from '../utils/logger';
 import { getCombatTracker } from '../combat/combat-tracker';
 import { Types } from '../../../shared/ts/gametypes';
+import { getVeniceClient } from '../ai';
 
 const log = createModuleLogger('DebugServer');
 
@@ -35,16 +36,29 @@ export interface DebugSnapshot {
   groups: Record<string, { players: number; mobs: number }>;
   stats: {
     playerCount: number;
+    humanCount: number;
+    aiCount: number;
     mobCount: number;
     entityCount: number;
     ups: number;
   };
+  venice: {
+    successRate: number | null;
+    totalCalls: number;
+    failureCount: number;
+    avgLatencyMs: number;
+    circuitState: string;
+    lastError: string | null;
+    lastErrorCategory: string | null;
+  } | null;
   recentLogs: DebugLogEntry[];
 }
 
 interface DebugPlayer {
   id: number;
   name: string;
+  isAI: boolean;
+  isDead: boolean;
   x: number;
   y: number;
   hp: number;
@@ -125,6 +139,8 @@ function buildSnapshot(world: any): DebugSnapshot {
     players.push({
       id: player.id,
       name: player.name || `Player#${player.id}`,
+      isAI: player.isAI === true,
+      isDead: player.isDead === true,
       x: player.x,
       y: player.y,
       hp: player.hitPoints ?? 0,
@@ -185,6 +201,10 @@ function buildSnapshot(world: any): DebugSnapshot {
     }
   }
 
+  // Venice AI metrics (null if not initialized)
+  const veniceClient = getVeniceClient();
+  const veniceMetrics = veniceClient ? veniceClient.getMetrics() : null;
+
   return {
     timestamp: Date.now(),
     players,
@@ -193,10 +213,22 @@ function buildSnapshot(world: any): DebugSnapshot {
     groups,
     stats: {
       playerCount: players.length,
+      humanCount: players.filter(p => !p.isAI).length,
+      aiCount: players.filter(p => p.isAI).length,
       mobCount: mobs.length,
       entityCount: Object.keys(world.entities || {}).length,
       ups: world.ups || 50,
     },
+    venice: veniceMetrics ? {
+      successRate: veniceMetrics.totalCalls > 0
+        ? Math.round((veniceMetrics.successCount / veniceMetrics.totalCalls) * 100) : null,
+      totalCalls: veniceMetrics.totalCalls,
+      failureCount: veniceMetrics.failureCount,
+      avgLatencyMs: veniceMetrics.avgLatencyMs,
+      circuitState: veniceMetrics.circuitState,
+      lastError: veniceMetrics.lastError,
+      lastErrorCategory: veniceMetrics.lastErrorCategory,
+    } : null,
     recentLogs: logBuffer.slice(-20),
   };
 }
@@ -218,11 +250,11 @@ export function startDebugServer(world: any, port = 8001): WebSocketServer {
     }
 
     // Handle commands from TUI
-    ws.on('message', (raw) => {
+    ws.on('message', async (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
         if (msg.type === 'command') {
-          const result = handleCommand(world, msg.command);
+          const result = await handleCommand(world, msg.command);
           ws.send(JSON.stringify({ type: 'result', data: result }));
         }
       } catch (e) {
@@ -271,7 +303,7 @@ interface CommandResult {
   msg: string;
 }
 
-function handleCommand(world: any, input: string): CommandResult {
+async function handleCommand(world: any, input: string): Promise<CommandResult> {
   const parts = input.trim().split(/\s+/);
   const cmd = parts[0]?.toLowerCase();
   const args = parts.slice(1);
@@ -291,12 +323,41 @@ function handleCommand(world: any, input: string): CommandResult {
           `Pos: (${entity.x}, ${entity.y})  Group: ${entity.group || '?'}`,
           `HP: ${entity.hitPoints ?? '?'}/${entity.maxHitPoints ?? '?'}`,
         ];
-        if (entity.name) info.push(`Name: ${entity.name}  Level: ${entity.level ?? '?'}`);
+        if (entity.name) {
+          const aiTag = entity.isAI ? ' [AI]' : '';
+          info.push(`Name: ${entity.name}${aiTag}  Level: ${entity.level ?? '?'}`);
+        }
         if (entity.target) info.push(`Target: #${entity.target}`);
         if (entity.characterId) info.push(`CharID: ${entity.characterId}`);
         if (entity.isDead) info.push('STATUS: DEAD');
         const aggroCount = tracker.getPlayerAggroCount(entity.id) || tracker.getMobAggroCount(entity.id);
         if (aggroCount > 0) info.push(`Aggro links: ${aggroCount}`);
+        return { ok: true, msg: info.join('\n') };
+      }
+
+      case 'dump': {
+        const id = parseInt(args[0]);
+        if (isNaN(id)) return { ok: false, msg: 'Usage: dump <entityId>' };
+        const ent: any = world.getEntityById(id);
+        if (!ent) return { ok: false, msg: `Entity #${id} not found` };
+        const own = Object.getOwnPropertyNames(ent);
+        const proto = Object.getOwnPropertyNames(Object.getPrototypeOf(ent));
+        const proto2 = Object.getOwnPropertyNames(Object.getPrototypeOf(Object.getPrototypeOf(ent)));
+        const proto3 = Object.getOwnPropertyNames(Object.getPrototypeOf(Object.getPrototypeOf(Object.getPrototypeOf(ent))));
+        const levelDesc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(ent), 'level');
+        const levelOwn = Object.getOwnPropertyDescriptor(ent, 'level');
+        const info: string[] = [
+          `Constructor: ${ent.constructor?.name}`,
+          `Own props: ${own.join(', ')}`,
+          `Proto1 (${Object.getPrototypeOf(ent).constructor?.name}): ${proto.join(', ')}`,
+          `Proto2 (${Object.getPrototypeOf(Object.getPrototypeOf(ent)).constructor?.name}): ${proto2.join(', ')}`,
+          `Proto3: ${proto3.join(', ')}`,
+          `level own descriptor: ${JSON.stringify(levelOwn)}`,
+          `level proto descriptor: ${JSON.stringify(levelDesc ? { get: !!levelDesc.get, set: !!levelDesc.set } : null)}`,
+          `entity.level = ${JSON.stringify(ent.level)}`,
+          `typeof entity.level = ${typeof ent.level}`,
+          `entity.progression = ${JSON.stringify(ent.progression ? { level: ent.progression.level, xp: ent.progression.xp } : null)}`,
+        ];
         return { ok: true, msg: info.join('\n') };
       }
 
@@ -453,6 +514,55 @@ function handleCommand(world: any, input: string): CommandResult {
         return { ok: true, msg: `Tick rate set to ${rate} UPS` };
       }
 
+      // ── Venice AI diagnostics ──
+      case 'venice': {
+        const sub = args[0]?.toLowerCase();
+        const client = getVeniceClient();
+        if (!client) return { ok: false, msg: 'Venice client not initialized (no API key?)' };
+
+        if (sub === 'health') {
+          const result = await client.healthCheck();
+          const lines = [
+            `Status: ${result.ok ? 'OK' : 'FAILED'}`,
+            `Latency: ${result.latencyMs}ms`,
+            `Model: ${result.model}`,
+            `Circuit: ${result.circuitState}`,
+          ];
+          if (result.error) lines.push(`Error: ${result.error}`);
+          if (result.errorCategory) lines.push(`Category: ${result.errorCategory}`);
+          return { ok: result.ok, msg: lines.join('\n') };
+        }
+
+        // Default: show metrics
+        const m = client.getMetrics();
+        const uptime = Math.round((Date.now() - m.startTime) / 1000);
+        const successRate = m.totalCalls > 0 ? Math.round((m.successCount / m.totalCalls) * 100) : 0;
+        const lines = [
+          `Venice AI Metrics (uptime: ${uptime}s)`,
+          `─────────────────────────────────`,
+          `Calls: ${m.totalCalls} total, ${m.successCount} ok, ${m.failureCount} failed (${successRate}% success)`,
+          `Retries: ${m.retryCount}`,
+          ``,
+          `Errors by type:`,
+          `  timeout:    ${m.timeoutCount}`,
+          `  auth:       ${m.authErrorCount}`,
+          `  rate_limit: ${m.rateLimitCount}`,
+          `  server:     ${m.serverErrorCount}`,
+          `  network:    ${m.networkErrorCount}`,
+          `  unknown:    ${m.unknownErrorCount}`,
+          ``,
+          `Latency: avg=${m.avgLatencyMs}ms  p95=${m.p95LatencyMs}ms  max=${m.maxLatencyMs}ms`,
+          `Circuit breaker: ${m.circuitState} (tripped ${m.circuitBreakerTrips}x, rejected ${m.circuitBreakerRejects} calls)`,
+          ``,
+          `Last success: ${m.lastSuccessTime ? new Date(m.lastSuccessTime).toISOString() : 'never'}`,
+          `Last failure: ${m.lastFailureTime ? new Date(m.lastFailureTime).toISOString() : 'never'}`,
+        ];
+        if (m.lastError) {
+          lines.push(`Last error: [${m.lastErrorCategory}] ${m.lastError}`);
+        }
+        return { ok: true, msg: lines.join('\n') };
+      }
+
       case 'help':
         return {
           ok: true,
@@ -470,6 +580,8 @@ function handleCommand(world: any, input: string): CommandResult {
             'pause              Pause game loop',
             'resume             Resume game loop',
             'ups <rate>         Set tick rate (1-100)',
+            'venice             Venice AI metrics',
+            'venice health      Live API connectivity test',
           ].join('\n'),
         };
 

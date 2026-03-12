@@ -191,10 +191,10 @@ describe('Mob', () => {
       expect(mob.hitPoints).toBe(0);
     });
 
-    it('should allow hitPoints to go negative (caller handles death)', () => {
+    it('should clamp hitPoints at 0 on overkill damage', () => {
       const mob = createMob();
       mob.receiveDamage(150, 100);
-      expect(mob.hitPoints).toBe(-50);
+      expect(mob.hitPoints).toBe(0);
     });
 
     it('should accept multiple damage applications cumulatively', () => {

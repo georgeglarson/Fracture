@@ -762,6 +762,15 @@ describe('MessageRouter', () => {
       expect(ctx.world.handleHurtEntity).toHaveBeenCalledWith(ctx);
     });
 
+    it('should clamp hitPoints at 0 on overkill damage', async () => {
+      ctx.hitPoints = 5;
+      mockFormulas.dmg.mockReturnValue(20);
+
+      await router.route(ctx, [Msg.HURT, 42]);
+
+      expect(ctx.hitPoints).toBe(0);
+    });
+
     it('should not take damage from a dead mob', async () => {
       mob.isDead = true;
 

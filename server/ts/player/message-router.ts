@@ -409,7 +409,7 @@ export function createMessageHandlers(
           ctx.world.broadcastAttacker(mob);
         }
 
-        ctx.hitPoints -= Formulas.dmg(mob.weaponLevel, ctx.armorLevel, mob.level ?? 1);
+        ctx.hitPoints = Math.max(0, ctx.hitPoints - Formulas.dmg(mob.weaponLevel, ctx.armorLevel, mob.level ?? 1));
         ctx.world.handleHurtEntity(ctx);
 
         if (ctx.hitPoints <= 0) {

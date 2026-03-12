@@ -12,7 +12,7 @@ Most of my career has been taking old systems and making them maintainable. Frac
 
 The starting point was [BrowserQuest](https://github.com/mozilla/BrowserQuest), Mozilla's 2012 HTML5 demo. A JavaScript prototype with no types, no tests, God-object classes, and everything coupled to everything. I picked it because it's a good stand-in for what legacy modernization actually looks like: code that works but can't scale, can't be safely changed, and has no safety net.
 
-What you're looking at now is **250 TypeScript files**, **2,255 passing tests**, a real-time multiplayer game with AI-driven NPCs, zone-based combat, persistent player progression, and a production deployment behind nginx with SSL. The original codebase is still in there (every entity, every sprite, every tile) but the architecture around it is unrecognizable.
+What you're looking at now is **250 TypeScript files**, **2,342 passing tests**, a real-time multiplayer game with AI-driven NPCs, zone-based combat, persistent player progression, and a production deployment behind nginx with SSL. The original codebase is still in there (every entity, every sprite, every tile) but the architecture around it is unrecognizable.
 
 ## The legacy modernization story
 
@@ -91,7 +91,11 @@ Production-grade monitoring stack using the same tools and patterns as commercia
 
 **Log-trace correlation.** `pino-opentelemetry-transport` injects `trace_id` and `span_id` into every log line and ships logs via OTLP to the same collector that receives traces. Click a trace in SigNoz, see every log that happened during that request.
 
-**Self-hosted dashboards.** SigNoz (ClickHouse-backed) with dashboards for server operations and AI/persistence monitoring. Four alert rules: aggro tick P99 latency, Venice AI response time, error rate spike, and save frequency drop. All running on the same VPS with ClickHouse capped at 2GB.
+**Self-hosted dashboards.** SigNoz (ClickHouse-backed) with dashboards for server operations and AI/persistence monitoring. Public Grafana dashboards for portfolio demos. All running on the same VPS with ClickHouse capped at 2GB.
+
+**Venice AI resilience.** Circuit breaker (opens after 5 failures, 30s recovery), retry with backoff for transient errors, error classification (timeout, auth, rate_limit, server_error, network), latency histogram, and per-call metrics. Survives API outages without impacting gameplay.
+
+**Debug CLI.** A non-interactive diagnostic probe (`tools/debug-cli.js`) that connects to the game server's debug WebSocket and reports: player/mob state, aggro links, server stats, structured logs, automated health checks (10 anomaly detectors), and Venice AI metrics with live connectivity tests. Designed to be invoked by AI development tools during troubleshooting sessions.
 
 ```
 Game Server ──OTLP HTTP──→ OTel Collector ──→ ClickHouse
@@ -103,7 +107,7 @@ Game Server ──OTLP HTTP──→ OTel Collector ──→ ClickHouse
 ## Test suite
 
 ```
-43 test files | 2,255 tests | 0 failures
+45 test files | 2,342 tests | 0 failures
 ```
 
 | Module | Coverage |
@@ -152,6 +156,12 @@ pnpm run dev
 # Tests
 pnpm test
 pnpm test:coverage
+
+# Debug CLI (requires running server)
+pnpm run debug health        # Anomaly detection
+pnpm run debug players       # Connected players
+pnpm run debug venice health # Venice AI connectivity test
+pnpm run debug watch 10      # Stream state for 10s
 ```
 
 Client connects to `localhost:8000` by default. For production, configure `client/config/config.prod.json`.
@@ -189,16 +199,20 @@ Fracture/
 │   ├── storage/         # SQLite persistence (instrumented with spans)
 │   ├── utils/logger.ts  # Pino structured logging + OTel transport
 │   ├── world/           # Spatial manager, spawn manager, game loop
-│   └── __tests__/       # Test suite (43 files)
+│   └── __tests__/       # Test suite (45+ files)
 ├── shared/ts/           # Shared types (27 files)
 │   ├── zones/           # Zone boundaries and bonuses
 │   ├── skills/          # Skill definitions
 │   ├── items/           # Item types, legendaries, rarity
 │   └── events/          # Typed event bus
+├── tools/               # Development utilities
+│   ├── debug-cli.js     # Non-interactive debug probe (AI-assisted diagnostics)
+│   └── tui.js           # Nethack-style live terminal dashboard
 ├── deploy/              # Deployment configs
 │   ├── signoz/          # OTel Collector config
+│   ├── grafana/         # Public dashboard provisioning
 │   └── common/          # ClickHouse configs
-├── docker-compose.signoz.yml  # SigNoz observability stack
+├── docker-compose.signoz.yml  # SigNoz + Grafana observability stack
 └── specs/               # Feature specifications
 ```
 
@@ -208,7 +222,7 @@ Fracture/
 - **Systems design.** Combat, inventory, progression, zones, AI, persistence, real-time networking, all integrated and tested.
 - **Observability engineering.** Structured logging, distributed tracing, and self-hosted monitoring wired end-to-end. The same OTel + Pino + SigNoz stack used in production microservices, applied to a game server.
 - **AI-augmented development.** Built with Claude as a development partner, showing what one engineer can ship with AI tooling.
-- **Testing discipline.** 2,255 tests, coverage thresholds enforced, tests written before refactors.
+- **Testing discipline.** 2,300+ tests, coverage thresholds enforced, tests written before refactors.
 - **Production operations.** SSL, reverse proxy, rate limiting, anti-exploit guards, Docker Compose infrastructure, deployed and running.
 
 ## Credits

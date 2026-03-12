@@ -120,6 +120,7 @@ let aiPlayerIdCounter = 100000; // Start high to avoid collision with real playe
 export class AIPlayer extends Character {
   // Player-like properties (must match Player for getState())
   name: string;
+  level: number = 1;   // Derived from equipment tier
   armor!: number;      // Initialized in constructor via setRandomEquipment()
   weapon!: number;     // Initialized in constructor via setRandomEquipment()
   armorLevel!: number; // Initialized in constructor via setRandomEquipment()
@@ -242,6 +243,7 @@ export class AIPlayer extends Character {
     this.weapon = weapons[Math.floor(Math.random() * weapons.length)];
     this.armorLevel = Properties.getArmorLevel(this.armor) ?? 1;
     this.weaponLevel = Properties.getWeaponLevel(this.weapon) ?? 1;
+    this.level = Math.max(this.armorLevel, this.weaponLevel);
   }
 
   private updateHitPoints(): void {
@@ -660,7 +662,8 @@ export class AIPlayer extends Character {
 
   // Handle being attacked
   receiveDamage(damage: number, attackerId: number): void {
-    this.hitPoints -= damage;
+    if (this.isDead) return; // Already dead, ignore further damage
+    this.hitPoints = Math.max(0, this.hitPoints - damage);
 
     if (this.hitPoints <= 0) {
       this.die();

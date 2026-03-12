@@ -59,7 +59,7 @@ export class Mob extends Character {
   }
 
   receiveDamage(points: number, playerId: number): void {
-    this.hitPoints -= points;
+    this.hitPoints = Math.max(0, this.hitPoints - points);
   }
 
   hates(playerId: number): boolean {
