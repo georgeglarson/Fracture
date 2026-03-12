@@ -26,7 +26,9 @@ This is the same approach that works on enterprise software. It works on games t
 
 **4. Make the architecture earn its keep.** Every abstraction exists because it solved a real problem. The SpatialManager exists because the aggro tick was O(n\*m) and needed spatial partitioning. The AggroPolicy exists because safe zones, density caps, and level scaling were scattered across three files. The EventBus exists because mob death needed to notify five decoupled systems.
 
-**5. Ship it.** The game is live, behind nginx with SSL. It handles concurrent players. It's been through a full security audit. It's deployed and maintained.
+**5. Add observability.** You can't maintain what you can't see. Structured logging (Pino), distributed tracing (OpenTelemetry), and a self-hosted monitoring dashboard (SigNoz) so every request, every save, every AI call is traceable end-to-end. The same stack you'd wire up for a production microservice, applied to a game server.
+
+**6. Ship it.** The game is live, behind nginx with SSL. It handles concurrent players. It's been through a full security audit. It's deployed and maintained.
 
 ## What I built on top of the legacy code
 
@@ -54,6 +56,10 @@ Decomposed an 1,100-line God-object Player class into focused modules using SRP.
 │  │ Venice AI SDK (llama-3.3-70b) + Fish Audio TTS   │  │
 │  └───────────────────────────────────────────────────┘  │
 ├─────────────────────────────────────────────────────────┤
+│  Observability                                          │
+│  Pino → OTel Collector → ClickHouse ← SigNoz UI        │
+│  Structured logs, distributed traces, span metrics      │
+├─────────────────────────────────────────────────────────┤
 │  Shared (4k LOC TypeScript)                             │
 │  Game types, zone data, skills, items, events           │
 └─────────────────────────────────────────────────────────┘
@@ -74,6 +80,25 @@ Seven progression zones from village (safe) to boss arena. An AggroPolicy engine
 ### Multiplayer infrastructure
 
 Socket.IO WebSocket transport with 105 message types. Spatial partitioning for zone-based broadcasting so mobs only scan players in adjacent groups, not all players globally. Party system with proximity-based XP sharing. Per-message-type rate limiting. Spawn protection. Anti-exploit validation. SQLite persistence for all player state.
+
+### Observability
+
+Production-grade monitoring stack using the same tools and patterns as commercial microservices:
+
+**Structured logging.** Every `console.*` call (316 across 48 files) replaced with Pino structured logging. 50 modules emit JSON logs with typed context: player IDs, item kinds, damage values, zone names. Player-scoped child loggers automatically attach identity to every log line. Hot-path logging (aggro ticks, movement) uses `trace` level that Pino skips entirely unless explicitly enabled.
+
+**Distributed tracing.** OpenTelemetry SDK with manual span instrumentation on the paths that matter: message routing (`player.message.{type}`), persistence operations (`storage.saveCharacter`, `storage.loadPlayerState`), aggro ticks (`game.aggro_tick` with mob count attributes), and external AI calls (`ai.venice`, `ai.tts` with latency tracking). HTTP auto-instrumentation covers Socket.IO transport. 10% sampling in production to control volume.
+
+**Log-trace correlation.** `pino-opentelemetry-transport` injects `trace_id` and `span_id` into every log line and ships logs via OTLP to the same collector that receives traces. Click a trace in SigNoz, see every log that happened during that request.
+
+**Self-hosted dashboards.** SigNoz (ClickHouse-backed) with dashboards for server operations and AI/persistence monitoring. Four alert rules: aggro tick P99 latency, Venice AI response time, error rate spike, and save frequency drop. All running on the same VPS with ClickHouse capped at 2GB.
+
+```
+Game Server ──OTLP HTTP──→ OTel Collector ──→ ClickHouse
+  │ Pino (JSON logs)            │                  ↑
+  │ OTel SDK (traces)           │            SigNoz UI
+  └─────────────────────────────┘       (dashboards, alerts)
+```
 
 ## Test suite
 
@@ -101,8 +126,9 @@ Vitest with v8 coverage. Storage tests use in-memory SQLite. Coverage thresholds
 | **Server** | Node.js, TypeScript 5.8, Socket.IO 4 |
 | **Database** | SQLite (better-sqlite3) |
 | **AI** | Venice AI SDK (llama-3.3-70b), Fish Audio TTS |
+| **Observability** | OpenTelemetry, Pino, SigNoz, ClickHouse |
 | **Testing** | Vitest 4, v8 coverage |
-| **Production** | nginx, Let's Encrypt SSL |
+| **Production** | nginx, Let's Encrypt SSL, Docker Compose |
 | **Package manager** | pnpm |
 
 ## Running locally
@@ -130,6 +156,21 @@ pnpm test:coverage
 
 Client connects to `localhost:8000` by default. For production, configure `client/config/config.prod.json`.
 
+### Observability stack (optional)
+
+```bash
+# Start SigNoz (ClickHouse + OTel Collector + UI)
+docker compose -f docker-compose.signoz.yml up -d
+
+# Start the server with OTel export enabled
+NODE_ENV=production OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
+  node dist/server/ts/main.js
+
+# SigNoz UI at http://localhost:3301
+```
+
+In dev mode (`NODE_ENV !== 'production'`), traces print to the console and logs use pino-pretty. No collector needed for local development.
+
 ## Project structure
 
 ```
@@ -141,10 +182,12 @@ Fracture/
 │   ├── renderer/        # Canvas rendering, camera, particles
 │   └── ui/              # HUD, inventory, shop, achievement panels
 ├── server/ts/           # Game server (128 files)
+│   ├── tracing.ts       # OTel SDK bootstrap (imported first)
 │   ├── ai/              # Venice AI, narration, TTS
 │   ├── combat/          # Aggro policy, combat tracker, kill streaks, nemesis
 │   ├── player/          # MessageRouter + handler modules
-│   ├── storage/         # SQLite persistence
+│   ├── storage/         # SQLite persistence (instrumented with spans)
+│   ├── utils/logger.ts  # Pino structured logging + OTel transport
 │   ├── world/           # Spatial manager, spawn manager, game loop
 │   └── __tests__/       # Test suite (43 files)
 ├── shared/ts/           # Shared types (27 files)
@@ -152,6 +195,10 @@ Fracture/
 │   ├── skills/          # Skill definitions
 │   ├── items/           # Item types, legendaries, rarity
 │   └── events/          # Typed event bus
+├── deploy/              # Deployment configs
+│   ├── signoz/          # OTel Collector config
+│   └── common/          # ClickHouse configs
+├── docker-compose.signoz.yml  # SigNoz observability stack
 └── specs/               # Feature specifications
 ```
 
@@ -159,9 +206,10 @@ Fracture/
 
 - **Legacy modernization.** Taking a real codebase from 2012 and systematically improving it without rewriting from scratch.
 - **Systems design.** Combat, inventory, progression, zones, AI, persistence, real-time networking, all integrated and tested.
+- **Observability engineering.** Structured logging, distributed tracing, and self-hosted monitoring wired end-to-end. The same OTel + Pino + SigNoz stack used in production microservices, applied to a game server.
 - **AI-augmented development.** Built with Claude as a development partner, showing what one engineer can ship with AI tooling.
 - **Testing discipline.** 2,255 tests, coverage thresholds enforced, tests written before refactors.
-- **Production operations.** SSL, reverse proxy, rate limiting, anti-exploit guards, persistence, deployed and running.
+- **Production operations.** SSL, reverse proxy, rate limiting, anti-exploit guards, Docker Compose infrastructure, deployed and running.
 
 ## Credits
 
