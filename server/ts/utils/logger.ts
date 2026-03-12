@@ -19,7 +19,8 @@ const baseConfig: pino.LoggerOptions = {
     service: 'fracture-server',
     version: process.env.npm_package_version || '1.0.0',
   },
-  timestamp: pino.stdTimeFunctions.isoTime,
+  // Default epoch-ms timestamps — required for pino-opentelemetry-transport compatibility
+  // (OTel SDK rejects ISO string timestamps silently)
 };
 
 // Dev: pino-pretty for readable output
@@ -39,11 +40,23 @@ const transport = isDev
         { target: 'pino/file', options: { destination: 1 }, level: logLevel as string },
         // OTel transport: injects trace_id/span_id and ships to collector
         {
-          target: 'pino-opentelemetry-transport',
+          target: require.resolve('pino-opentelemetry-transport'),
           options: {
+            loggerName: 'fracture-server',
             resourceAttributes: {
               'service.name': 'fracture-server',
               'deployment.environment': process.env.NODE_ENV || 'production',
+            },
+            logRecordProcessorOptions: {
+              recordProcessorType: 'simple',
+              exporterOptions: {
+                protocol: 'http',
+                httpExporterOptions: {
+                  url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+                    ? `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/logs`
+                    : 'http://localhost:4318/v1/logs',
+                },
+              },
             },
           },
           level: logLevel as string,
@@ -56,6 +69,7 @@ export const logger = pino({
   ...baseConfig,
   transport,
 });
+
 
 /**
  * Create a child logger with additional context
