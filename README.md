@@ -12,7 +12,7 @@ Most of my career has been taking old systems and making them maintainable. Frac
 
 The starting point was [BrowserQuest](https://github.com/mozilla/BrowserQuest), Mozilla's 2012 HTML5 demo. A JavaScript prototype with no types, no tests, God-object classes, and everything coupled to everything. I picked it because it's a good stand-in for what legacy modernization actually looks like: code that works but can't scale, can't be safely changed, and has no safety net.
 
-What you're looking at now is **250 TypeScript files**, **2,342 passing tests**, a real-time multiplayer game with AI-driven NPCs, zone-based combat, persistent player progression, and a production deployment behind nginx with SSL. The original codebase is still in there (every entity, every sprite, every tile) but the architecture around it is unrecognizable.
+What you're looking at now is **250 TypeScript files**, **2,689 passing tests**, a real-time multiplayer game with AI-driven NPCs, zone-based combat, persistent player progression, and a production deployment behind nginx with SSL. The original codebase is still in there (every entity, every sprite, every tile) but the architecture around it is unrecognizable.
 
 ## The legacy modernization story
 
@@ -107,7 +107,7 @@ Game Server ──OTLP HTTP──→ OTel Collector ──→ ClickHouse
 ## Test suite
 
 ```
-45 test files | 2,342 tests | 0 failures
+55 test files | 2,689 tests | 0 failures
 ```
 
 | Module | Coverage |
