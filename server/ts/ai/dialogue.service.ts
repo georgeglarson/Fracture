@@ -7,6 +7,9 @@ import { VeniceClient } from './venice-client';
 import { ProfileService } from './profile.service';
 import { ConversationExchange, PlayerProfile } from './types';
 import { NPC_PERSONALITIES } from './npc-personalities';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Dialogue');
 
 export class DialogueService {
   private client: VeniceClient;
@@ -69,7 +72,7 @@ The player "${playerName}" approaches. Respond in character:`;
       }
       return response || personality.greeting;
     } catch (error) {
-      console.error('Venice NPC dialogue error:', error);
+      log.error({ err: error }, 'Venice NPC dialogue error');
       return personality.greeting;
     }
   }

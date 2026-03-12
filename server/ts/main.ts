@@ -1,3 +1,6 @@
+// OpenTelemetry must be initialized before all other imports
+import './tracing';
+
 // Load environment variables from .env file (with explicit path)
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
@@ -7,13 +10,14 @@ import * as path from 'path';
 const envPath = path.resolve(__dirname, '../../../.env');
 const result = dotenv.config({ path: envPath });
 if (result.error) {
+  // Logger not yet available at module top-level, use console for env bootstrap
   console.warn(`[ENV] Could not load .env from ${envPath}:`, result.error.message);
 } else {
   console.info(`[ENV] Loaded environment from ${envPath}`);
 }
 // Catch unhandled promise rejections to prevent silent server crashes
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('[Server] Unhandled promise rejection:', reason);
+  log.fatal({ err: reason }, 'Unhandled promise rejection');
 });
 
 import {World} from './world';
@@ -22,6 +26,9 @@ import {Metrics} from './metrics';
 import {Player} from './player';
 import {initVeniceService, initFishAudioService, getVeniceClient} from './ai';
 import {initIntroService} from './ai/intro.service';
+import { createModuleLogger } from './utils/logger.js';
+
+const log = createModuleLogger('Server');
 
 // Server configuration interface
 interface ServerConfig {
@@ -61,21 +68,19 @@ function acquireServerLock(): boolean {
         try {
             const existingPid = parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
             if (existingPid && isProcessRunning(existingPid)) {
-                console.error(`[Server] Another instance is already running (PID: ${existingPid})`);
-                console.error(`[Server] Kill it first with: kill ${existingPid}`);
-                console.error(`[Server] Or remove stale PID file: rm ${PID_FILE}`);
+                log.error({ existingPid, pidFile: PID_FILE }, 'Another instance is already running');
                 return false;
             }
             // Stale PID file - process no longer running
-            console.info(`[Server] Removing stale PID file (old PID: ${existingPid})`);
+            log.info({ existingPid }, 'Removing stale PID file');
         } catch (e) {
-            console.warn(`[Server] Could not read PID file, removing it`);
+            log.warn('Could not read PID file, removing it');
         }
     }
 
     // Write our PID
     fs.writeFileSync(PID_FILE, process.pid.toString());
-    console.info(`[Server] Acquired lock (PID: ${process.pid})`);
+    log.info({ pid: process.pid }, 'Acquired server lock');
     return true;
 }
 
@@ -85,7 +90,7 @@ function releaseServerLock(): void {
             const storedPid = parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
             if (storedPid === process.pid) {
                 fs.unlinkSync(PID_FILE);
-                console.info(`[Server] Released lock`);
+                log.info('Released server lock');
             }
         }
     } catch (e) {
@@ -117,7 +122,7 @@ function main(config: ServerConfig): void {
             }
         }, 1000);
 
-    console.info("Starting Fracture game server...");
+    log.info('Starting Fracture game server');
 
     // Initialize Venice AI service if API key is configured
     // Priority: environment variable > config file
@@ -125,35 +130,33 @@ function main(config: ServerConfig): void {
     if (veniceApiKey) {
         // Log key status (masked for security)
         const maskedKey = veniceApiKey.substring(0, 4) + '...' + veniceApiKey.substring(veniceApiKey.length - 4);
-        console.info(`[Venice] API key found: ${maskedKey} (length: ${veniceApiKey.length})`);
+        log.info({ maskedKey, keyLength: veniceApiKey.length }, 'Venice API key found');
 
         initVeniceService(veniceApiKey, {
             model: process.env.VENICE_MODEL || config.venice_model || 'llama-3.3-70b',
             timeout: parseInt(process.env.VENICE_TIMEOUT || '') || config.venice_timeout || 5000
         });
-        console.info("[Venice] AI service initialized");
+        log.info('Venice AI service initialized');
 
         // Initialize intro service (depends on Venice)
         const veniceClient = getVeniceClient();
         if (veniceClient) {
             initIntroService(veniceClient);
-            console.info("[IntroService] Initialized");
+            log.info('IntroService initialized');
         }
     } else {
-        console.warn("[Venice] NO API KEY FOUND! Set VENICE_API_KEY in .env file");
-        console.warn("[Venice] Checked: process.env.VENICE_API_KEY =", process.env.VENICE_API_KEY ? 'set' : 'undefined');
+        log.warn({ envVarSet: !!process.env.VENICE_API_KEY }, 'Venice API key not found — set VENICE_API_KEY in .env');
     }
 
     // Initialize Fish Audio TTS service if API key is configured
     const fishAudioApiKey = process.env.FISH_AUDIO_API_KEY || config.fish_audio_api_key;
     if (fishAudioApiKey) {
         const maskedKey = fishAudioApiKey.substring(0, 4) + '...' + fishAudioApiKey.substring(fishAudioApiKey.length - 4);
-        console.info(`[FishAudio] API key found: ${maskedKey}`);
+        log.info({ maskedKey }, 'FishAudio API key found');
         initFishAudioService({ apiKey: fishAudioApiKey });
-        console.info("[FishAudio] TTS service initialized");
+        log.info('FishAudio TTS service initialized');
     } else {
-        console.warn("[FishAudio] NO API KEY FOUND! Set FISH_AUDIO_API_KEY in .env file");
-        console.warn("[FishAudio] NPC voice acting will be disabled");
+        log.warn('FishAudio API key not found — NPC voice acting disabled');
     }
 
     server.onConnect(function(connection: Connection) {
@@ -166,7 +169,7 @@ function main(config: ServerConfig): void {
 
         if(metrics) {
             metrics.getOpenWorldCount(function(open_world_count: number) {
-                console.log('open world count: ' + open_world_count);
+                log.debug({ openWorldCount: open_world_count }, 'Open world count');
                 // choose the least populated world among open worlds
                 world = worlds.find((w: World) => w.playerCount < config.nb_players_per_world && w.playerCount < open_world_count);
                 connect();
@@ -181,7 +184,7 @@ function main(config: ServerConfig): void {
     });
 
     server.onError(function() {
-        console.error(Array.prototype.join.call(arguments, ", "));
+        log.error({ details: Array.prototype.join.call(arguments, ", ") }, 'Server error');
     });
 
     var onPopulationChange = function() {
@@ -230,7 +233,7 @@ function getWorldDistribution(worlds: World[]): number[] {
 function getConfigFile(path: string, callback: (config: ServerConfig | null) => void): void {
     fs.readFile(path, 'utf8', function(err, json_string) {
         if(err) {
-            console.error("Could not open config file:", err.path);
+            log.error({ path: err.path }, 'Could not open config file');
             callback(null);
         } else {
             callback(JSON.parse(json_string) as ServerConfig);
@@ -252,7 +255,7 @@ getConfigFile(configPath, function(config: ServerConfig | null) {
         process.exit(1);
     }
     if (!config) {
-        console.error("Failed to load config file");
+        log.fatal('Failed to load config file');
         process.exit(1);
     }
     main(config);

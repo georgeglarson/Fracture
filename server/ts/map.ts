@@ -1,6 +1,9 @@
 import * as fs from 'fs';
 import {Checkpoint} from './checkpoint';
 import {Utils} from './utils';
+import { createModuleLogger } from './utils/logger.js';
+
+const log = createModuleLogger('Map');
 
 interface Position {
   x: number;
@@ -87,7 +90,7 @@ export class Map {
 
     fs.exists(filepath, function (exists) {
       if (!exists) {
-        console.error(filepath + ' doesnt exist.');
+        log.error({ filepath }, 'Map file does not exist');
         return;
       }
 

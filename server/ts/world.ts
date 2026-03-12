@@ -30,6 +30,9 @@ import {ChestArea} from './chestarea';
 import {evaluateAggro} from './combat/aggro-policy';
 import {getLeashDistance} from './combat/combat-constants';
 import type {Player} from './player'; // Type-only import to avoid circular dep
+import { createModuleLogger } from './utils/logger.js';
+
+const log = createModuleLogger('World');
 
 // Message type for push methods - can be an object with serialize() or a raw array
 type MessagePayload = { serialize(): unknown[] } | unknown[];
@@ -105,6 +108,9 @@ export class World {
   // Startup timeouts (stored for cleanup)
   private startupTimers: ReturnType<typeof setTimeout>[] = [];
 
+  // Periodic save interval (60-second auto-save for all connected players)
+  private periodicSaveInterval: ReturnType<typeof setInterval> | null = null;
+
   // Storage service for player persistence
   private storageService: IStorageService | null = null;
 
@@ -128,7 +134,7 @@ export class World {
     });
 
     this.onPlayerEnter(function (player: Player) {
-      console.info(player.name + ' has joined ' + self.id);
+      log.info({ playerName: player.name, worldId: self.id }, 'Player joined world');
 
       if (!player.hasEnteredGame) {
         self.incrementPlayerCount();
@@ -145,7 +151,7 @@ export class World {
       self.pushRelevantEntityListTo(player);
 
       const move_callback = function (x: number, y: number) {
-        console.debug(player.name + ' is moving to (' + x + ', ' + y + ').');
+        log.trace({ playerName: player.name, x, y }, 'Player moving');
 
         player.forEachAttacker(function (attacker) {
           // Use type guard to ensure attacker is a Mob before using Mob-specific methods
@@ -161,6 +167,9 @@ export class World {
               mob.clearTarget();
               mob.forgetEveryone();
               player.removeAttacker(mob);
+              // Return to spawn and broadcast MOVE so client removes exclamation
+              mob.resetPosition();
+              self.onMobMoveCallback(mob);
             } else {
               mob.move(pos.x, pos.y);
             }
@@ -169,6 +178,9 @@ export class World {
             mob.clearTarget();
             mob.forgetEveryone();
             player.removeAttacker(mob);
+            // Return to spawn and broadcast MOVE so client removes exclamation
+            mob.resetPosition();
+            self.onMobMoveCallback(mob);
           }
         });
       };
@@ -194,15 +206,15 @@ export class World {
       });
 
       player.onExit(function () {
-        console.info(player.name + ' has left the game.');
+        log.info({ playerName: player.name }, 'Player left the game');
 
         // Save player data to database before removing
         if (self.storageService && player.characterId) {
           try {
             player.saveToStorage(self.storageService);
-            console.log(`[Storage] Saved ${player.name} on exit`);
+            log.info({ playerName: player.name, characterId: player.characterId }, 'Saved player on exit');
           } catch (e) {
-            console.error(`[Storage] Failed to save ${player.name}:`, e);
+            log.error({ err: e, playerName: player.name }, 'Failed to save player on exit');
           }
         }
 
@@ -242,10 +254,10 @@ export class World {
 
     // AI Thought Bubbles - The "Ant Farm" Feature
     this.onThoughtTick(function () {
-      console.log('[Thoughts] Tick fired');
+      log.trace('Thoughts tick fired');
       const venice = getVeniceService();
       if (!venice) {
-        console.log('[Thoughts] No venice service');
+        log.trace('Thoughts tick: no venice service');
         return;
       }
 
@@ -287,7 +299,7 @@ export class World {
 
           // Generate thought
           const thoughtResult = venice.getEntityThought(typeName, state);
-          console.log('[Thoughts]', typeName, '(id:', entity.id, '):', thoughtResult.thought);
+          log.debug({ entityType: typeName, entityId: entity.id, thought: thoughtResult.thought }, 'Entity thought');
 
           // Broadcast to all players in adjacent groups
           // Use groupId (the key) not group.id (which doesn't exist)
@@ -300,7 +312,7 @@ export class World {
         });
       });
 
-      console.log('[Thoughts] Processed', groupsWithPlayers, 'groups,', totalEntities, 'entities');
+      log.debug({ groupsWithPlayers, totalEntities }, 'Thoughts tick processed');
     });
 
     // Mob Proximity Aggro — zone-aware aggro with density capping
@@ -334,6 +346,9 @@ export class World {
             (target as Character).removeAttacker(mob);
             mob.clearTarget();
             mob.forgetEveryone();
+            // Return to spawn and broadcast MOVE so client removes exclamation
+            mob.resetPosition();
+            self.onMobMoveCallback(mob);
             return;
           }
           // Re-broadcast attack every aggro tick — keeps client combat state synchronized
@@ -391,7 +406,7 @@ export class World {
           self.handleMobHate(mob.id, closestPlayer.id, hatePoints);
 
           const mobName = Types.getKindAsString(mob.kind);
-          console.debug(`[Aggro] ${mobName} (range ${mob.aggroRange}, zone ${mob.zoneId}) targeting ${closestPlayer.name} at distance ${closestDistance.toFixed(1)}`);
+          log.trace({ mobName, aggroRange: mob.aggroRange, zoneId: mob.zoneId, targetPlayer: closestPlayer.name, distance: +closestDistance.toFixed(1) }, 'Mob aggro targeting');
         }
       });
     });
@@ -505,9 +520,33 @@ export class World {
         }
       });
       self.gameLoop.start();
+
+      // Periodic save: every 60 seconds, save all connected players
+      // Fixes level persistence bug: saves were only happening on disconnect
+      self.periodicSaveInterval = setInterval(() => {
+        const storage = self.getStorageService();
+        let savedCount = 0;
+        let failCount = 0;
+
+        self.forEachPlayer((player: Player) => {
+          if (player.characterId) {
+            try {
+              player.saveToStorage(storage);
+              savedCount++;
+            } catch (e) {
+              failCount++;
+              log.error({ err: e, playerName: player.name, characterId: player.characterId }, 'Periodic save failed for player');
+            }
+          }
+        });
+
+        if (savedCount > 0 || failCount > 0) {
+          log.info({ event: 'periodic_save', playerCount: savedCount, failures: failCount }, 'Periodic save completed');
+        }
+      }, 60_000);
     });
 
-    console.info('' + this.id + ' created (capacity: ' + this.maxPlayers + ' players).');
+    log.info({ worldId: this.id, capacity: this.maxPlayers }, 'World created');
 
     // Start AI Players (Westworld feature) - after a delay to let the world settle
     this.startupTimers.push(setTimeout(() => {
@@ -599,7 +638,7 @@ export class World {
       }
     });
 
-    console.debug('Pushed ' + sortedIds.length + ' new spawns to ' + player.id);
+    log.trace({ count: sortedIds.length, playerId: player.id }, 'Pushed spawns to player');
   }
 
   pushToPlayer(player: Player, message: { serialize(): unknown[] }) {
@@ -784,7 +823,7 @@ export class World {
       for (const legendary of legendaries) {
         if (Math.random() < legendary.dropChance) {
           // Legendary dropped! Create with legendary rarity
-          console.log(`[LEGENDARY DROP] ${legendary.name} dropped from ${bossId}!`);
+          log.info({ legendaryName: legendary.name, legendaryId: legendary.id, bossId }, 'Legendary item dropped');
           const legendaryItem = this.createItemWithProperties(legendary.kind, mob.x, mob.y, zone);
           if (legendaryItem && legendaryItem.properties) {
             // Force legendary rarity and add legendary flags
@@ -824,7 +863,7 @@ export class World {
    */
   private broadcastLegendaryDrop(itemName: string, bossId: string): void {
     const message = `A legendary ${itemName} has dropped from ${bossId.replace(/_/g, ' ')}!`;
-    console.log(`[BROADCAST] ${message}`);
+    log.info({ message, bossId }, 'Legendary drop broadcast');
     // Use chat broadcast for now - could add a dedicated message type later
     this.pushBroadcast(new Messages.Chat({ id: 0, name: 'World' } as any, `[LEGENDARY] ${message}`));
   }

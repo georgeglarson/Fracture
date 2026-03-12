@@ -8,6 +8,9 @@
 
 import { VeniceClient } from './venice-client';
 import { MOB_THOUGHTS, NPC_THOUGHTS, fillTemplate } from './npc-personalities';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Thoughts');
 
 export type ThoughtState = 'idle' | 'combat' | 'flee' | 'playerNearby' | 'special';
 
@@ -83,7 +86,7 @@ export class ThoughtService {
       .sort(() => Math.random() - 0.5)
       .slice(0, 3);
 
-    console.log('[Thoughts] Refreshing AI pool for:', typesToRefresh.join(', '));
+    log.info({ entityTypes: typesToRefresh }, 'Refreshing AI pool');
 
     for (const entityType of typesToRefresh) {
       try {
@@ -132,7 +135,7 @@ Output exactly 5 thoughts, one per line. No numbering or punctuation at start:`;
             thoughts: newThoughts,
             lastRefresh: Date.now()
           });
-          console.log(`[Thoughts] AI pool refreshed for ${entityType}: ${newThoughts.length} thoughts`);
+          log.info({ entityType, count: newThoughts.length }, 'AI pool refreshed');
         }
       }
     } catch {

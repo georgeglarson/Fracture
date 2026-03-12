@@ -13,6 +13,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { createModuleLogger } from '../utils/logger.js';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
+
+const log = createModuleLogger('FishAudio');
+const tracer = trace.getTracer('fracture-server');
 
 // Voice IDs from Fish Audio (2 male, 2 female for variety)
 export const VOICES = {
@@ -69,11 +74,11 @@ export class FishAudioService {
     // Ensure cache directory exists
     if (!fs.existsSync(this.cacheDir)) {
       fs.mkdirSync(this.cacheDir, { recursive: true });
-      console.info(`[FishAudio] Created cache directory: ${this.cacheDir}`);
+      log.info({ cacheDir: this.cacheDir }, 'Created cache directory');
     }
 
-    console.info(`[FishAudio] Service initialized`);
-    console.info(`[FishAudio] Cache directory: ${this.cacheDir}`);
+    log.info('Service initialized');
+    log.info({ cacheDir: this.cacheDir }, 'Cache directory');
   }
 
   /**
@@ -189,52 +194,70 @@ export class FishAudioService {
     }
 
     // Generate new audio
-    try {
-      const response = await fetch('https://api.fish.audio/v1/tts', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: cleanText,
-          reference_id: voiceId,
-          format: 'mp3',
-          mp3_bitrate: 64,  // Lower bitrate for smaller files
-          latency: 'normal',
-        }),
-        signal: AbortSignal.timeout(this.timeout),
+    return tracer.startActiveSpan('ai.tts', async (span) => {
+      span.setAttributes({
+        'ai.provider': 'fish_audio',
+        'ai.prompt_length': cleanText.length,
+        'ai.voice_id': voiceId,
+        'ai.context': context,
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[FishAudio] API error ${response.status}: ${errorText}`);
+      const startMs = Date.now();
+      try {
+        const response = await fetch('https://api.fish.audio/v1/tts', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: cleanText,
+            reference_id: voiceId,
+            format: 'mp3',
+            mp3_bitrate: 64,  // Lower bitrate for smaller files
+            latency: 'normal',
+          }),
+          signal: AbortSignal.timeout(this.timeout),
+        });
+
+        span.setAttribute('ai.response_time_ms', Date.now() - startMs);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          span.setStatus({ code: SpanStatusCode.ERROR, message: `HTTP ${response.status}` });
+          span.end();
+          log.error({ status: response.status, errorText }, 'API error');
+          return null;
+        }
+
+        // Get audio data
+        const audioBuffer = await response.arrayBuffer();
+
+        // Save to cache
+        fs.writeFileSync(cacheFile, Buffer.from(audioBuffer));
+        this.cache.set(cacheKey, cacheFile);
+
+        log.info({ textPreview: cleanText.substring(0, 30), context }, 'Generated speech');
+
+        span.end();
+        return {
+          audioUrl: `/tts/${cacheKey}.mp3`,
+          cached: false
+        };
+      } catch (error) {
+        span.setAttribute('ai.response_time_ms', Date.now() - startMs);
+        if (error instanceof Error) {
+          span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+          if (error.name === 'TimeoutError') {
+            log.warn({ textPreview: cleanText.substring(0, 30) }, 'Request timed out');
+          } else {
+            log.error({ err: error }, 'Error generating speech');
+          }
+        }
+        span.end();
         return null;
       }
-
-      // Get audio data
-      const audioBuffer = await response.arrayBuffer();
-
-      // Save to cache
-      fs.writeFileSync(cacheFile, Buffer.from(audioBuffer));
-      this.cache.set(cacheKey, cacheFile);
-
-      console.info(`[FishAudio] Generated speech for "${cleanText.substring(0, 30)}..." (${context})`);
-
-      return {
-        audioUrl: `/tts/${cacheKey}.mp3`,
-        cached: false
-      };
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.name === 'TimeoutError') {
-          console.warn(`[FishAudio] Request timed out for: "${cleanText.substring(0, 30)}..."`);
-        } else {
-          console.error(`[FishAudio] Error: ${error.message}`);
-        }
-      }
-      return null;
-    }
+    });
   }
 
   /**
@@ -267,10 +290,10 @@ export class FishAudioService {
       }
 
       if (cleared > 0) {
-        console.info(`[FishAudio] Cleared ${cleared} old cache files`);
+        log.info({ cleared }, 'Cleared old cache files');
       }
     } catch (error) {
-      console.error(`[FishAudio] Error clearing cache:`, error);
+      log.error({ err: error }, 'Error clearing cache');
     }
 
     return cleared;

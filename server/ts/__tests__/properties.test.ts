@@ -268,7 +268,6 @@ describe('Properties', () => {
     });
 
     it('should return undefined when getArmorRank throws', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       // Weapon kind is not a mob but getArmorRank will return -1 (indexOf not found)
       // This actually won't throw, it returns 0 (rank -1 + 1).
       // To test the error path, we mock Types.getArmorRank to throw.
@@ -276,7 +275,6 @@ describe('Properties', () => {
       vi.spyOn(Types, 'isMob').mockReturnValue(false);
       const result = Properties.getArmorLevel(99999);
       expect(result).toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalled();
     });
   });
 
@@ -308,12 +306,10 @@ describe('Properties', () => {
     });
 
     it('should return undefined when getWeaponRank throws', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       vi.spyOn(Types, 'getWeaponRank').mockImplementation(() => { throw new Error('test'); });
       vi.spyOn(Types, 'isMob').mockReturnValue(false);
       const result = Properties.getWeaponLevel(99999);
       expect(result).toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalled();
     });
   });
 

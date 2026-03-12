@@ -17,6 +17,11 @@ import {
 } from './storage.interface.js';
 import { SerializedInventorySlot } from '../../../shared/ts/inventory/inventory-types.js';
 import { PlayerAchievements, createEmptyPlayerAchievements } from '../../../shared/ts/achievements/achievement-data.js';
+import { createModuleLogger } from '../utils/logger.js';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
+
+const log = createModuleLogger('Storage');
+const tracer = trace.getTracer('fracture-server');
 
 const DB_PATH = path.join(process.cwd(), 'server', 'data', 'fracture.db');
 
@@ -38,14 +43,14 @@ export class SQLiteStorageService implements IStorageService {
    * Initialize database and create tables
    */
   initialize(): void {
-    console.log(`[Storage] Initializing SQLite database at ${DB_PATH}`);
+    log.info({ path: DB_PATH }, 'Initializing SQLite database');
 
     try {
       // Ensure data directory exists
       const dataDir = path.dirname(DB_PATH);
       if (!fs.existsSync(dataDir)) {
         fs.mkdirSync(dataDir, { recursive: true });
-        console.log(`[Storage] Created data directory: ${dataDir}`);
+        log.info({ dataDir }, 'Created data directory');
       }
 
       this.db = new Database(DB_PATH);
@@ -54,9 +59,9 @@ export class SQLiteStorageService implements IStorageService {
       // Create tables
       this.createTables();
 
-      console.log('[Storage] Database initialized successfully');
+      log.info('Database initialized successfully');
     } catch (error) {
-      console.error('[Storage] Failed to initialize database:', error);
+      log.error({ err: error }, 'Failed to initialize database');
       throw new StorageError('initialize', error as Error);
     }
   }
@@ -68,7 +73,7 @@ export class SQLiteStorageService implements IStorageService {
     if (this.db) {
       this.db.close();
       this.db = null;
-      console.log('[Storage] Database connection closed');
+      log.info('Database connection closed');
     }
   }
 
@@ -99,7 +104,7 @@ export class SQLiteStorageService implements IStorageService {
     // Migration: Add password_hash column if missing (for existing DBs)
     try {
       this.db.exec(`ALTER TABLE characters ADD COLUMN password_hash TEXT`);
-      console.log('[Storage] Added password_hash column to existing database');
+      log.info('Added password_hash column to existing database');
     } catch (e) {
       // Column already exists, ignore
     }
@@ -107,17 +112,17 @@ export class SQLiteStorageService implements IStorageService {
     // Migration: Add progression system columns
     try {
       this.db.exec(`ALTER TABLE characters ADD COLUMN ascension_count INTEGER DEFAULT 0`);
-      console.log('[Storage] Added ascension_count column');
+      log.info('Added ascension_count column');
     } catch (e) { /* Column already exists */ }
 
     try {
       this.db.exec(`ALTER TABLE characters ADD COLUMN rested_xp REAL DEFAULT 0`);
-      console.log('[Storage] Added rested_xp column');
+      log.info('Added rested_xp column');
     } catch (e) { /* Column already exists */ }
 
     try {
       this.db.exec(`ALTER TABLE characters ADD COLUMN last_logout_time INTEGER DEFAULT 0`);
-      console.log('[Storage] Added last_logout_time column');
+      log.info('Added last_logout_time column');
     } catch (e) { /* Column already exists */ }
 
     // Inventory table
@@ -205,7 +210,7 @@ export class SQLiteStorageService implements IStorageService {
 
   getCharacter(name: string): CharacterData | null {
     if (!this.db) {
-      console.error('[Storage] getCharacter: Database not initialized');
+      log.error('getCharacter: Database not initialized');
       return null;
     }
 
@@ -236,14 +241,14 @@ export class SQLiteStorageService implements IStorageService {
         lastLogoutTime: row.last_logout_time || 0
       };
     } catch (error) {
-      console.error(`[Storage] getCharacter failed for ${name}:`, error);
+      log.error({ err: error, characterName: name }, 'getCharacter failed');
       return null;
     }
   }
 
   getCharacterById(id: string): CharacterData | null {
     if (!this.db) {
-      console.error('[Storage] getCharacterById: Database not initialized');
+      log.error('getCharacterById: Database not initialized');
       return null;
     }
 
@@ -274,44 +279,58 @@ export class SQLiteStorageService implements IStorageService {
         lastLogoutTime: row.last_logout_time || 0
       };
     } catch (error) {
-      console.error(`[Storage] getCharacterById failed for ${id}:`, error);
+      log.error({ err: error, characterId: id }, 'getCharacterById failed');
       return null;
     }
   }
 
   saveCharacter(data: CharacterData): boolean {
     if (!this.db) {
-      console.error('[Storage] saveCharacter: Database not initialized');
+      log.error('saveCharacter: Database not initialized');
       return false;
     }
 
-    try {
-      const stmt = this.db.prepare(`
-        UPDATE characters
-        SET level = ?, xp = ?, gold = ?, armor_kind = ?, weapon_kind = ?,
-            x = ?, y = ?, last_saved = CURRENT_TIMESTAMP,
-            ascension_count = ?, rested_xp = ?, last_logout_time = ?
-        WHERE id = ?
-      `);
+    return tracer.startActiveSpan('storage.saveCharacter', (span) => {
+      span.setAttributes({
+        'db.operation': 'saveCharacter',
+        'character.id': data.id,
+        'character.name': data.name,
+        'character.level': data.level,
+        'character.xp': data.xp,
+        'character.gold': data.gold,
+      });
 
-      stmt.run(
-        data.level,
-        data.xp,
-        data.gold,
-        data.armorKind,
-        data.weaponKind,
-        data.x,
-        data.y,
-        data.ascensionCount || 0,
-        data.restedXp || 0,
-        data.lastLogoutTime || 0,
-        data.id
-      );
-      return true;
-    } catch (error) {
-      console.error(`[Storage] saveCharacter failed for ${data.name}:`, error);
-      return false;
-    }
+      try {
+        const stmt = this.db!.prepare(`
+          UPDATE characters
+          SET level = ?, xp = ?, gold = ?, armor_kind = ?, weapon_kind = ?,
+              x = ?, y = ?, last_saved = CURRENT_TIMESTAMP,
+              ascension_count = ?, rested_xp = ?, last_logout_time = ?
+          WHERE id = ?
+        `);
+
+        stmt.run(
+          data.level,
+          data.xp,
+          data.gold,
+          data.armorKind,
+          data.weaponKind,
+          data.x,
+          data.y,
+          data.ascensionCount || 0,
+          data.restedXp || 0,
+          data.lastLogoutTime || 0,
+          data.id
+        );
+        span.end();
+        return true;
+      } catch (error) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
+        span.end();
+        log.error({ err: error, characterId: data.id, characterName: data.name, level: data.level, xp: data.xp }, 'saveCharacter failed');
+        return false;
+      }
+    });
   }
 
   createCharacter(name: string, password: string): CharacterData {
@@ -319,17 +338,21 @@ export class SQLiteStorageService implements IStorageService {
       throw new StorageError('createCharacter', new Error('Database not initialized'));
     }
 
-    try {
-      const id = this.generateId();
-      const passwordHash = this.hashPassword(password);
-      const stmt = this.db.prepare(`
-        INSERT INTO characters (id, name, password_hash, level, xp, gold, x, y)
-        VALUES (?, ?, ?, 1, 0, 0, 0, 0)
-      `);
+    return tracer.startActiveSpan('storage.createCharacter', (span) => {
+      span.setAttributes({ 'db.operation': 'createCharacter', 'character.name': name });
 
-      stmt.run(id, name, passwordHash);
+      try {
+        const id = this.generateId();
+        const passwordHash = this.hashPassword(password);
+        const stmt = this.db!.prepare(`
+          INSERT INTO characters (id, name, password_hash, level, xp, gold, x, y)
+          VALUES (?, ?, ?, 1, 0, 0, 0, 0)
+        `);
 
-      console.log(`[Storage] Created new character: ${name} (${id})`);
+        stmt.run(id, name, passwordHash);
+
+        span.setAttribute('character.id', id);
+        log.info({ characterId: id, characterName: name }, 'Created new character');
 
       return {
         id,
@@ -346,14 +369,18 @@ export class SQLiteStorageService implements IStorageService {
         lastLogoutTime: 0
       };
     } catch (error) {
-      console.error(`[Storage] createCharacter failed for ${name}:`, error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
+      log.error({ err: error, characterName: name }, 'createCharacter failed');
       throw new StorageError('createCharacter', error as Error);
+    } finally {
+      span.end();
     }
+    });
   }
 
   characterExists(name: string): boolean {
     if (!this.db) {
-      console.error('[Storage] characterExists: Database not initialized');
+      log.error('characterExists: Database not initialized');
       return false;
     }
 
@@ -361,7 +388,7 @@ export class SQLiteStorageService implements IStorageService {
       const stmt = this.db.prepare('SELECT 1 FROM characters WHERE name = ?');
       return stmt.get(name) !== undefined;
     } catch (error) {
-      console.error(`[Storage] characterExists failed for ${name}:`, error);
+      log.error({ err: error, characterName: name }, 'characterExists failed');
       return false;
     }
   }
@@ -372,7 +399,7 @@ export class SQLiteStorageService implements IStorageService {
    */
   verifyPassword(name: string, password: string): boolean {
     if (!this.db) {
-      console.error('[Storage] verifyPassword: Database not initialized');
+      log.error('verifyPassword: Database not initialized');
       return false;
     }
 
@@ -383,7 +410,7 @@ export class SQLiteStorageService implements IStorageService {
 
       return this.checkPassword(password, row.password_hash);
     } catch (error) {
-      console.error(`[Storage] verifyPassword failed for ${name}:`, error);
+      log.error({ err: error, characterName: name }, 'verifyPassword failed');
       return false;
     }
   }
@@ -392,7 +419,7 @@ export class SQLiteStorageService implements IStorageService {
 
   getInventory(characterId: string): (SerializedInventorySlot | null)[] {
     if (!this.db) {
-      console.error('[Storage] getInventory: Database not initialized');
+      log.error('getInventory: Database not initialized');
       return new Array(20).fill(null);
     }
 
@@ -420,14 +447,14 @@ export class SQLiteStorageService implements IStorageService {
 
       return inventory;
     } catch (error) {
-      console.error(`[Storage] getInventory failed for ${characterId}:`, error);
+      log.error({ err: error, characterId }, 'getInventory failed');
       return new Array(20).fill(null);
     }
   }
 
   saveInventory(characterId: string, slots: (SerializedInventorySlot | null)[]): boolean {
     if (!this.db) {
-      console.error('[Storage] saveInventory: Database not initialized');
+      log.error('saveInventory: Database not initialized');
       return false;
     }
 
@@ -460,7 +487,7 @@ export class SQLiteStorageService implements IStorageService {
       insertMany(slots);
       return true;
     } catch (error) {
-      console.error(`[Storage] saveInventory failed for ${characterId}:`, error);
+      log.error({ err: error, characterId }, 'saveInventory failed');
       return false;
     }
   }
@@ -469,7 +496,7 @@ export class SQLiteStorageService implements IStorageService {
 
   getAchievements(characterId: string): PlayerAchievements {
     if (!this.db) {
-      console.error('[Storage] getAchievements: Database not initialized');
+      log.error('getAchievements: Database not initialized');
       return createEmptyPlayerAchievements();
     }
 
@@ -505,14 +532,14 @@ export class SQLiteStorageService implements IStorageService {
         selectedTitle: titleRow?.selected_title || null
       };
     } catch (error) {
-      console.error(`[Storage] getAchievements failed for ${characterId}:`, error);
+      log.error({ err: error, characterId }, 'getAchievements failed');
       return createEmptyPlayerAchievements();
     }
   }
 
   saveAchievements(characterId: string, data: PlayerAchievements): boolean {
     if (!this.db) {
-      console.error('[Storage] saveAchievements: Database not initialized');
+      log.error('saveAchievements: Database not initialized');
       return false;
     }
 
@@ -552,7 +579,7 @@ export class SQLiteStorageService implements IStorageService {
       saveMany(data);
       return true;
     } catch (error) {
-      console.error(`[Storage] saveAchievements failed for ${characterId}:`, error);
+      log.error({ err: error, characterId }, 'saveAchievements failed');
       return false;
     }
   }
@@ -561,7 +588,7 @@ export class SQLiteStorageService implements IStorageService {
 
   getDailyData(characterId: string): DailyData | null {
     if (!this.db) {
-      console.error('[Storage] getDailyData: Database not initialized');
+      log.error('getDailyData: Database not initialized');
       return null;
     }
 
@@ -581,14 +608,14 @@ export class SQLiteStorageService implements IStorageService {
         totalLogins: row.total_logins
       };
     } catch (error) {
-      console.error(`[Storage] getDailyData failed for ${characterId}:`, error);
+      log.error({ err: error, characterId }, 'getDailyData failed');
       return null;
     }
   }
 
   saveDailyData(characterId: string, data: DailyData): boolean {
     if (!this.db) {
-      console.error('[Storage] saveDailyData: Database not initialized');
+      log.error('saveDailyData: Database not initialized');
       return false;
     }
 
@@ -612,7 +639,7 @@ export class SQLiteStorageService implements IStorageService {
       );
       return true;
     } catch (error) {
-      console.error(`[Storage] saveDailyData failed for ${characterId}:`, error);
+      log.error({ err: error, characterId }, 'saveDailyData failed');
       return false;
     }
   }
@@ -620,43 +647,72 @@ export class SQLiteStorageService implements IStorageService {
   // ============ Convenience Methods ============
 
   savePlayerState(state: PlayerSaveState): boolean {
-    try {
-      const charSuccess = this.saveCharacter(state.character);
-      const invSuccess = this.saveInventory(state.character.id, state.inventory);
-      const achSuccess = this.saveAchievements(state.character.id, state.achievements);
-      const dailySuccess = this.saveDailyData(state.character.id, state.daily);
+    return tracer.startActiveSpan('storage.savePlayerState', (span) => {
+      span.setAttributes({
+        'db.operation': 'savePlayerState',
+        'character.id': state.character.id,
+        'character.name': state.character.name,
+        'character.level': state.character.level,
+      });
 
-      if (!charSuccess || !invSuccess || !achSuccess || !dailySuccess) {
-        console.warn(`[Storage] Partial save failure for ${state.character.name}: char=${charSuccess}, inv=${invSuccess}, ach=${achSuccess}, daily=${dailySuccess}`);
+      try {
+        const charSuccess = this.saveCharacter(state.character);
+        const invSuccess = this.saveInventory(state.character.id, state.inventory);
+        const achSuccess = this.saveAchievements(state.character.id, state.achievements);
+        const dailySuccess = this.saveDailyData(state.character.id, state.daily);
+
+        if (!charSuccess || !invSuccess || !achSuccess || !dailySuccess) {
+          log.warn({ characterName: state.character.name, charSuccess, invSuccess, achSuccess, dailySuccess }, 'Partial save failure');
+        }
+
+        span.end();
+        return charSuccess && invSuccess && achSuccess && dailySuccess;
+      } catch (error) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
+        span.end();
+        log.error({ err: error, characterName: state.character.name }, 'savePlayerState failed');
+        return false;
       }
-
-      return charSuccess && invSuccess && achSuccess && dailySuccess;
-    } catch (error) {
-      console.error(`[Storage] savePlayerState failed for ${state.character.name}:`, error);
-      return false;
-    }
+    });
   }
 
   loadPlayerState(characterName: string): PlayerSaveState | null {
-    try {
-      const character = this.getCharacter(characterName);
-      if (!character) return null;
+    return tracer.startActiveSpan('storage.loadPlayerState', (span) => {
+      span.setAttributes({
+        'db.operation': 'loadPlayerState',
+        'character.name': characterName,
+      });
 
-      return {
-        character,
-        inventory: this.getInventory(character.id),
-        achievements: this.getAchievements(character.id),
-        daily: this.getDailyData(character.id) || {
-          lastLogin: '',
-          currentStreak: 0,
-          longestStreak: 0,
-          totalLogins: 0
+      try {
+        const character = this.getCharacter(characterName);
+        if (!character) {
+          span.end();
+          return null;
         }
-      };
-    } catch (error) {
-      console.error(`[Storage] loadPlayerState failed for ${characterName}:`, error);
-      return null;
-    }
+
+        span.setAttribute('character.id', character.id);
+        span.setAttribute('character.level', character.level);
+
+        const result = {
+          character,
+          inventory: this.getInventory(character.id),
+          achievements: this.getAchievements(character.id),
+          daily: this.getDailyData(character.id) || {
+            lastLogin: '',
+            currentStreak: 0,
+            longestStreak: 0,
+            totalLogins: 0
+          }
+        };
+        span.end();
+        return result;
+      } catch (error) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
+        span.end();
+        log.error({ err: error, characterName }, 'loadPlayerState failed');
+        return null;
+      }
+    });
   }
 }
 

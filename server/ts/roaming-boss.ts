@@ -21,6 +21,9 @@ import { ZONE_DATA } from '../../shared/ts/zones/zone-data';
 import { evaluateAggro } from './combat/aggro-policy';
 import { getCombatTracker } from './combat/combat-tracker';
 import type { Player } from './player';
+import { createModuleLogger } from './utils/logger.js';
+
+const log = createModuleLogger('RoamingBoss');
 
 // Minimal World interface for RoamingBoss needs
 interface BossWorld {
@@ -153,7 +156,7 @@ export class RoamingBoss extends Mob {
       // Scale current HP proportionally
       this.hitPoints = Math.floor(this.maxHitPoints * hpPercent);
 
-      console.debug(`[${this.config.id}] Dynamic difficulty: ${playerCount} players → ${Math.round(hpMultiplier * 100)}% HP, ${Math.round(dmgMultiplier * 100)}% damage`);
+      log.debug({ bossId: this.config.id, playerCount, hpMultiplier: Math.round(hpMultiplier * 100), dmgMultiplier: Math.round(dmgMultiplier * 100) }, 'Dynamic difficulty updated');
     }
   }
 
@@ -317,7 +320,7 @@ export class RoamingBoss extends Mob {
       this.world.handleMobHate(this.id, player.id, 100);
     }
 
-    console.debug(`[${this.config.id}] ${this.bossName} is hunting ${player.name}!`);
+    log.debug({ bossId: this.config.id, bossName: this.bossName, targetPlayer: player.name }, 'Boss hunting player');
   }
 
   /**
@@ -389,7 +392,7 @@ export class ZoneBossManager {
       this.spawnTimers.push(timer);
     });
 
-    console.log(`[ZoneBossManager] Initialized - ${configs.length} zone bosses configured!`);
+    log.info({ bossCount: configs.length }, 'ZoneBossManager initialized');
   }
 
   /**
@@ -399,7 +402,7 @@ export class ZoneBossManager {
     // Check if boss of this type already exists
     for (const boss of this.bosses.values()) {
       if (boss.config.id === config.id) {
-        console.log(`[ZoneBossManager] ${config.name} already spawned, skipping`);
+        log.info({ bossName: config.name }, 'Boss already spawned, skipping');
         return;
       }
     }
@@ -407,7 +410,7 @@ export class ZoneBossManager {
     // Get spawn position within zone
     const pos = getZoneSpawnPosition(config.zoneId);
     if (!pos) {
-      console.error(`[ZoneBossManager] Failed to get spawn position for ${config.name} in ${config.zoneId}`);
+      log.error({ bossName: config.name, zoneId: config.zoneId }, 'Failed to get spawn position');
       return;
     }
 
@@ -429,7 +432,7 @@ export class ZoneBossManager {
       this.handleBossDeath(bossId, config);
     });
 
-    console.log(`[ZoneBossManager] Spawned ${boss.bossName} (ID: ${bossId}) in ${config.zoneId} at (${pos.x}, ${pos.y})`);
+    log.info({ bossName: boss.bossName, bossId, zoneId: config.zoneId, x: pos.x, y: pos.y }, 'Boss spawned');
   }
 
   /**
@@ -457,7 +460,7 @@ export class ZoneBossManager {
 
     this.respawnTimers.set(config.id, timer);
 
-    console.log(`[ZoneBossManager] ${config.name} died, respawning in ${config.respawnTime / 1000}s`);
+    log.info({ bossName: config.name, respawnSec: config.respawnTime / 1000 }, 'Boss died, scheduling respawn');
   }
 
   /**
@@ -486,7 +489,7 @@ export class ZoneBossManager {
       this.globalKills.set(playerId, { name: playerName, kills: 1 });
     }
 
-    console.log(`[Leaderboard] ${playerName} now has ${this.globalKills.get(playerId)?.kills} total boss kills`);
+    log.info({ playerName, playerId, totalBossKills: this.globalKills.get(playerId)?.kills }, 'Boss kill recorded');
   }
 
   /**
@@ -551,7 +554,7 @@ export class ZoneBossManager {
       this.world.pushToPlayer(this.world.players[playerId], message);
     }
 
-    console.log(`[ZoneBossManager] ${killerName} has slain ${bossName}!`);
+    log.info({ killerName, bossName }, 'Boss slain');
   }
 
   /**

@@ -1086,16 +1086,12 @@ describe('PersistenceHandler', () => {
       expect(storage.loadPlayerState).toHaveBeenCalledWith('UniquePlayerName');
     });
 
-    it('saveToStorage should log a warning and bail if characterId is falsy', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('saveToStorage should bail if characterId is falsy', () => {
       const storage = makeStorage();
       const ctx = makePlayerContext({ characterId: null });
 
       saveToStorage(ctx, storage);
 
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Cannot save player'),
-      );
       expect(storage.savePlayerState).not.toHaveBeenCalled();
     });
 

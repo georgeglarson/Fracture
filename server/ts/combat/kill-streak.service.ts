@@ -4,6 +4,9 @@
  */
 
 import { getServerEventBus } from '../../../shared/ts/events/index.js';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('KillStreak');
 
 export interface StreakData {
   count: number;
@@ -96,7 +99,7 @@ class KillStreakService {
         announcement: tier.announcement
       });
 
-      console.log(`[KillStreak] ${playerName} reached ${tier.title} (${streakData.count} kills)!`);
+      log.info({ playerName, tier: tier.title, kills: streakData.count }, 'Streak reached new tier');
     }
 
     return {
@@ -122,7 +125,7 @@ class KillStreakService {
         endedById: endedBy
       });
 
-      console.log(`[KillStreak] Player ${playerId}'s streak of ${streakData.count} ended`);
+      log.info({ playerId, streak: streakData.count }, 'Streak ended');
     }
 
     this.streaks.delete(playerId);

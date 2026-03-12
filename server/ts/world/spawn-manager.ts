@@ -8,6 +8,9 @@ import { ChestArea } from '../chestarea.js';
 import { Types } from '../../../shared/ts/gametypes.js';
 import { Mob } from '../mob.js';
 import { Messages } from '../message.js';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('SpawnManager');
 
 export interface MapSpawnContext {
   mobAreas: any[];
@@ -240,23 +243,23 @@ export class SpawnManager {
     if (!chest || !this.broadcaster || !this.entityManager) return;
 
     const chestGroup = chest.group;  // Save group before removing
-    console.log('[Chest] Opening chest', chest.id, 'at', chest.x, chest.y);
-    console.log('[Chest] Chest items:', chest.items);
+    log.info({ chestId: chest.id, x: chest.x, y: chest.y }, 'Opening chest');
+    log.debug({ chestId: chest.id, items: chest.items }, 'Chest items');
 
     this.broadcaster.pushToAdjacentGroups(chestGroup, chest.despawn());
     this.entityManager.removeEntity(chest);
 
     const kind = chest.getRandomItem();
-    console.log('[Chest] Random item kind:', kind);
+    log.debug({ kind }, 'Random item kind from chest');
 
     if (kind) {
       const item = this.entityManager.addItemFromChest(kind, chest.x, chest.y);
-      console.log('[Chest] Created item', item.id, 'of kind', kind, 'at', chest.x, chest.y);
+      log.debug({ itemId: item.id, kind, x: chest.x, y: chest.y }, 'Created item from chest');
       // Push to adjacent groups - player is already in these groups
       this.broadcaster.pushToAdjacentGroups(chestGroup, new Messages.Spawn(item));
       this.handleItemDespawn(item);
     } else {
-      console.log('[Chest] No item dropped - chest.items was:', chest.items);
+      log.debug({ items: chest.items }, 'No item dropped from chest');
     }
   }
 }

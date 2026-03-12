@@ -10,6 +10,9 @@ import { Messages } from '../message';
 import { getEconomyService } from './economy.service';
 import { Inventory } from '../inventory/inventory';
 import { serializeProperties } from '../../../shared/ts/items/item-types';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Shop');
 
 /**
  * Player context for shop operations
@@ -40,7 +43,7 @@ export interface ShopPlayerContext {
  * Handle a shop purchase request
  */
 export function handleShopBuy(ctx: ShopPlayerContext, npcKind: number, itemKind: number): void {
-  console.log(`[Shop] ${ctx.name} attempting to buy item ${itemKind} from NPC ${npcKind}`);
+  log.info({ player: ctx.name, itemKind, npcKind }, 'Attempting to buy item');
 
   const economyService = getEconomyService();
   const result = economyService.processPurchase(npcKind, itemKind, ctx.gold);
@@ -52,7 +55,7 @@ export function handleShopBuy(ctx: ShopPlayerContext, npcKind: number, itemKind:
 
       // Check if inventory has room
       if (!inventory.hasRoom(itemKind)) {
-        console.log(`[Shop] ${ctx.name}'s inventory is full`);
+        log.info({ player: ctx.name, itemKind }, 'Inventory is full');
         ctx.send(new Messages.ShopBuyResult(false, itemKind, ctx.gold, 'Inventory is full').serialize());
         return;
       }
@@ -60,25 +63,25 @@ export function handleShopBuy(ctx: ShopPlayerContext, npcKind: number, itemKind:
       // Add to inventory BEFORE deducting gold to prevent losing gold on failure
       const slotIndex = inventory.addItem(itemKind, null, 1);
       if (slotIndex < 0) {
-        console.log(`[Shop] ${ctx.name}'s inventory failed to add item (race condition?)`);
+        log.info({ player: ctx.name, itemKind }, 'Inventory failed to add item (race condition?)');
         ctx.send(new Messages.ShopBuyResult(false, itemKind, ctx.gold, 'Inventory is full').serialize());
         return;
       }
 
       // Deduct gold only after item is successfully added
       ctx.setGold(result.newGold);
-      console.log(`[Shop] ${ctx.name} purchased item ${itemKind} for ${result.cost}g (new balance: ${ctx.gold}g)`);
+      log.info({ player: ctx.name, itemKind, cost: result.cost, newBalance: ctx.gold }, 'Purchased item');
 
       // Send inventory add message
       ctx.send([Types.Messages.INVENTORY_ADD, slotIndex, itemKind, null, 1]);
-      console.log(`[Shop] ${ctx.name} added ${Types.getKindAsString(itemKind)} to inventory slot ${slotIndex}`);
+      log.info({ player: ctx.name, itemKind: Types.getKindAsString(itemKind), slotIndex }, 'Added item to inventory');
     } else if (result.isConsumable) {
       // Consumables go to inventory (player can use them when needed)
       const inventory = ctx.getInventory();
 
       // Check if inventory has room
       if (!inventory.hasRoom(itemKind)) {
-        console.log(`[Shop] ${ctx.name}'s inventory is full`);
+        log.info({ player: ctx.name, itemKind }, 'Inventory is full for consumable');
         ctx.send(new Messages.ShopBuyResult(false, itemKind, ctx.gold, 'Inventory is full').serialize());
         return;
       }
@@ -86,18 +89,18 @@ export function handleShopBuy(ctx: ShopPlayerContext, npcKind: number, itemKind:
       // Add to inventory BEFORE deducting gold to prevent losing gold on failure
       const slotIndex = inventory.addItem(itemKind, null, 1);
       if (slotIndex < 0) {
-        console.log(`[Shop] ${ctx.name}'s inventory failed to add item (race condition?)`);
+        log.info({ player: ctx.name, itemKind }, 'Inventory failed to add consumable (race condition?)');
         ctx.send(new Messages.ShopBuyResult(false, itemKind, ctx.gold, 'Inventory is full').serialize());
         return;
       }
 
       // Deduct gold only after item is successfully added
       ctx.setGold(result.newGold);
-      console.log(`[Shop] ${ctx.name} purchased item ${itemKind} for ${result.cost}g (new balance: ${ctx.gold}g)`);
+      log.info({ player: ctx.name, itemKind, cost: result.cost, newBalance: ctx.gold }, 'Purchased consumable');
 
       const slot = inventory.getSlot(slotIndex);
       ctx.send([Types.Messages.INVENTORY_ADD, slotIndex, itemKind, null, slot?.count || 1]);
-      console.log(`[Shop] ${ctx.name} added ${Types.getKindAsString(itemKind)} to inventory slot ${slotIndex}`);
+      log.info({ player: ctx.name, itemKind: Types.getKindAsString(itemKind), slotIndex }, 'Added consumable to inventory');
     }
 
     // Send success response with new gold total
@@ -110,7 +113,7 @@ export function handleShopBuy(ctx: ShopPlayerContext, npcKind: number, itemKind:
     ctx.checkPurchaseAchievements(result.cost);
   } else {
     // Send failure response
-    console.log(`[Shop] ${ctx.name} failed to buy: ${result.message}`);
+    log.info({ player: ctx.name, itemKind, reason: result.message }, 'Failed to buy item');
     ctx.send(new Messages.ShopBuyResult(false, itemKind, ctx.gold, result.message).serialize());
   }
 }
@@ -123,7 +126,7 @@ export function handleShopSell(ctx: ShopPlayerContext, slotIndex: number): void 
   const slot = inventory.getSlot(slotIndex);
 
   if (!slot) {
-    console.log(`[Shop] ${ctx.name} tried to sell empty slot ${slotIndex}`);
+    log.info({ player: ctx.name, slotIndex }, 'Tried to sell empty slot');
     ctx.send(new Messages.ShopSellResult(false, 0, ctx.gold, 'Nothing to sell').serialize());
     return;
   }
@@ -133,7 +136,7 @@ export function handleShopSell(ctx: ShopPlayerContext, slotIndex: number): void 
   const result = economyService.processSell(itemKind, ctx.gold);
 
   if (!result.success) {
-    console.log(`[Shop] ${ctx.name} tried to sell unsellable item ${itemKind}`);
+    log.info({ player: ctx.name, itemKind }, 'Tried to sell unsellable item');
     ctx.send(new Messages.ShopSellResult(false, 0, ctx.gold, result.message).serialize());
     return;
   }
@@ -143,7 +146,7 @@ export function handleShopSell(ctx: ShopPlayerContext, slotIndex: number): void 
 
   // Grant gold
   ctx.setGold(result.newGold);
-  console.log(`[Shop] ${ctx.name} sold item ${itemKind} for ${result.sellPrice}g (new balance: ${ctx.gold}g)`);
+  log.info({ player: ctx.name, itemKind, sellPrice: result.sellPrice, newBalance: ctx.gold }, 'Sold item');
 
   // Send updated inventory
   const updatedSlot = inventory.getSlot(slotIndex);

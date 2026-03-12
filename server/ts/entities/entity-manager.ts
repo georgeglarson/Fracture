@@ -9,6 +9,9 @@ import { Chest } from '../chest.js';
 import { Item } from '../item.js';
 import { generateItem } from '../items/index.js';
 import { getZoneAtPosition } from '../../../shared/ts/zones';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('EntityManager');
 
 // Using 'any' for entities to avoid type conflicts with various entity classes
 // The actual entity classes (Player, Mob, Item, Npc) have different interfaces
@@ -79,14 +82,14 @@ export class EntityManager {
   addEntity(entity: Entity): boolean {
     try {
       if (!entity || entity.id === undefined) {
-        console.error('[EntityManager] Cannot add invalid entity');
+        log.error('Cannot add invalid entity');
         return false;
       }
       this.entities[entity.id] = entity;
       this.groupContext?.handleEntityGroupMembership(entity);
       return true;
     } catch (error) {
-      console.error(`[EntityManager] Failed to add entity ${entity?.id}:`, error);
+      log.error({ err: error, entityId: entity?.id }, 'Failed to add entity');
       return false;
     }
   }
@@ -98,7 +101,7 @@ export class EntityManager {
   removeEntity(entity: Entity): boolean {
     try {
       if (!entity || entity.id === undefined) {
-        console.error('[EntityManager] Cannot remove invalid entity');
+        log.error('Cannot remove invalid entity');
         return false;
       }
 
@@ -119,10 +122,10 @@ export class EntityManager {
 
       entity.destroy();
       this.groupContext?.removeFromGroups(entity);
-      console.debug('Removed ' + Types.getKindAsString(entity.kind) + ' : ' + entity.id);
+      log.debug({ kind: Types.getKindAsString(entity.kind), entityId: entity.id }, 'Removed entity');
       return true;
     } catch (error) {
-      console.error(`[EntityManager] Failed to remove entity ${entity?.id}:`, error);
+      log.error({ err: error, entityId: entity?.id }, 'Failed to remove entity');
       return false;
     }
   }
@@ -142,7 +145,7 @@ export class EntityManager {
       this.broadcaster?.createQueue(player.id);
       return true;
     } catch (error) {
-      console.error(`[EntityManager] Failed to add player ${player?.id}:`, error);
+      log.error({ err: error, playerId: player?.id }, 'Failed to add player');
       return false;
     }
   }
@@ -161,7 +164,7 @@ export class EntityManager {
       this.broadcaster?.removeQueue(player.id);
       return true;
     } catch (error) {
-      console.error(`[EntityManager] Failed to remove player ${player?.id}:`, error);
+      log.error({ err: error, playerId: player?.id }, 'Failed to remove player');
       return false;
     }
   }
@@ -180,7 +183,7 @@ export class EntityManager {
       this.mobs[mob.id] = mob;
       return true;
     } catch (error) {
-      console.error(`[EntityManager] Failed to add mob ${mob?.id}:`, error);
+      log.error({ err: error, mobId: mob?.id }, 'Failed to add mob');
       return false;
     }
   }
@@ -194,7 +197,7 @@ export class EntityManager {
       this.npcs[npc.id] = npc;
       return npc;
     } catch (error) {
-      console.error(`[EntityManager] Failed to add NPC kind=${kind} at (${x}, ${y}):`, error);
+      log.error({ err: error, kind, x, y }, 'Failed to add NPC');
       return null;
     }
   }
@@ -207,7 +210,7 @@ export class EntityManager {
       this.items[item.id] = item;
       return item;
     } catch (error) {
-      console.error(`[EntityManager] Failed to add item ${item?.id}:`, error);
+      log.error({ err: error, itemId: item?.id }, 'Failed to add item');
       return item; // Return item anyway, entity may still be usable
     }
   }
@@ -228,7 +231,7 @@ export class EntityManager {
         return new Item(id, kind, x, y);
       }
     } catch (error) {
-      console.error(`[EntityManager] Failed to create item kind=${kind} at (${x}, ${y}):`, error);
+      log.error({ err: error, kind, x, y }, 'Failed to create item');
       return null;
     }
   }
@@ -268,7 +271,7 @@ export class EntityManager {
         return new Item(id, kind, x, y, properties);
       }
     } catch (error) {
-      console.error(`[EntityManager] Failed to create item with properties kind=${kind} at (${x}, ${y}):`, error);
+      log.error({ err: error, kind, x, y }, 'Failed to create item with properties');
       return null;
     }
   }
@@ -286,10 +289,10 @@ export class EntityManager {
       if (!chest) return null;
       chest.setItems(items);
 
-      console.log(`[EntityManager] Created ${Types.getKindAsString(kind)} at (${x}, ${y})`);
+      log.info({ kind: Types.getKindAsString(kind), x, y }, 'Created chest');
       return chest;
     } catch (error) {
-      console.error(`[EntityManager] Failed to create chest at (${x}, ${y}):`, error);
+      log.error({ err: error, x, y }, 'Failed to create chest');
       return null;
     }
   }
@@ -300,7 +303,7 @@ export class EntityManager {
       item.onRespawn(this.addStaticItem.bind(this, item));
       return this.addItem(item);
     } catch (error) {
-      console.error(`[EntityManager] Failed to add static item ${item?.id}:`, error);
+      log.error({ err: error, itemId: item?.id }, 'Failed to add static item');
       return null;
     }
   }
@@ -312,7 +315,7 @@ export class EntityManager {
       item.isFromChest = true;
       return this.addItem(item);
     } catch (error) {
-      console.error(`[EntityManager] Failed to add item from chest kind=${kind} at (${x}, ${y}):`, error);
+      log.error({ err: error, kind, x, y }, 'Failed to add item from chest');
       return null;
     }
   }

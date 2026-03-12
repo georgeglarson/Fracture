@@ -10,6 +10,9 @@
 
 import { VeniceClient } from './venice-client';
 import { FishAudioService, getFishAudioService, VOICES } from './fish-audio.service';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('IntroService');
 
 // Placeholder for player name in pre-generated intros
 // Use "Traveler" - unique enough to not appear elsewhere, sounds natural when spoken
@@ -84,17 +87,17 @@ export class IntroService {
     if (this.isGenerating) return;
     this.isGenerating = true;
 
-    console.log('[IntroService] Pre-generating cached intro text...');
+    log.info('Pre-generating cached intro text');
     try {
       const result = await this.generateTextOnly(PLAYER_PLACEHOLDER);
       if (result) {
         this.cachedText = result;
-        console.log('[IntroService] Cached text ready (narrator: %s):', result.narrator.name, result.lines[0].substring(0, 50) + '...');
+        log.info({ narrator: result.narrator.name, preview: result.lines[0].substring(0, 50) }, 'Cached text ready');
       } else {
-        console.warn('[IntroService] Failed to pre-generate intro text, will use static fallback');
+        log.warn('Failed to pre-generate intro text, will use static fallback');
       }
     } catch (error) {
-      console.error('[IntroService] Error pre-generating intro text:', error);
+      log.error({ err: error }, 'Error pre-generating intro text');
     } finally {
       this.isGenerating = false;
     }
@@ -119,7 +122,7 @@ export class IntroService {
 
     // If we have cached text, use it
     if (this.cachedText) {
-      console.log('[IntroService] Using cached text for:', playerName);
+      log.info({ playerName }, 'Using cached text');
       const cached = this.cachedText;
 
       // Clear cache and start generating next text in background
@@ -136,14 +139,14 @@ export class IntroService {
       let audioUrl: string | undefined;
       if (fishAudio) {
         try {
-          console.log('[IntroService] Generating TTS for', playerName, 'with voice', cached.narrator.name);
+          log.info({ playerName, voice: cached.narrator.name }, 'Generating TTS');
           const ttsResult = await fishAudio.generateIntroSpeech(personalizedStory, cached.narrator.id);
           if (ttsResult) {
             audioUrl = ttsResult.audioUrl;
-            console.log('[IntroService] TTS ready:', audioUrl);
+            log.info({ audioUrl }, 'TTS ready');
           }
         } catch (ttsError) {
-          console.warn('[IntroService] TTS generation failed:', ttsError);
+          log.warn({ err: ttsError }, 'TTS generation failed');
         }
       }
 
@@ -157,7 +160,7 @@ export class IntroService {
     }
 
     // No cache - generate fresh (first player or cache miss)
-    console.log('[IntroService] No cached text, generating fresh for:', playerName);
+    log.info({ playerName }, 'No cached text, generating fresh');
     const result = await this.generateFreshIntro(playerName);
 
     // Start generating next cached text in background
@@ -219,7 +222,7 @@ Output ONLY the 4 sentences, one per line.`;
         .slice(0, 4); // Ensure max 4 lines
 
       if (lines.length < 2) {
-        console.warn('[IntroService] AI returned too few lines');
+        log.warn('AI returned too few lines');
         return null;
       }
 
@@ -232,7 +235,7 @@ Output ONLY the 4 sentences, one per line.`;
         narrator
       };
     } catch (error) {
-      console.error('[IntroService] Generation error:', error);
+      log.error({ err: error }, 'Generation error');
       return null;
     }
   }
@@ -249,14 +252,14 @@ Output ONLY the 4 sentences, one per line.`;
     const fishAudio = getFishAudioService();
     if (fishAudio) {
       try {
-        console.log('[IntroService] Generating fresh TTS with voice', textResult.narrator.name);
+        log.info({ voice: textResult.narrator.name }, 'Generating fresh TTS');
         const ttsResult = await fishAudio.generateIntroSpeech(textResult.story, textResult.narrator.id);
         if (ttsResult) {
           audioUrl = ttsResult.audioUrl;
-          console.log('[IntroService] Fresh TTS ready:', audioUrl);
+          log.info({ audioUrl }, 'Fresh TTS ready');
         }
       } catch (ttsError) {
-        console.warn('[IntroService] Fresh TTS failed:', ttsError);
+        log.warn({ err: ttsError }, 'Fresh TTS failed');
       }
     }
 

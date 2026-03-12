@@ -4,6 +4,9 @@
  */
 
 import { VeniceClient } from './venice-client';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('News');
 
 export interface WorldEvent {
   type: string;
@@ -93,7 +96,7 @@ export class NewsService {
         headlines.push(aiHeadline);
       }
     } catch (error) {
-      console.error('Venice newspaper error:', error);
+      log.error({ err: error }, 'Venice newspaper error');
     }
 
     // Add stat-based headlines

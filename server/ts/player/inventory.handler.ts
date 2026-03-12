@@ -11,6 +11,9 @@ import { Inventory } from '../inventory/inventory';
 import { serializeSlot, SerializedInventorySlot } from '../../../shared/ts/inventory/inventory-types';
 import { serializeProperties } from '../../../shared/ts/items/item-types';
 import { EquipmentSlot } from '../../../shared/ts/equipment/equipment-types';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Inventory');
 
 /**
  * Player context for inventory operations
@@ -111,7 +114,7 @@ export function handleInventoryPickup(ctx: InventoryPlayerContext, itemId: numbe
     slot?.count || 1
   ]);
 
-  console.debug(`[Inventory] ${ctx.name} picked up ${Types.getKindAsString(item.kind)} to slot ${slotIndex}`);
+  log.debug({ player: ctx.name, itemKind: Types.getKindAsString(item.kind), slotIndex }, 'Picked up item');
 }
 
 /**
@@ -123,12 +126,12 @@ export function handleInventoryUse(ctx: InventoryPlayerContext, slotIndex: numbe
   const slot = inventory.getSlot(slotIndex);
 
   if (!slot) {
-    console.debug(`[Inventory] Slot ${slotIndex} is empty`);
+    log.debug({ slotIndex }, 'Slot is empty');
     return;
   }
 
   if (!inventory.isSlotConsumable(slotIndex)) {
-    console.debug(`[Inventory] Slot ${slotIndex} is not consumable`);
+    log.debug({ slotIndex }, 'Slot is not consumable');
     return;
   }
 
@@ -152,11 +155,11 @@ export function handleInventoryUse(ctx: InventoryPlayerContext, slotIndex: numbe
       ctx.regenHealthBy(healAmount);
       world.pushToPlayer(ctx, ctx.health());
       inventory.removeItem(slotIndex, 1);
-      console.debug(`[Inventory] ${ctx.name} healed for ${healAmount} HP`);
+      log.debug({ player: ctx.name, healAmount }, 'Healed');
     } else if (ctx.hasFullHealth()) {
       // Don't consume if at full health - just notify
       ctx.send([Types.Messages.CHAT, 'You are already at full health']);
-      console.debug(`[Inventory] ${ctx.name} tried to heal at full health`);
+      log.debug({ player: ctx.name }, 'Tried to heal at full health');
       return; // Don't consume the item
     } else {
       // Unknown consumable with 0 heal amount
@@ -172,7 +175,7 @@ export function handleInventoryUse(ctx: InventoryPlayerContext, slotIndex: numbe
     ctx.send([Types.Messages.INVENTORY_REMOVE, slotIndex]);
   }
 
-  console.debug(`[Inventory] ${ctx.name} used ${Types.getKindAsString(kind)}`);
+  log.debug({ player: ctx.name, itemKind: Types.getKindAsString(kind) }, 'Used item');
 }
 
 /**
@@ -183,12 +186,12 @@ export function handleInventoryEquip(ctx: InventoryPlayerContext, slotIndex: num
   const slot = inventory.getSlot(slotIndex);
 
   if (!slot) {
-    console.debug(`[Inventory] Slot ${slotIndex} is empty`);
+    log.debug({ slotIndex }, 'Equip slot is empty');
     return;
   }
 
   if (!inventory.isSlotEquipment(slotIndex)) {
-    console.debug(`[Inventory] Slot ${slotIndex} is not equipment`);
+    log.debug({ slotIndex }, 'Slot is not equipment');
     return;
   }
 
@@ -241,7 +244,7 @@ export function handleInventoryEquip(ctx: InventoryPlayerContext, slotIndex: num
   // Also send directly to self (broadcast may not reach self reliably)
   ctx.send(ctx.equip(newItemKind).serialize());
 
-  console.debug(`[Inventory] ${ctx.name} equipped ${Types.getKindAsString(newItemKind)}`);
+  log.debug({ player: ctx.name, itemKind: Types.getKindAsString(newItemKind) }, 'Equipped item');
 }
 
 /**
@@ -253,7 +256,7 @@ export function handleInventoryDrop(ctx: InventoryPlayerContext, slotIndex: numb
   const slot = inventory.getSlot(slotIndex);
 
   if (!slot) {
-    console.debug(`[Inventory] Slot ${slotIndex} is empty`);
+    log.debug({ slotIndex }, 'Drop slot is empty');
     return;
   }
 
@@ -268,7 +271,7 @@ export function handleInventoryDrop(ctx: InventoryPlayerContext, slotIndex: numb
   if (item) {
     world.addItem(item);
     ctx.broadcast(new Messages.Spawn(item), false);
-    console.debug(`[Inventory] ${ctx.name} dropped ${Types.getKindAsString(kind)} at (${ctx.x}, ${ctx.y})`);
+    log.debug({ player: ctx.name, itemKind: Types.getKindAsString(kind), x: ctx.x, y: ctx.y }, 'Dropped item');
   }
 
   // Send inventory remove
@@ -282,7 +285,7 @@ export function handleInventorySwap(ctx: InventoryPlayerContext, fromSlot: numbe
   const inventory = ctx.getInventory();
   if (inventory.swapSlots(fromSlot, toSlot)) {
     sendInventoryInit(ctx);
-    console.debug(`[Inventory] ${ctx.name} swapped slots ${fromSlot} <-> ${toSlot}`);
+    log.debug({ player: ctx.name, fromSlot, toSlot }, 'Swapped slots');
   }
 }
 
@@ -308,7 +311,7 @@ export function handleUnequipToInventory(ctx: InventoryPlayerContext, slot: stri
 
   // Validate slot
   if (slot !== 'weapon' && slot !== 'armor') {
-    console.debug(`[Inventory] Invalid slot type: ${slot}`);
+    log.debug({ slot }, 'Invalid slot type');
     return;
   }
 
@@ -318,20 +321,20 @@ export function handleUnequipToInventory(ctx: InventoryPlayerContext, slot: stri
 
   // Cannot unequip default items
   if (currentKind === defaultKind) {
-    console.debug(`[Inventory] Cannot unequip default ${slot}`);
+    log.debug({ slot }, 'Cannot unequip default item');
     return;
   }
 
   // Check if inventory has room
   if (!inventory.hasRoom(currentKind)) {
-    console.debug(`[Inventory] ${ctx.name}'s inventory is full - cannot unequip ${slot}`);
+    log.debug({ player: ctx.name, slot }, 'Inventory full, cannot unequip');
     return;
   }
 
   // Add to inventory
   const slotIndex = inventory.addItem(currentKind, null, 1);
   if (slotIndex === -1) {
-    console.debug(`[Inventory] Failed to add ${slot} to inventory (race condition?)`);
+    log.debug({ player: ctx.name, slot }, 'Failed to add to inventory (race condition?)');
     ctx.send([Types.Messages.CHAT, 'Inventory full! Drop or sell items first.']);
     return;
   }
@@ -357,5 +360,5 @@ export function handleUnequipToInventory(ctx: InventoryPlayerContext, slot: stri
     1
   ]);
 
-  console.debug(`[Inventory] ${ctx.name} unequipped ${Types.getKindAsString(currentKind)} to inventory slot ${slotIndex}`);
+  log.debug({ player: ctx.name, itemKind: Types.getKindAsString(currentKind), slotIndex }, 'Unequipped to inventory');
 }

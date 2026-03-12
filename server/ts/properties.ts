@@ -1,5 +1,8 @@
 import {Types} from '../../shared/ts/gametypes';
 import {Formulas} from './formulas';
+import { createModuleLogger } from './utils/logger.js';
+
+const log = createModuleLogger('Properties');
 
 /**
  * Mob Properties with Level-Based Scaling
@@ -307,7 +310,7 @@ export const Properties: Record<string, any> = {
         return Types.getArmorRank(kind) + 1;
       }
     } catch (e) {
-      console.error('No level found for armor: ' + Types.getKindAsString(kind));
+      log.error({ kind: Types.getKindAsString(kind) }, 'No level found for armor');
       return undefined;
     }
   },
@@ -324,7 +327,7 @@ export const Properties: Record<string, any> = {
         return Types.getWeaponRank(kind) + 1;
       }
     } catch (e) {
-      console.error('No level found for weapon: ' + Types.getKindAsString(kind));
+      log.error({ kind: Types.getKindAsString(kind) }, 'No level found for weapon');
       return undefined;
     }
   },

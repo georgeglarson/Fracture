@@ -21,6 +21,9 @@ import {
   MODIFIERS
 } from '../../../shared/ts/rifts/rift-data';
 import { Types } from '../../../shared/ts/gametypes';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('RiftManager');
 
 // Simple unique ID generator
 function generateRunId(): string {
@@ -73,7 +76,7 @@ export class RiftManager {
   startRun(playerId: number, playerName: string, playerLevel: number): ActiveRun | null {
     // Check if player already in a rift
     if (this.activeRuns.has(playerId)) {
-      console.log(`[Rift] Player ${playerId} already in rift`);
+      log.info({ playerId }, 'Player already in rift');
       return null;
     }
 
@@ -83,7 +86,7 @@ export class RiftManager {
 
     // Check level requirement
     if (playerLevel < tier.minLevel) {
-      console.log(`[Rift] Player ${playerId} level ${playerLevel} below requirement ${tier.minLevel}`);
+      log.info({ playerId, playerLevel, requiredLevel: tier.minLevel }, 'Player level below rift requirement');
       return null;
     }
 
@@ -107,7 +110,7 @@ export class RiftManager {
     };
 
     this.activeRuns.set(playerId, run);
-    console.log(`[Rift] Player ${playerName} started rift run with ${modifiers.length} modifiers: ${modifiers.join(', ')}`);
+    log.info({ playerName, modifierCount: modifiers.length, modifiers }, 'Player started rift run');
 
     return run;
   }
@@ -148,10 +151,10 @@ export class RiftManager {
       if (newTier.modifierCount > run.modifiers.length) {
         const newMods = selectRandomModifiers(1);
         run.modifiers.push(...newMods);
-        console.log(`[Rift] Player ${playerId} gained new modifier: ${newMods[0]}`);
+        log.info({ playerId, modifier: newMods[0] }, 'Player gained new rift modifier');
       }
 
-      console.log(`[Rift] Player ${playerId} advanced to depth ${run.depth}`);
+      log.info({ playerId, depth: run.depth }, 'Player advanced rift depth');
 
       return {
         advanced: true,
@@ -203,7 +206,7 @@ export class RiftManager {
       });
     }
 
-    console.log(`[Rift] Player ${run.playerName} ended run at depth ${run.completedDepth} (${reason}), kills: ${run.killCount}`);
+    log.info({ playerName: run.playerName, depth: run.completedDepth, reason, kills: run.killCount }, 'Player ended rift run');
 
     // Clean up
     this.activeRuns.delete(playerId);

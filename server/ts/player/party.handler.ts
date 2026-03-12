@@ -8,6 +8,9 @@
 import { Messages } from '../message';
 import { PartyService } from '../party';
 import { isPlayer } from '../utils';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Party');
 
 /**
  * Player interface for party handler
@@ -52,7 +55,7 @@ export function handlePartyInvite(ctx: PartyPlayerContext, targetId: number): vo
 
   // Use isPlayer() to reject AIPlayers and other non-human entities
   if (!targetPlayer || !isPlayer(targetPlayer)) {
-    console.log(`[Party] ${ctx.name} tried to invite invalid player ${targetId}`);
+    log.warn({ player: ctx.name, targetId }, 'Tried to invite invalid player');
     return;
   }
 
@@ -61,7 +64,7 @@ export function handlePartyInvite(ctx: PartyPlayerContext, targetId: number): vo
 
   const error = partyService.sendInvite(inviterRef, targetId, targetRef);
   if (error) {
-    console.log(`[Party] Invite failed: ${error}`);
+    log.info({ player: ctx.name, reason: error }, 'Invite failed');
   }
 }
 
@@ -79,7 +82,7 @@ export function handlePartyAccept(ctx: PartyPlayerContext, inviterId: number): v
   const result = partyService.acceptInvite(accepterRef, inviterId, inviterRef);
 
   if (typeof result === 'string') {
-    console.log(`[Party] Accept failed: ${result}`);
+    log.info({ player: ctx.name, reason: result }, 'Accept failed');
     return;
   }
 
@@ -147,7 +150,7 @@ export function handlePartyKick(ctx: PartyPlayerContext, targetId: number): void
   const result = partyService.kickMember(ctx.id, targetId);
 
   if (!result || !result.success) {
-    console.log(`[Party] Kick failed: ${result?.message || 'Unknown error'}`);
+    log.warn({ player: ctx.name, targetId, reason: result?.message || 'Unknown error' }, 'Kick failed');
     return;
   }
 
@@ -198,7 +201,7 @@ export function handlePlayerInspect(ctx: PartyPlayerContext, targetId: number): 
 
   // Use isPlayer() to reject AIPlayers and other non-human entities
   if (!targetPlayer || !isPlayer(targetPlayer)) {
-    console.log(`[Inspect] ${ctx.name} tried to inspect invalid player ${targetId}`);
+    log.warn({ player: ctx.name, targetId }, 'Tried to inspect invalid player');
     return;
   }
 

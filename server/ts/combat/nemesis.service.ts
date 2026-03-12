@@ -8,6 +8,9 @@
 
 import { getServerEventBus } from '../../../shared/ts/events/index.js';
 import { Types } from '../../../shared/ts/gametypes';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Nemesis');
 
 // Nemesis name prefixes and suffixes for generating unique names
 const NAME_PREFIXES = [
@@ -77,7 +80,7 @@ class NemesisService {
       this.onMobKilled(event.mobId, event.killerId, event.killerName);
     });
 
-    console.log('[NemesisService] Initialized - Enemies will remember you!');
+    log.info('Initialized - Enemies will remember you!');
   }
 
   setContext(context: NemesisContext) {
@@ -139,7 +142,7 @@ class NemesisService {
         ? `${nemesis.nemesisName} ${nemesis.title} has slain ${playerName}! (Power: ${Math.round(nemesis.powerLevel * 100)}%)`
         : `A ${nemesis.originalName} has become ${nemesis.nemesisName} ${nemesis.title} after killing ${playerName}!`;
 
-      console.log(`[Nemesis] ${announcement}`);
+      log.info({ mobId, nemesisName: nemesis.nemesisName, title: nemesis.title, powerLevel: nemesis.powerLevel, playerName }, announcement);
       this.broadcastNemesisEvent('NEMESIS_POWER_UP', mobId, nemesis, playerName);
     }
   }
@@ -164,7 +167,7 @@ class NemesisService {
     const generated = this.generateNemesisName();
     nemesis.nemesisName = generated.name;
     nemesis.title = generated.title;
-    console.log(`[Nemesis] Created: ${nemesis.nemesisName} ${nemesis.title} (${nemesis.originalName})`);
+    log.info({ nemesisName: nemesis.nemesisName, title: nemesis.title, originalName: nemesis.originalName }, 'Nemesis created');
   }
 
   /**
@@ -230,7 +233,7 @@ class NemesisService {
         ? `${killerName} has taken REVENGE on ${nemesis.nemesisName} ${nemesis.title}!`
         : `${killerName} has slain ${nemesis.nemesisName} ${nemesis.title}!`;
 
-      console.log(`[Nemesis] ${announcement}`);
+      log.info({ mobId, nemesisName: nemesis.nemesisName, title: nemesis.title, killerName, isRevenge: wasNemesisForPlayer }, announcement);
       this.broadcastNemesisEvent('NEMESIS_KILLED', mobId, nemesis, killerName, wasNemesisForPlayer);
     }
 

@@ -6,6 +6,9 @@
 import { Chest } from '../chest.js';
 import { Item } from '../item.js';
 import { Messages } from '../message.js';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('SpatialManager');
 
 export interface Group {
   entities: Record<string | number, any>;
@@ -149,10 +152,7 @@ export class SpatialManager {
    * Debug utility to log players in a group
    */
   logGroupPlayers(groupId: string): void {
-    console.debug('Players inside group ' + groupId + ':');
-    this.groups[groupId].players.forEach(function(id) {
-      console.debug('- player ' + id);
-    });
+    log.trace({ groupId, players: this.groups[groupId].players }, 'Players inside group');
   }
 
   /**
@@ -173,7 +173,7 @@ export class SpatialManager {
 
         if (oldGroups.length > 0) {
           entity.recentlyLeftGroups = oldGroups.filter(g => !newGroups.includes(g));
-          console.debug('group diff: ' + entity.recentlyLeftGroups);
+          log.trace({ recentlyLeftGroups: entity.recentlyLeftGroups }, 'Group diff');
         }
       }
     }

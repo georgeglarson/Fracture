@@ -8,6 +8,9 @@ import {
   getMobTypeFromKind,
   createEmptyPlayerAchievements
 } from '../../../shared/ts/achievements';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Achievement');
 
 export class AchievementService {
   // Per-player achievement state (keyed by player ID)
@@ -40,7 +43,7 @@ export class AchievementService {
     const achievements = savedData || createEmptyPlayerAchievements();
     this.playerAchievements.set(playerId, achievements);
 
-    console.log(`[Achievement] Initialized player ${playerId} with ${achievements.unlocked.length} unlocked achievements`);
+    log.info({ playerId, unlockedCount: achievements.unlocked.length }, 'Initialized player achievements');
     return achievements;
   }
 
@@ -257,7 +260,7 @@ export class AchievementService {
 
     // Mark as unlocked
     state.unlocked.push(achievement.id);
-    console.log(`[Achievement] Player ${playerId} unlocked: ${achievement.name}`);
+    log.info({ playerId, achievementName: achievement.name }, 'Player unlocked achievement');
 
     // Send unlock notification
     if (this.sendCallback) {
@@ -290,25 +293,25 @@ export class AchievementService {
     // Null means clear title
     if (achievementId === null) {
       state.selectedTitle = null;
-      console.log(`[Achievement] Player ${playerId} cleared title`);
+      log.info({ playerId }, 'Player cleared title');
       return null;
     }
 
     // Check if achievement is unlocked
     if (!state.unlocked.includes(achievementId)) {
-      console.log(`[Achievement] Player ${playerId} cannot select locked title: ${achievementId}`);
+      log.info({ playerId, achievementId }, 'Player cannot select locked title');
       return null;
     }
 
     // Check if achievement has a title
     const title = getAchievementTitle(achievementId);
     if (!title) {
-      console.log(`[Achievement] Achievement ${achievementId} has no title`);
+      log.info({ achievementId }, 'Achievement has no title');
       return null;
     }
 
     state.selectedTitle = achievementId;
-    console.log(`[Achievement] Player ${playerId} selected title: ${title}`);
+    log.info({ playerId, title }, 'Player selected title');
     return title;
   }
 

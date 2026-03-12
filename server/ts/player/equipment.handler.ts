@@ -10,6 +10,9 @@ import { Messages } from '../message';
 import { Formulas } from '../formulas';
 import { EquipmentManager } from '../equipment/equipment-manager';
 import { EquipmentSlot } from '../../../shared/ts/equipment/equipment-types';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Equipment');
 
 /**
  * Item with equipment kind
@@ -71,7 +74,7 @@ export function equipWeapon(ctx: EquipmentPlayerContext, kind: number, propertie
 export function equipItem(ctx: EquipmentPlayerContext, item: EquippableItem | null): void {
   if (!item) return;
 
-  console.debug(`${ctx.name} equips ${Types.getKindAsString(item.kind)}`);
+  log.debug({ player: ctx.name, itemKind: Types.getKindAsString(item.kind) }, 'Equips item');
 
   const equipment = ctx.getEquipment();
   // Pass item properties to equipment manager
@@ -106,13 +109,13 @@ export function createEquipMessage(ctx: EquipmentPlayerContext, itemKind: number
 export function handleDropItem(ctx: EquipmentPlayerContext, itemType: string): void {
   const slot = itemType as EquipmentSlot;
   const equipment = ctx.getEquipment();
-  console.log(`[Drop] ${ctx.name} dropping ${slot}`);
+  log.info({ player: ctx.name, slot }, 'Dropping equipment');
 
   // Use unified drop - handles default check internally
   // Returns { kind, properties } or null if can't drop
   const dropped = equipment.drop(slot);
   if (!dropped) {
-    console.log(`[Drop] Cannot drop default ${slot}`);
+    log.info({ slot }, 'Cannot drop default equipment');
     return;
   }
 
@@ -122,7 +125,7 @@ export function handleDropItem(ctx: EquipmentPlayerContext, itemType: string): v
   if (item) {
     world.addItem(item);
     ctx.broadcast(new Messages.Spawn(item), false);
-    console.log(`[Drop] Created item ${Types.getKindAsString(dropped.kind)} at (${ctx.x}, ${ctx.y})`);
+    log.info({ itemKind: Types.getKindAsString(dropped.kind), x: ctx.x, y: ctx.y }, 'Created dropped item');
   }
 
   // Get the new default item that was auto-equipped

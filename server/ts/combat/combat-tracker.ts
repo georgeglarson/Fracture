@@ -6,6 +6,9 @@
  */
 
 import { normalizeId } from '../utils';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('CombatTracker');
 
 export interface AggroEntry {
   entityId: number;
@@ -100,7 +103,7 @@ export class CombatTracker {
     }
     mobSet.add(normMobId);
 
-    console.debug(`[CombatTracker] Mob ${normMobId} now hates player ${normPlayerId} (hate: ${playerMap.get(normPlayerId)?.hate})`);
+    log.trace({ mobId: normMobId, playerId: normPlayerId, hate: playerMap.get(normPlayerId)?.hate }, 'Mob aggro updated');
   }
 
   /**
@@ -129,7 +132,7 @@ export class CombatTracker {
       }
     }
 
-    console.debug(`[CombatTracker] Removed aggro: mob ${normMobId} -> player ${normPlayerId}`);
+    log.trace({ mobId: normMobId, playerId: normPlayerId }, 'Removed aggro');
   }
 
   /**
@@ -151,7 +154,7 @@ export class CombatTracker {
       }
       this.mobToPlayers.delete(normMobId);
     }
-    console.debug(`[CombatTracker] Cleared all aggro for mob ${normMobId}`);
+    log.debug({ mobId: normMobId }, 'Cleared all aggro for mob');
   }
 
   /**
@@ -173,7 +176,7 @@ export class CombatTracker {
       }
       this.playerToMobs.delete(normPlayerId);
     }
-    console.debug(`[CombatTracker] Cleared all aggro for player ${normPlayerId}`);
+    log.debug({ playerId: normPlayerId }, 'Cleared all aggro for player');
   }
 
   /**
@@ -303,7 +306,7 @@ export class CombatTracker {
    */
   getMobEntitiesAttacking(playerId: number): CombatEntity[] {
     if (!this.entityLookup) {
-      console.warn('[CombatTracker] Entity lookup not set');
+      log.warn('Entity lookup not set');
       return [];
     }
 
@@ -330,7 +333,7 @@ export class CombatTracker {
     callback: (mob: T) => void
   ): void {
     if (!this.entityLookup) {
-      console.warn('[CombatTracker] Entity lookup not set');
+      log.warn('Entity lookup not set');
       return;
     }
 
@@ -347,18 +350,16 @@ export class CombatTracker {
    * Debug: Print current state
    */
   debugPrint(): void {
-    console.log('[CombatTracker] Current state:');
-    console.log('  Mob -> Players:');
+    const mobToPlayers: Record<number, string[]> = {};
     for (const [mobId, playerMap] of this.mobToPlayers) {
-      const entries = Array.from(playerMap.entries())
-        .map(([pid, e]) => `${pid}(hate:${e.hate})`)
-        .join(', ');
-      console.log(`    Mob ${mobId}: ${entries}`);
+      mobToPlayers[mobId] = Array.from(playerMap.entries())
+        .map(([pid, e]) => `${pid}(hate:${e.hate})`);
     }
-    console.log('  Player -> Mobs:');
+    const playerToMobs: Record<number, number[]> = {};
     for (const [playerId, mobSet] of this.playerToMobs) {
-      console.log(`    Player ${playerId}: ${Array.from(mobSet).join(', ')}`);
+      playerToMobs[playerId] = Array.from(mobSet);
     }
+    log.debug({ mobToPlayers, playerToMobs }, 'Current combat state');
   }
 }
 

@@ -197,34 +197,20 @@ describe('PartyHandler', () => {
       expect(mockPartyService.sendInvite).not.toHaveBeenCalled();
     });
 
-    it('should log when sendInvite returns an error string', () => {
+    it('should not throw when sendInvite returns an error string', () => {
       const target = createMockPlayer(2, 'Target');
       addEntityToCtx(ctx, target);
       mockPartyService.sendInvite.mockReturnValue('Party is full.');
 
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-      handlePartyInvite(ctx, 2);
-
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Party is full.'));
-      spy.mockRestore();
+      expect(() => handlePartyInvite(ctx, 2)).not.toThrow();
     });
 
-    it('should not log when sendInvite succeeds (returns null)', () => {
+    it('should not throw when sendInvite succeeds (returns null)', () => {
       const target = createMockPlayer(2, 'Target');
       addEntityToCtx(ctx, target);
       mockPartyService.sendInvite.mockReturnValue(null);
 
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-      handlePartyInvite(ctx, 2);
-
-      // Only the [Party] log line for invalid targets would be logged; not the error path
-      const failCalls = spy.mock.calls.filter(
-        (c: any[]) => typeof c[0] === 'string' && c[0].includes('Invite failed'),
-      );
-      expect(failCalls.length).toBe(0);
-      spy.mockRestore();
+      expect(() => handlePartyInvite(ctx, 2)).not.toThrow();
     });
   });
 
@@ -272,14 +258,12 @@ describe('PartyHandler', () => {
       // Inviter with id=2 is NOT in the entity map
       mockPartyService.acceptInvite.mockReturnValue('Inviter is no longer available.');
 
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
       handlePartyAccept(ctx, 2);
 
       const [accepterRef, inviterId, inviterRef] = mockPartyService.acceptInvite.mock.calls[0];
       expect(accepterRef.id).toBe(1);
       expect(inviterId).toBe(2);
       expect(inviterRef).toBeUndefined();
-      spy.mockRestore();
     });
 
     it('should pass inviterRef when inviter entity exists', () => {
@@ -287,33 +271,27 @@ describe('PartyHandler', () => {
       addEntityToCtx(ctx, inviter);
       mockPartyService.acceptInvite.mockReturnValue('Some error.');
 
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
       handlePartyAccept(ctx, 2);
 
       const [, , inviterRef] = mockPartyService.acceptInvite.mock.calls[0];
       expect(inviterRef).toBeDefined();
       expect(inviterRef.id).toBe(2);
-      spy.mockRestore();
     });
 
-    it('should log and return when acceptInvite returns an error string', () => {
+    it('should not send any messages when acceptInvite returns an error string', () => {
       mockPartyService.acceptInvite.mockReturnValue('No pending invite from that player.');
 
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      handlePartyAccept(ctx, 2);
-
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('No pending invite'));
-      spy.mockRestore();
-    });
-
-    it('should not send any messages when acceptInvite returns an error', () => {
-      mockPartyService.acceptInvite.mockReturnValue('Invite has expired.');
-
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
       handlePartyAccept(ctx, 2);
 
       expect(ctx.send).not.toHaveBeenCalled();
-      spy.mockRestore();
+    });
+
+    it('should not send any messages when acceptInvite returns a different error', () => {
+      mockPartyService.acceptInvite.mockReturnValue('Invite has expired.');
+
+      handlePartyAccept(ctx, 2);
+
+      expect(ctx.send).not.toHaveBeenCalled();
     });
 
     it('should skip members whose entity is not found in world', () => {
@@ -476,28 +454,20 @@ describe('PartyHandler', () => {
   // handlePartyKick
   // =========================================================================
   describe('handlePartyKick', () => {
-    it('should log and return when kickMember returns null', () => {
+    it('should not throw when kickMember returns null', () => {
       mockPartyService.kickMember.mockReturnValue(null);
 
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      handlePartyKick(ctx, 2);
-
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Kick failed'));
-      spy.mockRestore();
+      expect(() => handlePartyKick(ctx, 2)).not.toThrow();
     });
 
-    it('should log and return when kick is not successful', () => {
+    it('should not throw when kick is not successful', () => {
       mockPartyService.kickMember.mockReturnValue({
         success: false,
         message: 'Only the leader can kick members.',
         party: {},
       });
 
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      handlePartyKick(ctx, 2);
-
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Only the leader can kick'));
-      spy.mockRestore();
+      expect(() => handlePartyKick(ctx, 2)).not.toThrow();
     });
 
     it('should send PartyDisband to the kicked player', () => {
@@ -564,11 +534,9 @@ describe('PartyHandler', () => {
     it('should call kickMember with ctx.id as leader and target id', () => {
       mockPartyService.kickMember.mockReturnValue(null);
 
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
       handlePartyKick(ctx, 5);
 
       expect(mockPartyService.kickMember).toHaveBeenCalledWith(1, 5);
-      spy.mockRestore();
     });
   });
 
@@ -663,13 +631,8 @@ describe('PartyHandler', () => {
       expect(ctx.send).not.toHaveBeenCalled();
     });
 
-    it('should log when target is invalid', () => {
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-      handlePlayerInspect(ctx, 999);
-
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('tried to inspect invalid player'));
-      spy.mockRestore();
+    it('should not throw when target is invalid', () => {
+      expect(() => handlePlayerInspect(ctx, 999)).not.toThrow();
     });
 
     it('should send null title when target has no title', () => {

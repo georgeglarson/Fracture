@@ -7,6 +7,9 @@
 import { Types } from '../../../shared/ts/gametypes';
 import { riftManager } from '../rifts/rift-manager';
 import { RiftModifier, MODIFIERS, formatModifier } from '../../../shared/ts/rifts/rift-data';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Rift');
 
 /**
  * Player context for rift operations
@@ -63,7 +66,7 @@ export function handleRiftEnter(ctx: RiftPlayerContext): boolean {
     killCount: 0
   }]);
 
-  console.log(`[Rift] ${ctx.name} entered rift at depth 1`);
+  log.info({ player: ctx.name, depth: 1 }, 'Entered rift');
   return true;
 }
 
@@ -125,7 +128,7 @@ export function handleRiftExit(ctx: RiftPlayerContext): void {
     leaderboardRank: result.leaderboardRank
   }]);
 
-  console.log(`[Rift] ${ctx.name} exited rift at depth ${result.run.completedDepth}`);
+  log.info({ player: ctx.name, completedDepth: result.run.completedDepth }, 'Exited rift');
 }
 
 /**
@@ -154,7 +157,7 @@ export function handleRiftDeath(ctx: RiftPlayerContext): void {
     leaderboardRank: result.leaderboardRank
   }]);
 
-  console.log(`[Rift] ${ctx.name} died in rift at depth ${result.run.depth}`);
+  log.info({ player: ctx.name, depth: result.run.depth }, 'Died in rift');
 }
 
 /**

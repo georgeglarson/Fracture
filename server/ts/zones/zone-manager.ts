@@ -5,13 +5,16 @@
 
 import { getZoneAtPosition, getZoneLevelWarning, ZoneDefinition } from '../../../shared/ts/zones';
 import { Types } from '../../../shared/ts/gametypes';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('ZoneManager');
 
 export class ZoneManager {
   // Track current zone per player
   private playerZones: Map<string, string | null> = new Map();
 
   constructor() {
-    console.log('[ZoneManager] Initialized');
+    log.info('Initialized');
   }
 
   /**

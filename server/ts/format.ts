@@ -1,5 +1,8 @@
 
 import {Types} from '../../shared/ts/gametypes';
+import { createModuleLogger } from './utils/logger.js';
+
+const log = createModuleLogger('Format');
 
 export class FormatChecker {
   formats: Record<number, string[]> = {};
@@ -92,7 +95,7 @@ export class FormatChecker {
       return message.length > 0 && message.every((param) => typeof param === 'number');
     }
     else {
-      console.error('Unknown message type: ' + type);
+      log.error({ messageType: type }, 'Unknown message type');
       return false;
     }
   }

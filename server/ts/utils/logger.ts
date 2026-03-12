@@ -1,8 +1,10 @@
 /**
- * Structured Logging with Pino
+ * Structured Logging with Pino + OpenTelemetry Correlation
  *
- * Replaces console.log with proper structured logging.
- * Supports log levels, context injection, and JSON output in production.
+ * - Dev: pino-pretty for human-readable output
+ * - Prod: pino-opentelemetry-transport injects trace_id/span_id into every log line
+ * - createModuleLogger() for per-module child loggers
+ * - createPlayerLogger() for player-scoped child loggers with id/name context
  */
 
 import pino from 'pino';
@@ -20,7 +22,8 @@ const baseConfig: pino.LoggerOptions = {
   timestamp: pino.stdTimeFunctions.isoTime,
 };
 
-// In development, use pino-pretty for readable output
+// Dev: pino-pretty for readable output
+// Prod: pino-opentelemetry-transport for trace correlation
 const transport = isDev
   ? {
       target: 'pino-pretty',
@@ -30,7 +33,23 @@ const transport = isDev
         ignore: 'pid,hostname,service,version',
       },
     }
-  : undefined;
+  : {
+      targets: [
+        // JSON to stdout (standard structured logging)
+        { target: 'pino/file', options: { destination: 1 }, level: logLevel as string },
+        // OTel transport: injects trace_id/span_id and ships to collector
+        {
+          target: 'pino-opentelemetry-transport',
+          options: {
+            resourceAttributes: {
+              'service.name': 'fracture-server',
+              'deployment.environment': process.env.NODE_ENV || 'production',
+            },
+          },
+          level: logLevel as string,
+        },
+      ],
+    };
 
 // Create the main logger
 export const logger = pino({
@@ -59,6 +78,18 @@ export function createChildLogger(context: Record<string, unknown>): pino.Logger
  */
 export function createModuleLogger(moduleName: string): pino.Logger {
   return logger.child({ module: moduleName });
+}
+
+/**
+ * Create a player-scoped child logger
+ * Automatically includes playerId and playerName in every log line
+ *
+ * @example
+ * const log = createPlayerLogger(player.id, player.name);
+ * log.info({ level: 5, xp: 1200 }, 'Level up');
+ */
+export function createPlayerLogger(playerId: number | string, playerName: string): pino.Logger {
+  return logger.child({ playerId, playerName });
 }
 
 // Named log level methods for convenience

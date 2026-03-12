@@ -6,6 +6,9 @@
  */
 
 import { ZoneManager } from '../zones/zone-manager';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Zone');
 
 /**
  * Player context for zone operations
@@ -38,7 +41,7 @@ export function checkZoneChange(ctx: ZonePlayerContext, x: number, y: number): v
     // Send zone info (bonus percentages)
     ctx.send(world.zoneManager.createZoneInfoMessage(result.zone));
 
-    console.log(`[Zone] ${ctx.name} entered ${result.zone.name} (Level ${result.zone.minLevel}-${result.zone.maxLevel})`);
+    log.info({ playerName: ctx.name, zoneName: result.zone.name, minLevel: result.zone.minLevel, maxLevel: result.zone.maxLevel }, 'Player entered zone');
   }
 }
 

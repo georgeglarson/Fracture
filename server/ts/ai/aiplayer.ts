@@ -15,6 +15,9 @@ import { Formulas } from '../formulas';
 import { World } from '../world';
 import { getVeniceService } from './venice.service';
 import { getCombatTracker } from '../combat/combat-tracker';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('AIPlayer');
 
 /**
  * Combat target interface
@@ -183,7 +186,7 @@ export class AIPlayer extends Character {
     this.moveCooldown = 300 + Math.random() * 200;     // 300-500ms per tile (fast like real players)
     this.actionCooldown = 800 + Math.random() * 400;   // 0.8-1.2 seconds between attacks
 
-    console.debug(`[AIPlayer] Created "${this.name}" (${this.personality}) at (${this.x}, ${this.y})`);
+    log.debug({ name: this.name, personality: this.personality, x: this.x, y: this.y }, 'Created AI player');
   }
 
   private generateName(usedNames?: Set<string>): string {
@@ -667,7 +670,7 @@ export class AIPlayer extends Character {
       // Fight back! Set the attacker as target and switch to fighting state
       this.target = attackerId;
       this.behaviorState = 'fighting';
-      console.debug(`[AIPlayer] ${this.name} is now fighting back against attacker ${attackerId}`);
+      log.debug({ name: this.name, attackerId }, 'Fighting back against attacker');
     }
   }
 
@@ -691,7 +694,7 @@ export class AIPlayer extends Character {
     // Remove from world entities temporarily
     this.world.removeEntity(this);
 
-    console.debug(`[AIPlayer] ${this.name} died (death #${this.deathCount})`);
+    log.debug({ name: this.name, deathCount: this.deathCount }, 'AI player died');
 
     // Respawn after delay (store handle for cleanup)
     this.respawnTimer = setTimeout(() => {
@@ -712,7 +715,7 @@ export class AIPlayer extends Character {
     // Re-add to world
     this.world.handleEntityGroupMembership(this);
 
-    console.debug(`[AIPlayer] ${this.name} respawned at (${this.x}, ${this.y})`);
+    log.debug({ name: this.name, x: this.x, y: this.y }, 'AI player respawned');
   }
 
   /**
@@ -773,7 +776,7 @@ export class AIPlayerManager {
   }
 
   start(): void {
-    console.info(`[AIPlayerManager] Starting with ${this.maxAIPlayers} AI players...`);
+    log.info({ maxAIPlayers: this.maxAIPlayers }, 'Starting AI player manager');
 
     // Spawn initial AI players
     for (let i = 0; i < this.maxAIPlayers; i++) {
@@ -821,7 +824,7 @@ export class AIPlayerManager {
 
     this.aiPlayers.set(ai.id, ai);
 
-    console.debug(`[AIPlayerManager] Spawned AI player: ${ai.name}`);
+    log.debug({ name: ai.name }, 'Spawned AI player');
   }
 
   private tick(): void {

@@ -1,4 +1,7 @@
 import {Types} from '../../shared/ts/gametypes';
+import { createModuleLogger } from './utils/logger.js';
+
+const log = createModuleLogger('Utils');
 
 // HTML entities for escaping
 const HTML_ENTITIES: Record<string, string> = {
@@ -94,7 +97,7 @@ export function normalizeId(id: string | number): number {
   if (typeof id === 'number') return id;
   const parsed = parseInt(id, 10);
   if (isNaN(parsed)) {
-    console.error(`[normalizeId] Invalid ID: ${id}`);
+    log.error({ id }, 'Invalid ID in normalizeId');
     return 0;
   }
   return parsed;

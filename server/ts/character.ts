@@ -1,6 +1,9 @@
 import {Entity} from './entity';
 import {Utils, normalizeId} from './utils';
 import {Messages} from './message';
+import { createModuleLogger } from './utils/logger.js';
+
+const log = createModuleLogger('Character');
 
 // Message return type for serializable messages
 interface SerializableMessage {
@@ -97,7 +100,7 @@ export abstract class Character extends Entity {
       const key = normalizeId(entity.id);
       if (key in this.attackers) {
         delete this.attackers[key];
-        console.debug(this.id + " REMOVED ATTACKER " + key);
+        log.debug({ entityId: this.id, attackerId: key }, 'Removed attacker');
       }
     }
   }

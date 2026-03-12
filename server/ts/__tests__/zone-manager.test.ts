@@ -39,11 +39,9 @@ describe('ZoneManager', () => {
       expect(zm).toBeInstanceOf(ZoneManager);
     });
 
-    it('should log initialization message', () => {
-      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    it('should initialize without throwing', () => {
       const _zm = new ZoneManager();
-      expect(spy).toHaveBeenCalledWith('[ZoneManager] Initialized');
-      spy.mockRestore();
+      expect(_zm).toBeInstanceOf(ZoneManager);
     });
   });
 

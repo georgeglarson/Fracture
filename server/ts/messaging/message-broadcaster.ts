@@ -3,6 +3,10 @@
  * Single Responsibility: Queue and deliver messages to players
  */
 
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Broadcaster');
+
 
 export interface Message {
   serialize(): any[];
@@ -86,7 +90,7 @@ export class MessageBroadcaster {
       }
       // AIPlayers don't have queues - this is expected, no need to log
     } catch (error) {
-      console.error(`[Broadcaster] Failed to push to player ${player?.id}:`, error);
+      log.error({ err: error, playerId: player?.id }, 'Failed to push to player');
     }
   }
 
@@ -105,10 +109,10 @@ export class MessageBroadcaster {
           }
         });
       } else {
-        console.debug('[Broadcaster] groupId: ' + groupId + ' is not a valid group');
+        log.debug({ groupId }, 'groupId is not a valid group');
       }
     } catch (error) {
-      console.error(`[Broadcaster] Failed to push to group ${groupId}:`, error);
+      log.error({ err: error, groupId }, 'Failed to push to group');
     }
   }
 
@@ -121,7 +125,7 @@ export class MessageBroadcaster {
         this.pushToGroup(id, message, ignoredPlayer);
       });
     } catch (error) {
-      console.error(`[Broadcaster] Failed to push to adjacent groups of ${groupId}:`, error);
+      log.error({ err: error, groupId }, 'Failed to push to adjacent groups');
     }
   }
 
@@ -137,7 +141,7 @@ export class MessageBroadcaster {
         player.recentlyLeftGroups = [];
       }
     } catch (error) {
-      console.error(`[Broadcaster] Failed to push to previous groups for player ${player?.id}:`, error);
+      log.error({ err: error, playerId: player?.id }, 'Failed to push to previous groups');
     }
   }
 
@@ -153,7 +157,7 @@ export class MessageBroadcaster {
         }
       }
     } catch (error) {
-      console.error('[Broadcaster] Failed to push broadcast:', error);
+      log.error({ err: error }, 'Failed to push broadcast');
     }
   }
 
@@ -172,7 +176,7 @@ export class MessageBroadcaster {
           this.outgoingQueues[id] = [];
         }
       } catch (error) {
-        console.error(`[Broadcaster] Failed to process queue for ${id}:`, error);
+        log.error({ err: error, playerId: id }, 'Failed to process queue');
         // Clear the queue even on error to prevent memory buildup
         this.outgoingQueues[id] = [];
       }

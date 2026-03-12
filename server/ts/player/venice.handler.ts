@@ -10,6 +10,9 @@ import { Messages } from '../message';
 import { getVeniceService, getFishAudioService } from '../ai';
 import { isMerchant, getShopInventory } from '../shop/shop.service';
 import { shopService } from '../shop/shop.service';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Venice');
 
 /**
  * Player interface for Venice handler
@@ -30,11 +33,11 @@ async function generateTTS(text: string, npcType: string): Promise<string | null
   try {
     const result = await fishAudio.textToSpeech(text, npcType);
     if (result) {
-      console.debug(`[FishAudio] Generated TTS for ${npcType}: ${result.audioUrl} (cached: ${result.cached})`);
+      log.debug({ npcType, audioUrl: result.audioUrl, cached: result.cached }, 'Generated TTS');
       return result.audioUrl;
     }
   } catch (error) {
-    console.error('[FishAudio] TTS error:', error);
+    log.error({ err: error }, 'FishAudio TTS error');
   }
   return null;
 }
@@ -43,7 +46,7 @@ async function generateTTS(text: string, npcType: string): Promise<string | null
  * Handle NPC dialogue request
  */
 export async function handleNpcTalk(ctx: VenicePlayerContext, npcKind: number): Promise<void> {
-  console.debug(`[Venice] handleNpcTalk npcKind=${npcKind}`);
+  log.debug({ npcKind }, 'handleNpcTalk');
   const venice = getVeniceService();
   const npcType = Types.getKindAsString(npcKind);
 
@@ -51,7 +54,7 @@ export async function handleNpcTalk(ctx: VenicePlayerContext, npcKind: number): 
   if (isMerchant(npcKind)) {
     const shop = getShopInventory(npcKind);
     if (shop) {
-      console.debug(`[Shop] Opening shop: ${shop.name}`);
+      log.debug({ shopName: shop.name }, 'Opening shop');
       const items = shopService.getInventoryWithStock(npcKind);
       ctx.send(new Messages.ShopOpen(npcKind, shop.name, items || []).serialize());
     }
@@ -73,18 +76,18 @@ export async function handleNpcTalk(ctx: VenicePlayerContext, npcKind: number): 
   }
 
   try {
-    console.debug(`[Venice] Generating dialogue for ${npcType}...`);
+    log.debug({ npcType }, 'Generating dialogue');
     const response = await venice.generateNpcDialogue(
       npcType,
       ctx.name,
       ctx.id.toString()
     );
-    console.debug(`[Venice] Got response: ${response}`);
+    log.debug({ response }, 'Got dialogue response');
 
     const audioUrl = await generateTTS(response, npcType);
     ctx.send(new Messages.NpcTalkResponse(npcKind, response, audioUrl).serialize());
   } catch (error) {
-    console.error('Venice NPC talk error:', error);
+    log.error({ err: error }, 'Venice NPC talk error');
     const fallback = venice.getFallback(npcType);
     const audioUrl = await generateTTS(fallback, npcType);
     ctx.send(new Messages.NpcTalkResponse(npcKind, fallback, audioUrl).serialize());
@@ -106,7 +109,7 @@ export async function handleRequestQuest(ctx: VenicePlayerContext, npcKind: numb
     const quest = await venice.generateQuest(ctx.id.toString(), npcType);
     ctx.send(new Messages.QuestOffer(quest).serialize());
   } catch (error) {
-    console.error('Venice quest generation error:', error);
+    log.error({ err: error }, 'Venice quest generation error');
   }
 }
 
@@ -236,7 +239,7 @@ export function cleanupVenice(playerId: string): void {
  * Handle news request (Town Crier)
  */
 export async function handleNewsRequest(ctx: VenicePlayerContext): Promise<void> {
-  console.debug('[TownCrier] handleNewsRequest for player:', ctx.name);
+  log.debug({ player: ctx.name }, 'handleNewsRequest');
   const venice = getVeniceService();
   if (!venice) {
     ctx.send(new Messages.NewsResponse([]).serialize());
@@ -245,11 +248,11 @@ export async function handleNewsRequest(ctx: VenicePlayerContext): Promise<void>
 
   try {
     const newspaper = await venice.generateNewspaper();
-    console.debug('[TownCrier] Generated', newspaper.headlines.length, 'headlines');
+    log.debug({ headlineCount: newspaper.headlines.length }, 'Generated headlines');
     const response = new Messages.NewsResponse(newspaper.headlines).serialize();
     ctx.send(response);
   } catch (error) {
-    console.error('[TownCrier] Venice newspaper error:', error);
+    log.error({ err: error }, 'Venice newspaper error');
     ctx.send(new Messages.NewsResponse(['No news today...']).serialize());
   }
 }
@@ -278,7 +281,7 @@ export async function triggerNarration(
     return;
   }
 
-  console.debug(`[Narrator] Triggering narration: ${event}`);
+  log.debug({ event }, 'Triggering narration');
 
   try {
     // Try AI narration first
@@ -299,7 +302,7 @@ export async function triggerNarration(
       narrationState.set(ctx.id, { lastTime: now });
     }
   } catch (error) {
-    console.error('[Narrator] Error:', error);
+    log.error({ err: error }, 'Narrator error');
     // Use static fallback on error (no audio for fallbacks)
     const fallback = venice.getStaticNarration(event, ctx.name, details);
     ctx.send(new Messages.Narrator(fallback.text, fallback.style).serialize());

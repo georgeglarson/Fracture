@@ -5,6 +5,9 @@
  */
 
 import { Types } from '../../../shared/ts/gametypes';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Progression');
 
 /**
  * Ascension titles based on prestige level
@@ -203,7 +206,7 @@ export function canAscend(level: number): boolean {
  */
 export function performAscension(ctx: ProgressionPlayerContext): boolean {
   if (!canAscend(ctx.level)) {
-    console.log(`[Progression] ${ctx.name} cannot ascend - level ${ctx.level} < ${MAX_LEVEL}`);
+    log.info({ playerName: ctx.name, level: ctx.level, required: MAX_LEVEL }, 'Cannot ascend - level too low');
     return false;
   }
 
@@ -215,7 +218,7 @@ export function performAscension(ctx: ProgressionPlayerContext): boolean {
   ctx.setXp(0);
 
   const title = getAscensionTitle(ctx.ascensionCount);
-  console.log(`[Progression] ${ctx.name} ASCENDED! Now ${title} (Ascension ${ctx.ascensionCount})`);
+  log.info({ playerName: ctx.name, title, ascensionCount: ctx.ascensionCount }, 'Player ascended');
 
   // Send ascension notification to client
   ctx.send([Types.Messages.PROGRESSION_ASCEND, ctx.ascensionCount, title]);
@@ -233,7 +236,7 @@ export function initProgression(ctx: ProgressionPlayerContext): void {
     ctx.restedXp = calculateRestedXp(ctx.lastLogoutTime, ctx.restedXp);
 
     if (ctx.restedXp > previousRested) {
-      console.log(`[Progression] ${ctx.name} gained ${(ctx.restedXp - previousRested).toFixed(1)}% rested XP`);
+      log.info({ playerName: ctx.name, restedXpGained: +(ctx.restedXp - previousRested).toFixed(1), totalRestedXp: ctx.restedXp }, 'Rested XP accumulated');
     }
   }
 

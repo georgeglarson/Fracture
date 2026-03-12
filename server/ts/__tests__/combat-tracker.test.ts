@@ -18,8 +18,6 @@ describe('CombatTracker', () => {
   beforeEach(() => {
     CombatTracker.reset();
     tracker = CombatTracker.getInstance();
-    // Suppress console.debug noise during tests
-    vi.spyOn(console, 'debug').mockImplementation(() => {});
   });
 
   // ---------------------------------------------------------------
@@ -524,13 +522,11 @@ describe('CombatTracker', () => {
       expect(result).toHaveLength(0);
     });
 
-    it('should return empty array and warn when entityLookup is not set', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('should return empty array when entityLookup is not set', () => {
       tracker.addAggro(1, 100);
 
       const result = tracker.getMobEntitiesAttacking(100);
       expect(result).toEqual([]);
-      expect(warnSpy).toHaveBeenCalledWith('[CombatTracker] Entity lookup not set');
     });
   });
 
@@ -558,13 +554,11 @@ describe('CombatTracker', () => {
     });
 
     it('should not invoke callback when entityLookup is unset', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       tracker.addAggro(1, 100);
 
       const cb = vi.fn();
       tracker.forEachMobAttackingWithEntity(100, cb);
       expect(cb).not.toHaveBeenCalled();
-      expect(warnSpy).toHaveBeenCalled();
     });
   });
 

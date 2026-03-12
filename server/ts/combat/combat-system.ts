@@ -11,6 +11,9 @@ import { getServerEventBus } from '../../../shared/ts/events/index.js';
 import { PartyService } from '../party/index.js';
 import { getKillStreakService } from './kill-streak.service.js';
 import { getCombatTracker } from './combat-tracker.js';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('CombatSystem');
 
 export interface Entity {
   id: string | number;
@@ -397,7 +400,7 @@ export class CombatSystem {
         const totalXp = Math.floor(baseXp * xpBonus);
         const xpPerMember = Math.floor(totalXp / nearbyMembers.length);
 
-        console.log(`[Party XP] ${nearbyMembers.length} members share ${totalXp} XP (${baseXp} base × ${xpBonus.toFixed(2)} bonus), ${xpPerMember} each`);
+        log.info({ memberCount: nearbyMembers.length, totalXp, baseXp, xpBonus: xpBonus.toFixed(2), xpPerMember }, 'Party XP sharing');
 
         // Distribute XP to all nearby party members
         for (const memberId of nearbyMembers) {

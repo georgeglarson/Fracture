@@ -1,4 +1,7 @@
 import {World} from './world';
+import { createModuleLogger } from './utils/logger.js';
+
+const log = createModuleLogger('Metrics');
 
 // Config interface for metrics
 interface MetricsConfig {
@@ -32,7 +35,7 @@ export class Metrics {
 
 
     this.client.on('connect', function () {
-      console.info('Metrics enabled: memcached client connected to ' + config.memcached_host + ':' + config.memcached_port);
+      log.info({ host: config.memcached_host, port: config.memcached_port }, 'Metrics enabled: memcached client connected');
       self.isReady = true;
       if (self.ready_callback) {
         self.ready_callback();
@@ -75,7 +78,7 @@ export class Metrics {
         });
       });
     } else {
-      console.error('Memcached client not connected');
+      log.error('Memcached client not connected');
     }
   }
 

@@ -3,6 +3,12 @@
  * Single Responsibility: Coordinate periodic game updates
  */
 
+import { createModuleLogger } from '../utils/logger.js';
+import { trace } from '@opentelemetry/api';
+
+const log = createModuleLogger('GameLoop');
+const tracer = trace.getTracer('fracture-server');
+
 export interface SpatialContext {
   processGroups(): void;
 }
@@ -94,7 +100,7 @@ export class GameLoop {
    */
   start(): void {
     if (this.tickInterval) {
-      console.warn('GameLoop already running');
+      log.warn('GameLoop already running');
       return;
     }
 
@@ -104,7 +110,7 @@ export class GameLoop {
       self.tick();
     }, 1000 / this.ups);
 
-    console.debug('GameLoop started at ' + this.ups + ' UPS');
+    log.debug({ ups: this.ups }, 'GameLoop started');
   }
 
   /**
@@ -114,7 +120,7 @@ export class GameLoop {
     if (this.tickInterval) {
       clearInterval(this.tickInterval);
       this.tickInterval = null;
-      console.debug('GameLoop stopped');
+      log.debug('GameLoop stopped');
     }
   }
 
@@ -126,21 +132,21 @@ export class GameLoop {
       // Process spatial groups (spawns, despawns)
       this.spatialContext?.processGroups();
     } catch (e) {
-      console.error('[GameLoop] Error in spatial processing:', e);
+      log.error({ err: e }, 'Error in spatial processing');
     }
 
     try {
       // Process message queues
       this.broadcasterContext?.processQueues();
     } catch (e) {
-      console.error('[GameLoop] Error in broadcaster processing:', e);
+      log.error({ err: e }, 'Error in broadcaster processing');
     }
 
     // Regeneration timer
     if (this.updateCount < this.regenCount) {
       this.updateCount += 1;
     } else {
-      try { this.regenCallback?.(); } catch (e) { console.error('[GameLoop] Error in regen callback:', e); }
+      try { this.regenCallback?.(); } catch (e) { log.error({ err: e }, 'Error in regen callback'); }
       this.updateCount = 0;
     }
 
@@ -148,15 +154,24 @@ export class GameLoop {
     if (this.thoughtUpdateCount < this.thoughtCount) {
       this.thoughtUpdateCount += 1;
     } else {
-      try { this.thoughtCallback?.(); } catch (e) { console.error('[GameLoop] Error in thought callback:', e); }
+      try { this.thoughtCallback?.(); } catch (e) { log.error({ err: e }, 'Error in thought callback'); }
       this.thoughtUpdateCount = 0;
     }
 
-    // Aggro check timer
+    // Aggro check timer (fires every 0.5s)
     if (this.aggroUpdateCount < this.aggroCount) {
       this.aggroUpdateCount += 1;
     } else {
-      try { this.aggroCallback?.(); } catch (e) { console.error('[GameLoop] Error in aggro callback:', e); }
+      const span = tracer.startSpan('game.aggro_tick');
+      const startMs = Date.now();
+      try {
+        this.aggroCallback?.();
+      } catch (e) {
+        log.error({ err: e }, 'Error in aggro callback');
+      } finally {
+        span.setAttribute('duration_ms', Date.now() - startMs);
+        span.end();
+      }
       this.aggroUpdateCount = 0;
     }
   }

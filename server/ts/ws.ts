@@ -4,6 +4,9 @@ import * as http from 'http';
 import * as path from 'path';
 import {Utils} from './utils';
 import { getIntroService } from './ai/intro.service';
+import { createModuleLogger } from './utils/logger.js';
+
+const log = createModuleLogger('WebSocket');
 
 // Message type - can be a serializable object or raw array
 type MessagePayload = { serialize(): unknown[] } | unknown[];
@@ -95,7 +98,7 @@ export class Server {
           res.json(introService.getStaticIntro(playerName));
         }
       } catch (error) {
-        console.error('[API] Intro generation error:', error);
+        log.error({ err: error }, 'Intro generation error');
         res.json(introService.getStaticIntro(playerName));
       }
     });
@@ -123,7 +126,7 @@ export class Server {
     });
 
     this.io.on('connection', function (connection) {
-      console.info('a user connected');
+      log.info('A user connected');
 
       // connection.ip = connection.handshake.address.address;
       const c = new Connection(self._createId(), connection, self);
@@ -135,15 +138,14 @@ export class Server {
     });
 
     this.io.on('error', function (err) {
-        console.error('io error');
-      console.error(err.stack);
+        log.error({ err }, 'Socket.IO error');
       if (self.error_callback) {
         self.error_callback();
       }
     });
 
     server.listen(port, function () {
-      console.info('listening on *:' + port);
+      log.info({ port }, 'Listening');
     });
   }
 
@@ -156,7 +158,7 @@ export class Server {
       try {
         connection.send(message);
       } catch (error) {
-        console.error(`[WS] Failed to broadcast to connection ${connection.id}:`, error);
+        log.error({ err: error, connectionId: connection.id }, 'Failed to broadcast to connection');
       }
     });
   }
@@ -168,7 +170,7 @@ export class Server {
     try {
       this.io.to(`zone:${zoneId}`).emit('message', message);
     } catch (error) {
-      console.error(`[WS] Failed to broadcast to zone ${zoneId}:`, error);
+      log.error({ err: error, zoneId }, 'Failed to broadcast to zone');
     }
   }
 
@@ -179,7 +181,7 @@ export class Server {
     try {
       this.io.to(`party:${partyId}`).emit('message', message);
     } catch (error) {
-      console.error(`[WS] Failed to broadcast to party ${partyId}:`, error);
+      log.error({ err: error, partyId }, 'Failed to broadcast to party');
     }
   }
 
@@ -191,7 +193,7 @@ export class Server {
       const sockets = await this.io.in(`zone:${zoneId}`).fetchSockets();
       return sockets.length;
     } catch (error) {
-      console.error(`[WS] Failed to get zone player count for ${zoneId}:`, error);
+      log.error({ err: error, zoneId }, 'Failed to get zone player count');
       return 0;
     }
   }
@@ -244,7 +246,7 @@ export class Connection {
 
     // HANDLE DISPATCHER IN HERE
     connection.on('dispatch', function (message) {
-      console.info('Received dispatch request');
+      log.info('Received dispatch request');
       self._connection.emit('dispatched', {'status': 'OK', host: server.host, port: server.port});
     });
 
@@ -278,7 +280,7 @@ export class Connection {
     try {
       this._connection.emit('message', message);
     } catch (error) {
-      console.error(`[WS] Failed to send to connection ${this.id}:`, error);
+      log.error({ err: error, connectionId: this.id }, 'Failed to send to connection');
     }
   }
 
@@ -286,7 +288,7 @@ export class Connection {
     try {
       this._connection.emit('message', data);
     } catch (error) {
-      console.error(`[WS] Failed to sendUTF8 to connection ${this.id}:`, error);
+      log.error({ err: error, connectionId: this.id }, 'Failed to sendUTF8 to connection');
     }
   }
 
@@ -304,7 +306,7 @@ export class Connection {
       this._connection.join(`zone:${zoneId}`);
       this._currentZone = zoneId;
     } catch (error) {
-      console.error(`[WS] Failed to join zone ${zoneId} for connection ${this.id}:`, error);
+      log.error({ err: error, zoneId, connectionId: this.id }, 'Failed to join zone');
     }
   }
 
@@ -317,7 +319,7 @@ export class Connection {
         this._connection.leave(`zone:${this._currentZone}`);
         this._currentZone = null;
       } catch (error) {
-        console.error(`[WS] Failed to leave zone for connection ${this.id}:`, error);
+        log.error({ err: error, connectionId: this.id }, 'Failed to leave zone');
         this._currentZone = null; // Reset state even on error
       }
     }
@@ -338,7 +340,7 @@ export class Connection {
       try {
         this._connection.to(`zone:${this._currentZone}`).emit('message', message);
       } catch (error) {
-        console.error(`[WS] Failed to broadcast to zone for connection ${this.id}:`, error);
+        log.error({ err: error, connectionId: this.id }, 'Failed to broadcast to zone');
       }
     }
   }
@@ -350,7 +352,7 @@ export class Connection {
     try {
       this._connection.join(`party:${partyId}`);
     } catch (error) {
-      console.error(`[WS] Failed to join party ${partyId} for connection ${this.id}:`, error);
+      log.error({ err: error, partyId, connectionId: this.id }, 'Failed to join party');
     }
   }
 
@@ -361,7 +363,7 @@ export class Connection {
     try {
       this._connection.leave(`party:${partyId}`);
     } catch (error) {
-      console.error(`[WS] Failed to leave party ${partyId} for connection ${this.id}:`, error);
+      log.error({ err: error, partyId, connectionId: this.id }, 'Failed to leave party');
     }
   }
 
@@ -372,16 +374,16 @@ export class Connection {
     try {
       this._connection.to(`party:${partyId}`).emit('message', message);
     } catch (error) {
-      console.error(`[WS] Failed to broadcast to party ${partyId} for connection ${this.id}:`, error);
+      log.error({ err: error, partyId, connectionId: this.id }, 'Failed to broadcast to party');
     }
   }
 
   close(logError?: string): void {
-    console.info(`[WS] Closing connection ${this.id}${logError ? ': ' + logError : ''}`);
+    log.info({ connectionId: this.id, reason: logError }, 'Closing connection');
     try {
       this._connection.disconnect();
     } catch (error) {
-      console.error(`[WS] Failed to disconnect connection ${this.id}:`, error);
+      log.error({ err: error, connectionId: this.id }, 'Failed to disconnect connection');
     }
   }
 }

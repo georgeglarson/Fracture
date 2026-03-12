@@ -4,6 +4,11 @@
  */
 
 import { VeniceAI } from '@venice-dev-tools/core';
+import { createModuleLogger } from '../utils/logger.js';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
+
+const log = createModuleLogger('VeniceClient');
+const tracer = trace.getTracer('fracture-server');
 
 export interface VeniceClientOptions {
   model?: string;
@@ -28,31 +33,47 @@ export class VeniceClient {
    * @returns The response text or null on error/timeout
    */
   async call(prompt: string, maxTokens: number = 100): Promise<string | null> {
-    try {
-      // Wrap API call with timeout
-      const apiCall = this.venice.chat.completions.create({
-        model: this.model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: maxTokens,
-        temperature: 0.9,
-        stream: false
+    return tracer.startActiveSpan('ai.venice', async (span) => {
+      span.setAttributes({
+        'ai.model': this.model,
+        'ai.prompt_length': prompt.length,
+        'ai.max_tokens': maxTokens,
       });
 
-      const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error(`Venice API timeout after ${this.timeout}ms`)), this.timeout);
-      });
+      const startMs = Date.now();
+      try {
+        // Wrap API call with timeout
+        const apiCall = this.venice.chat.completions.create({
+          model: this.model,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: maxTokens,
+          temperature: 0.9,
+          stream: false
+        });
 
-      const response = await Promise.race([apiCall, timeoutPromise]);
+        const timeoutPromise = new Promise<null>((_, reject) => {
+          setTimeout(() => reject(new Error(`Venice API timeout after ${this.timeout}ms`)), this.timeout);
+        });
 
-      const content = (response as any)?.choices?.[0]?.message?.content;
-      if (content) {
-        return this.cleanResponse(content);
+        const response = await Promise.race([apiCall, timeoutPromise]);
+
+        span.setAttribute('ai.response_time_ms', Date.now() - startMs);
+
+        const content = (response as any)?.choices?.[0]?.message?.content;
+        if (content) {
+          span.end();
+          return this.cleanResponse(content);
+        }
+        span.end();
+        return null;
+      } catch (error: any) {
+        span.setAttribute('ai.response_time_ms', Date.now() - startMs);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error?.message || String(error) });
+        span.end();
+        log.error({ err: error }, 'Venice API error');
+        return null;
       }
-      return null;
-    } catch (error: any) {
-      console.error('Venice API error:', error.message || error);
-      return null;
-    }
+    });
   }
 
   /**

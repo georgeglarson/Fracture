@@ -14,6 +14,9 @@ import {
   hasUnlockedSkill,
   getUnlockedSkills
 } from '../../../shared/ts/skills';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Skill');
 
 /**
  * Player context for skill operations
@@ -92,7 +95,7 @@ export function checkSkillUnlock(ctx: SkillPlayerContext, oldLevel: number, newL
         icon: skill.icon
       }]);
 
-      console.log(`[Skills] ${ctx.name} unlocked ${skill.name} at level ${newLevel}`);
+      log.info({ player: ctx.name, skill: skill.name, level: newLevel }, 'Unlocked skill');
     }
   }
 }
@@ -102,18 +105,18 @@ export function checkSkillUnlock(ctx: SkillPlayerContext, oldLevel: number, newL
  */
 export function handleSkillUse(ctx: SkillPlayerContext, skillId: string): void {
   try {
-    console.log(`[Skills] ${ctx.name} attempting to use skill: ${skillId}`);
+    log.info({ player: ctx.name, skillId }, 'Attempting to use skill');
 
     const skill = SKILLS[skillId as SkillId];
 
     if (!skill) {
-      console.log(`[Skills] Unknown skill: ${skillId}`);
+      log.info({ skillId }, 'Unknown skill');
       return;
     }
 
     // Check if player has unlocked this skill
     if (!hasUnlockedSkill(skillId as SkillId, ctx.level)) {
-      console.log(`[Skills] ${ctx.name} tried to use ${skill.name} but hasn't unlocked it (level ${ctx.level} < ${skill.unlockLevel})`);
+      log.info({ player: ctx.name, skill: skill.name, playerLevel: ctx.level, requiredLevel: skill.unlockLevel }, 'Skill not unlocked');
       return;
     }
 
@@ -121,7 +124,7 @@ export function handleSkillUse(ctx: SkillPlayerContext, skillId: string): void {
     const skillState = ctx.getSkillState();
     if (!isSkillReady(skillState, skillId as SkillId)) {
       const remaining = Math.ceil((skillState.cooldowns[skillId as SkillId] - Date.now()) / 1000);
-      console.log(`[Skills] ${ctx.name}'s ${skill.name} on cooldown (${remaining}s remaining)`);
+      log.debug({ player: ctx.name, skill: skill.name, remainingSeconds: remaining }, 'Skill on cooldown');
       return;
     }
 
@@ -139,10 +142,10 @@ export function handleSkillUse(ctx: SkillPlayerContext, skillId: string): void {
       // Using direct send since broadcastToZone requires Message objects with serialize()
       ctx.send([Types.Messages.SKILL_EFFECT, ctx.id, skillId, ctx.x, ctx.y, ctx.orientation]);
 
-      console.log(`[Skills] ${ctx.name} used ${skill.name}`);
+      log.info({ player: ctx.name, skill: skill.name }, 'Used skill');
     }
   } catch (error) {
-    console.error(`[Skills] ERROR in handleSkillUse:`, error);
+    log.error({ err: error }, 'Error in handleSkillUse');
   }
 }
 
@@ -164,7 +167,7 @@ function executeSkill(ctx: SkillPlayerContext, skill: typeof SKILLS[SkillId]): b
       return executeWhirlwind(ctx, skill.params.radius, skill.params.damagePercent);
 
     default:
-      console.log(`[Skills] Unknown skill type`);
+      log.info('Unknown skill type');
       return false;
   }
 }
@@ -196,7 +199,7 @@ function executePhaseShift(ctx: SkillPlayerContext, duration: number): boolean {
     }
   });
 
-  console.log(`[Skills] ${ctx.name} activated Phase Shift for ${duration}ms`);
+  log.info({ player: ctx.name, durationMs: duration }, 'Activated Phase Shift');
   return true;
 }
 
@@ -244,7 +247,7 @@ function executeWarCry(ctx: SkillPlayerContext, radius: number, stunDuration: nu
     }
   });
 
-  console.log(`[Skills] War Cry stunned ${stunCount} enemies in ${radius} tile radius`);
+  log.info({ stunCount, radius }, 'War Cry stunned enemies');
   return true;
 }
 
@@ -273,7 +276,7 @@ function executeWhirlwind(ctx: SkillPlayerContext, radius: number, damagePercent
     }
   });
 
-  console.log(`[Skills] Whirlwind hit ${hitCount} enemies for ${damage} damage each`);
+  log.info({ hitCount, damage }, 'Whirlwind hit enemies');
   return true;
 }
 
@@ -290,7 +293,7 @@ export function consumePowerStrikeBuff(ctx: SkillPlayerContext): number {
     skillState.powerStrikeExpires = 0;
     ctx.setPowerStrikeBuff(false, 0);
 
-    console.log(`[Skills] ${ctx.name} consumed Power Strike buff`);
+    log.info({ player: ctx.name }, 'Consumed Power Strike buff');
     return 2.0; // Double damage
   }
 

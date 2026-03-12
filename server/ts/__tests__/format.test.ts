@@ -395,21 +395,15 @@ describe('FormatChecker', () => {
 
   describe('check - unknown message types', () => {
     it('should reject an unknown numeric message type', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       expect(checker.check([9999])).toBe(false);
-      expect(consoleSpy).toHaveBeenCalledWith('Unknown message type: 9999');
     });
 
     it('should reject negative message type', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       expect(checker.check([-1])).toBe(false);
-      expect(consoleSpy).toHaveBeenCalled();
     });
 
-    it('should log an error for unknown message types', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      checker.check([5555, 1, 2, 3]);
-      expect(consoleSpy).toHaveBeenCalledWith('Unknown message type: 5555');
+    it('should return false for unknown message types', () => {
+      expect(checker.check([5555, 1, 2, 3])).toBe(false);
     });
   });
 

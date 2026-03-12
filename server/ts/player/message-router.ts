@@ -14,6 +14,7 @@ import {
   RateLimitResult
 } from '../middleware/rate-limiter.js';
 import { createModuleLogger } from '../utils/logger.js';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import * as VeniceHandler from './venice.handler';
 import * as PartyHandler from './party.handler';
 import * as InventoryHandler from './inventory.handler';
@@ -154,7 +155,7 @@ function persistInventory(ctx: MessageHandlerContext): void {
     const inventory = (ctx as any).getInventory();
     storage.saveInventory(ctx.characterId, inventory.getSerializedSlots());
   } catch (e) {
-    console.error('[Inventory] Failed to persist inventory:', e);
+    log.error({ err: e, playerId: ctx.id }, 'Failed to persist inventory');
   }
 }
 
@@ -185,7 +186,7 @@ export function createMessageHandlers(
       if (characterExists) {
         // Existing character - verify password
         if (!storage.verifyPassword(ctx.name, password)) {
-          console.log(`[Auth] Wrong password for: ${ctx.name}`);
+          log.warn({ playerName: ctx.name }, 'Wrong password');
           ctx.send([Types.Messages.AUTH_FAIL, 'wrong_password']);
           return; // Don't proceed - client should disconnect
         }
@@ -193,12 +194,12 @@ export function createMessageHandlers(
         // Password correct - load character
         const loaded = ctx.loadFromStorage(storage);
         if (loaded) {
-          console.log(`[Storage] Loaded returning player: ${ctx.name}`);
+          log.info({ playerName: ctx.name }, 'Loaded returning player');
         }
       } else {
         // New character - password is required
         if (!password || password.length < 3) {
-          console.log(`[Auth] Password too short for new character: ${ctx.name}`);
+          log.warn({ playerName: ctx.name }, 'Password too short for new character');
           ctx.send([Types.Messages.AUTH_FAIL, 'password_required']);
           return;
         }
@@ -211,7 +212,7 @@ export function createMessageHandlers(
         ctx.equipArmor(msg[2]);
         ctx.equipWeapon(msg[3]);
         ctx.setGold(msg[4] || 0);
-        console.log(`[Storage] Created new character: ${ctx.name} (${ctx.characterId})`);
+        log.info({ playerName: ctx.name, characterId: ctx.characterId }, 'Created new character');
       }
 
       ctx.orientation = Utils.randomOrientation();
@@ -396,6 +397,7 @@ export function createMessageHandlers(
           // Mob is too far away to deal damage this tick — skip but keep aggro
           // (clearing aggro here causes a stuck state: mob stays in player.attackers
           // but loses its target, and chooseMobTarget won't re-acquire)
+          log.trace({ mobId: mob.id, distance, meleeRange: MELEE_RANGE, playerName: ctx.name, mobPos: { x: mob.x, y: mob.y }, playerPos: { x: ctx.x, y: ctx.y } }, 'HURT rejected: mob out of range');
           return;
         }
 
@@ -786,22 +788,52 @@ export class MessageRouter {
       }
     }
 
-    // Execute handler with error boundary
-    try {
-      const result = config.handler(ctx, message);
-      if (result instanceof Promise) {
-        await result;
+    // Skip tracing for high-frequency messages (50/sec movement, aggro ticks)
+    const SKIP_TRACE: Set<number> = new Set([Types.Messages.MOVE, Types.Messages.LOOTMOVE, Types.Messages.AGGRO]);
+    const messageType = Types.getMessageTypeAsString(action) || String(action);
+
+    if (SKIP_TRACE.has(action)) {
+      // Execute without span for hot-path messages
+      try {
+        const result = config.handler(ctx, message);
+        if (result instanceof Promise) {
+          await result;
+        }
+      } catch (error) {
+        log.error(
+          { playerId: ctx.id, action, messageType, error },
+          'Handler error - message dropped'
+        );
       }
-    } catch (error) {
-      log.error(
-        { playerId: ctx.id, action, messageType: Types.getMessageTypeAsString(action), error },
-        'Handler error - message dropped'
-      );
-      // Return true to indicate message was "handled" (rejected due to error)
-      // Don't crash the server on bad message data
+      return true;
     }
 
-    return true;
+    // Execute handler with OTel span
+    const tracer = trace.getTracer('fracture-server');
+    return tracer.startActiveSpan(`player.message.${messageType}`, async (span) => {
+      span.setAttributes({
+        'message.type': messageType,
+        'player.name': ctx.name,
+        'player.id': ctx.id,
+      });
+
+      try {
+        const result = config.handler(ctx, message);
+        if (result instanceof Promise) {
+          await result;
+        }
+      } catch (error) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
+        log.error(
+          { playerId: ctx.id, action, messageType, error },
+          'Handler error - message dropped'
+        );
+      } finally {
+        span.end();
+      }
+
+      return true;
+    });
   }
 
   /**

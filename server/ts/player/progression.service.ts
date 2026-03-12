@@ -5,6 +5,9 @@
 
 import {Formulas} from '../formulas';
 import {Messages} from '../message';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Progression');
 
 export interface ProgressionState {
   level: number;
@@ -68,7 +71,7 @@ export class ProgressionService {
     }
 
     this.xp += amount;
-    console.log(`[XP] ${this.callbacks.getName()} gained ${amount} XP (${this.xp}/${this.xpToNext})`);
+    log.info({ playerName: this.callbacks.getName(), amount, currentXp: this.xp, xpToNext: this.xpToNext }, 'XP gained');
 
     // Send XP gain message to player
     this.callbacks.send(new Messages.XpGain(amount, this.xp, this.xpToNext).serialize());
@@ -93,7 +96,7 @@ export class ProgressionService {
     const bonusHP = Formulas.levelBonusHP(this.level);
     const bonusDamage = Formulas.levelBonusDamage(this.level);
 
-    console.log(`[LevelUp] ${this.callbacks.getName()} reached level ${this.level}! (+${bonusHP} HP, +${bonusDamage} dmg)`);
+    log.info({ playerName: this.callbacks.getName(), oldLevel: this.level - 1, newLevel: this.level, bonusHP, bonusDamage }, 'Level up');
 
     // Update HP with new level bonus
     this.callbacks.updateHitPoints();
@@ -123,7 +126,7 @@ export class ProgressionService {
    */
   grantGold(amount: number): GoldGainResult {
     this.gold += amount;
-    console.log(`[Gold] ${this.callbacks.getName()} gained ${amount} gold (total: ${this.gold})`);
+    log.info({ playerName: this.callbacks.getName(), amount, totalGold: this.gold }, 'Gold gained');
 
     // Send gold gain message to player
     this.callbacks.send(new Messages.GoldGain(amount, this.gold).serialize());

@@ -38,6 +38,9 @@ import * as SkillHandler from './player/skill.handler';
 import * as ProgressionHandler from './player/progression.handler';
 import * as RiftHandler from './player/rift.handler';
 import { PlayerSkillState, createInitialSkillState } from '../../shared/ts/skills';
+import { createModuleLogger } from './utils/logger.js';
+
+const log = createModuleLogger('Player');
 
 export class Player extends Character {
   // Shared message router instance (singleton pattern)
@@ -160,7 +163,7 @@ export class Player extends Character {
           self.message_callback(message);
         }
       } catch (error) {
-        console.error(`[Player] Error handling message from ${self.name}:`, error);
+        log.error({ err: error, playerName: self.name }, 'Error handling message');
       }
     });
 
@@ -516,7 +519,7 @@ export class Player extends Character {
     const result = dailyService.checkDailyReward(storedLastLogin, storedStreak);
 
     if (result.isNewDay) {
-      console.log(`[Daily] Granting ${this.name} day ${result.streak} reward: +${result.gold} gold, +${result.xp} XP`);
+      log.info({ playerName: this.name, day: result.streak, gold: result.gold, xp: result.xp }, 'Granting daily reward');
       this.grantGold(result.gold);
       this.grantXP(result.xp);
       this.checkStreakAchievements(result.streak);
@@ -538,7 +541,7 @@ export class Player extends Character {
         storage.saveDailyData(this.characterId, this.dailyData);
       }
     } else {
-      console.log(`[Daily] ${this.name} already claimed today (streak: ${result.streak})`);
+      log.info({ playerName: this.name, streak: result.streak }, 'Already claimed daily reward today');
     }
 
     // Send daily reward notification for popup

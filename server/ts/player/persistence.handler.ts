@@ -9,6 +9,9 @@ import { getAchievementService } from '../achievements/achievement.service';
 import { IStorageService, PlayerSaveState } from '../storage/storage.interface';
 import { Inventory } from '../inventory/inventory';
 import { ProgressionService } from './progression.service';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Persistence');
 
 /**
  * Daily data loaded from storage
@@ -108,7 +111,7 @@ export function loadFromStorage(ctx: PersistencePlayerContext, storage: IStorage
     lastLogoutTime: state.character.lastLogoutTime || 0
   });
 
-  console.log(`[Storage] Loaded character ${ctx.name} (${ctx.characterId}): Level ${ctx.level}, Gold ${ctx.gold}, Ascension ${state.character.ascensionCount || 0}, Streak ${state.daily?.currentStreak || 0}`);
+  log.info({ characterId: ctx.characterId, playerName: ctx.name, level: ctx.level, gold: ctx.gold, ascension: state.character.ascensionCount || 0, streak: state.daily?.currentStreak || 0 }, 'Loaded character');
 
   return true;
 }
@@ -118,7 +121,7 @@ export function loadFromStorage(ctx: PersistencePlayerContext, storage: IStorage
  */
 export function saveToStorage(ctx: PersistencePlayerContext, storage: IStorageService): void {
   if (!ctx.characterId) {
-    console.warn(`[Storage] Cannot save player ${ctx.name}: No character ID`);
+    log.warn({ playerName: ctx.name }, 'Cannot save player: No character ID');
     return;
   }
 
@@ -151,7 +154,7 @@ export function saveToStorage(ctx: PersistencePlayerContext, storage: IStorageSe
   };
 
   storage.savePlayerState(state);
-  console.log(`[Storage] Saved character ${ctx.name} (${ctx.characterId})`);
+  log.info({ characterId: ctx.characterId, playerName: ctx.name, level: ctx.level, xp: ctx.xp, gold: ctx.gold }, 'Saved character');
 }
 
 /**

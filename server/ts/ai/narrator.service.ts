@@ -7,6 +7,9 @@ import { VeniceClient } from './venice-client';
 import { ProfileService } from './profile.service';
 import { PlayerProfile } from './types';
 import { FishAudioService, getFishAudioService } from './fish-audio.service';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('Narrator');
 
 export interface NarrationResult {
   text: string;
@@ -203,17 +206,17 @@ ${dimensionStyle ? `Try to incorporate the dimension's aesthetic and vocabulary 
           const ttsResult = await fishAudio.narratorSpeech(text, ttsStyle);
           if (ttsResult) {
             audioUrl = ttsResult.audioUrl;
-            console.log(`[Narrator] TTS generated: ${audioUrl}`);
+            log.info({ audioUrl }, 'TTS generated');
           }
         } catch (ttsError) {
-          console.warn('[Narrator] TTS generation failed:', ttsError);
+          log.warn({ err: ttsError }, 'TTS generation failed');
           // Continue without audio - TTS is optional
         }
       }
 
       return { text, style, audioUrl };
     } catch (error) {
-      console.error('Venice narrator error:', error);
+      log.error({ err: error }, 'Venice narrator error');
       return null;
     }
   }

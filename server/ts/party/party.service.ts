@@ -4,6 +4,9 @@
  */
 
 import { Party, PartyMember } from './party';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('PartyService');
 
 interface PendingInvite {
   inviterId: number;
@@ -107,7 +110,7 @@ export class PartyService {
     // Send invite notification to target
     targetPlayer.send([55, inviter.id, inviter.name]); // PARTY_INVITE_RECEIVED
 
-    console.log(`[PartyService] ${inviter.name} invited player ${targetId} to party`);
+    log.info({ inviterName: inviter.name, targetId }, 'Player invited to party');
     return null;
   }
 
@@ -166,7 +169,7 @@ export class PartyService {
     party.updateMemberPosition(accepter.id, accepter.gridX, accepter.gridY);
     this.playerToParty.set(accepter.id, party.id);
 
-    console.log(`[PartyService] ${accepter.name} joined party ${party.id}`);
+    log.info({ playerName: accepter.name, partyId: party.id }, 'Player joined party');
     return party;
   }
 
@@ -176,7 +179,7 @@ export class PartyService {
   declineInvite(declinerId: number, inviterId: number): void {
     const inviteKey = `${inviterId}_${declinerId}`;
     this.pendingInvites.delete(inviteKey);
-    console.log(`[PartyService] Player ${declinerId} declined invite from ${inviterId}`);
+    log.info({ declinerId, inviterId }, 'Player declined party invite');
   }
 
   /**
@@ -201,11 +204,11 @@ export class PartyService {
         this.playerToParty.delete(lastMemberId);
       }
       this.parties.delete(party.id);
-      console.log(`[PartyService] Party ${party.id} disbanded`);
+      log.info({ partyId: party.id }, 'Party disbanded');
       return { party, newLeaderId: null, disbanded: true };
     }
 
-    console.log(`[PartyService] Player ${playerId} left party ${party.id}, new leader: ${newLeaderId}`);
+    log.info({ playerId, partyId: party.id, newLeaderId }, 'Player left party');
     return { party, newLeaderId: wasLeader ? newLeaderId : null, disbanded: false };
   }
 
@@ -233,7 +236,7 @@ export class PartyService {
     party.removeMember(targetId);
     this.playerToParty.delete(targetId);
 
-    console.log(`[PartyService] Player ${targetId} was kicked from party ${party.id}`);
+    log.info({ targetId, partyId: party.id }, 'Player kicked from party');
     return { party, success: true };
   }
 

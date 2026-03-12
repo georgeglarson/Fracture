@@ -12,6 +12,9 @@
 
 import { LegendaryEffect, getLegendaryByKind } from '../../../shared/ts/items/legendary-data';
 import { Types } from '../../../shared/ts/gametypes';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('LegendaryEffects');
 
 /**
  * Player legendary state tracking
@@ -145,7 +148,7 @@ export function recordSoulHarvestKill(playerId: number, weaponKind: number): num
 
   if (state.soulHarvestStacks < maxStacks) {
     state.soulHarvestStacks++;
-    console.log(`[Legendary] ${playerId} Soul Harvest: ${state.soulHarvestStacks} stacks (+${state.soulHarvestStacks * 2}% HP)`);
+    log.info({ playerId, stacks: state.soulHarvestStacks, hpBonus: state.soulHarvestStacks * 2 }, 'Soul Harvest stack gained');
   }
 
   return 1 + (state.soulHarvestStacks * 0.02);
@@ -165,7 +168,7 @@ export function getSoulHarvestMultiplier(playerId: number): number {
 export function resetSoulHarvestStacks(playerId: number): void {
   const state = getState(playerId);
   if (state.soulHarvestStacks > 0) {
-    console.log(`[Legendary] ${playerId} Soul Harvest reset (was ${state.soulHarvestStacks} stacks)`);
+    log.info({ playerId, previousStacks: state.soulHarvestStacks }, 'Soul Harvest stacks reset');
     state.soulHarvestStacks = 0;
   }
 }
