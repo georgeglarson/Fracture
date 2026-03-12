@@ -1,0 +1,640 @@
+{
+  "uid": "fracture-ops",
+  "title": "Fracture Server Operations",
+  "description": "Production observability for the Fracture game server — traces, logs, and performance metrics via OpenTelemetry",
+  "tags": ["fracture", "production", "otel"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "fiscalYearStartMonth": 0,
+  "liveNow": true,
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 2,
+      "title": "Traces (1h)",
+      "description": "Total distributed trace spans collected in the last hour",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "green", "value": 500 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT count() as traces FROM signoz_traces.signoz_index_v3 WHERE timestamp >= now() - INTERVAL 1 HOUR",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Error Rate",
+      "description": "Percentage of spans with errors in the last hour",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT round(countIf(has_error = true) * 100.0 / count(), 2) as error_rate FROM signoz_traces.signoz_index_v3 WHERE timestamp >= now() - INTERVAL 1 HOUR",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Median Latency",
+      "description": "P50 span duration across all operations",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 200 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT round(quantile(0.50)(duration_nano) / 1000000, 1) as p50_ms FROM signoz_traces.signoz_index_v3 WHERE timestamp >= now() - INTERVAL 1 HOUR",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Log Events (1h)",
+      "description": "Structured log records shipped via OpenTelemetry",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "green", "value": 50 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT count() as logs FROM signoz_logs.logs_v2 WHERE toDateTime(timestamp / 1000000000) >= now() - INTERVAL 1 HOUR",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Operations Tracked",
+      "description": "Distinct instrumented span types (message routing, storage, AI, aggro)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT uniq(name) as operations FROM signoz_traces.signoz_index_v3 WHERE timestamp >= now() - INTERVAL 1 HOUR",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Uptime",
+      "description": "Time since the oldest trace in the current session",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dtdurations",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT dateDiff('second', min(timestamp), now()) as uptime_seconds FROM signoz_traces.signoz_index_v3",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Performance",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 11,
+      "title": "Game Loop \u2014 Aggro Tick Latency",
+      "description": "Latency percentiles for the aggro evaluation tick (fires every 500ms, evaluates all mob-player distances)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 6 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 3,
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "spanNulls": true
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "P99" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "P95" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "P50" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT toStartOfInterval(timestamp, INTERVAL 1 MINUTE) as time, round(quantile(0.50)(duration_nano) / 1000000, 2) as P50, round(quantile(0.95)(duration_nano) / 1000000, 2) as P95, round(quantile(0.99)(duration_nano) / 1000000, 2) as P99 FROM signoz_traces.signoz_index_v3 WHERE name = 'game.aggro_tick' AND $__timeFilter(timestamp) GROUP BY time ORDER BY time",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 2
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "AI \u2014 Venice LLM Response Time",
+      "description": "Latency for Venice AI (llama-3.3-70b) NPC dialogue generation",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 6 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "lineWidth": 2,
+            "showPoints": "always",
+            "spanNulls": true
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Max" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Avg" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT toStartOfInterval(timestamp, INTERVAL 5 MINUTE) as time, round(avg(duration_nano) / 1000000, 0) as Avg, round(max(duration_nano) / 1000000, 0) as Max FROM signoz_traces.signoz_index_v3 WHERE name = 'ai.venice' AND $__timeFilter(timestamp) GROUP BY time ORDER BY time",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 2
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Persistence \u2014 Storage Operation Latency",
+      "description": "SQLite save/load operation latency (saveCharacter, loadPlayerState, savePlayerState)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 6 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "mode": "none" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT toStartOfInterval(timestamp, INTERVAL 1 MINUTE) as time, name as operation, round(avg(duration_nano) / 1000000, 2) as latency_ms FROM signoz_traces.signoz_index_v3 WHERE name LIKE 'storage.%' AND $__timeFilter(timestamp) GROUP BY time, operation ORDER BY time",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 2
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "title": "Activity",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 21,
+      "title": "Span Volume by Operation",
+      "description": "Trace span throughput grouped by instrumented operation",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 0,
+            "showPoints": "never",
+            "stacking": { "mode": "normal" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT toStartOfInterval(timestamp, INTERVAL 1 MINUTE) as time, multiIf(name LIKE 'player.message.%', 'message routing', name LIKE 'storage.%', 'persistence', name LIKE 'ai.%', 'AI calls', name = 'game.aggro_tick', 'aggro tick', name LIKE 'GET%' OR name LIKE 'POST%', 'HTTP', name) as operation, count() as spans FROM signoz_traces.signoz_index_v3 WHERE $__timeFilter(timestamp) GROUP BY time, operation ORDER BY time",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 2
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "title": "Log Volume by Severity",
+      "description": "Structured log throughput grouped by severity level (info, warn, error)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 0,
+            "showPoints": "never",
+            "stacking": { "mode": "normal" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "error" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "warn" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "info" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT toStartOfInterval(toDateTime(timestamp / 1000000000), INTERVAL 1 MINUTE) as time, severity_text as severity, count() as logs FROM signoz_logs.logs_v2 WHERE toDateTime(timestamp / 1000000000) >= $__fromTime AND toDateTime(timestamp / 1000000000) <= $__toTime GROUP BY time, severity ORDER BY time",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 2
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "title": "Logs",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 31,
+      "title": "Recent Log Events",
+      "description": "Latest structured log records from all server modules",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "severity" },
+            "properties": [
+              { "id": "custom.width", "value": 60 },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "error": { "color": "red", "text": "ERROR" }, "warn": { "color": "yellow", "text": "WARN" }, "info": { "color": "green", "text": "INFO" }, "debug": { "color": "blue", "text": "DEBUG" } } }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "module" },
+            "properties": [{ "id": "custom.width", "value": 140 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "time" },
+            "properties": [{ "id": "custom.width", "value": 180 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "message" },
+            "properties": [{ "id": "custom.width", "value": 500 }]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "time", "desc": true }],
+        "footer": { "show": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT toDateTime(timestamp / 1000000000) as time, severity_text as severity, attributes_string['module'] as module, body as message FROM signoz_logs.logs_v2 WHERE toDateTime(timestamp / 1000000000) >= $__fromTime AND toDateTime(timestamp / 1000000000) <= $__toTime ORDER BY timestamp DESC LIMIT 100",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "title": "Traces",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 41,
+      "title": "Slowest Operations (last hour)",
+      "description": "Top operations by P99 latency — identifies performance bottlenecks",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 33 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "operation" },
+            "properties": [{ "id": "custom.width", "value": 200 }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*_ms" },
+            "properties": [{ "id": "unit", "value": "ms" }, { "id": "decimals", "value": 1 }]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "p99_ms", "desc": true }],
+        "footer": { "show": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT name as operation, count() as spans, round(avg(duration_nano) / 1000000, 1) as avg_ms, round(quantile(0.95)(duration_nano) / 1000000, 1) as p95_ms, round(quantile(0.99)(duration_nano) / 1000000, 1) as p99_ms FROM signoz_traces.signoz_index_v3 WHERE timestamp >= now() - INTERVAL 1 HOUR GROUP BY name ORDER BY p99_ms DESC LIMIT 10",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "title": "Error Spans (last hour)",
+      "description": "Spans that recorded errors — empty table means zero errors",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 33 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "time" },
+            "properties": [{ "id": "custom.width", "value": 180 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "operation" },
+            "properties": [{ "id": "custom.width", "value": 200 }]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "time", "desc": true }],
+        "footer": { "show": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT timestamp as time, name as operation, status_message as error, round(duration_nano / 1000000, 1) as duration_ms FROM signoz_traces.signoz_index_v3 WHERE has_error = true AND timestamp >= now() - INTERVAL 1 HOUR ORDER BY timestamp DESC LIMIT 20",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

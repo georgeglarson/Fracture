@@ -5,7 +5,8 @@
 ##
 ## Start:  docker compose -f docker-compose.signoz.yml up -d
 ## Stop:   docker compose -f docker-compose.signoz.yml down
-## UI:     http://localhost:3301 (proxied via nginx with basic auth)
+## UI:     http://localhost:3301 (SigNoz, proxied via nginx)
+## Grafana: http://localhost:3302 (public dashboards, proxied via nginx)
 ##
 
 x-common: &common
@@ -166,10 +167,44 @@ services:
       - "4317:4317"   # gRPC OTLP
       - "4318:4318"   # HTTP OTLP (used by fracture-server)
 
+  grafana:
+    <<: *common
+    image: grafana/grafana:11.6.0
+    container_name: fracture-grafana
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    ports:
+      - "3302:3000"
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+    environment:
+      # Public anonymous read-only access
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      # Disable login UI for public visitors
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      - GF_AUTH_BASIC_ENABLED=true
+      # ClickHouse plugin
+      - GF_INSTALL_PLUGINS=grafana-clickhouse-datasource
+      # Branding
+      - GF_SERVER_ROOT_URL=https://fracture-grafana.georgelarson.me
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
 volumes:
   signoz-clickhouse:
     driver: local
   signoz-sqlite:
     driver: local
   signoz-zookeeper:
+    driver: local
+  grafana-data:
     driver: local
