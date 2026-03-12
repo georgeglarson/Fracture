@@ -68,6 +68,36 @@ const transport = isDev
 export const logger = pino({
   ...baseConfig,
   transport,
+  hooks: {
+    // Intercept log calls to forward to debug TUI
+    logMethod(inputArgs: any[], method: pino.LogFn, level: number) {
+      // Fire debug hook if connected
+      if (debugLogHook) {
+        try {
+          const levelMap: Record<number, string> = { 10: 'trace', 20: 'debug', 30: 'info', 40: 'warn', 50: 'error', 60: 'fatal' };
+          const levelName = levelMap[level] || 'info';
+          let msg = '';
+          let data: Record<string, unknown> = {};
+          let mod = '';
+
+          for (const arg of inputArgs) {
+            if (typeof arg === 'string') msg = arg;
+            else if (typeof arg === 'object' && arg !== null) {
+              data = { ...data, ...arg };
+            }
+          }
+          // Extract module from merged bindings (child logger context)
+          if ((this as any)?.module) mod = (this as any).module;
+          if (data.module) { mod = data.module as string; delete data.module; }
+
+          debugLogHook({ time: Date.now(), level: levelName, module: mod, msg, data });
+        } catch {
+          // Never break logging for debug
+        }
+      }
+      method.apply(this, inputArgs as Parameters<pino.LogFn>);
+    },
+  },
 });
 
 
@@ -114,6 +144,19 @@ export const log = {
   error: logger.error.bind(logger),
   fatal: logger.fatal.bind(logger),
 };
+
+// Debug TUI log hook — lazily connected so the debug server module is optional
+let debugLogHook: ((entry: any) => void) | null = null;
+
+export function setDebugLogHook(hook: (entry: any) => void): void {
+  debugLogHook = hook;
+}
+
+export function emitDebugLog(level: string, module: string, msg: string, data: Record<string, unknown> = {}): void {
+  if (debugLogHook) {
+    debugLogHook({ time: Date.now(), level, module, msg, data });
+  }
+}
 
 // Export types for consumers
 export type Logger = pino.Logger;

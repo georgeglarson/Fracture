@@ -210,6 +210,13 @@ function main(config: ServerConfig): void {
         return JSON.stringify(getWorldDistribution(worlds));
     });
 
+    // Start debug TUI server unless disabled
+    if (!process.env.NO_DEBUG) {
+        const { startDebugServer } = require('./debug/debug-server');
+        const debugPort = parseInt(process.env.DEBUG_PORT || '8001', 10);
+        startDebugServer(worlds[0], debugPort);
+    }
+
     if(config.metrics_enabled) {
         metrics!.ready(function() {
             onPopulationChange(); // initialize all counters to 0 when the server starts
