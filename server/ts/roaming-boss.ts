@@ -38,6 +38,7 @@ interface BossWorld {
 interface PlayerLike {
   id: number;
   name: string;
+  level: number;
   x: number;
   y: number;
   isDead: boolean;
@@ -291,7 +292,7 @@ export class RoamingBoss extends Mob {
         mobZoneId: this.zoneId,
         playerX: player.x,
         playerY: player.y,
-        playerLevel: (player as any).level ?? 1,
+        playerLevel: player.level ?? 1,
         distance,
         currentAggroOnPlayer: combatTracker.getPlayerAggroCount(player.id),
       });

@@ -70,7 +70,7 @@ export class FormatChecker {
   }
 
   check(msg: unknown[]): boolean {
-    var message = msg.slice(0),
+    const message = msg.slice(0),
       type = message[0] as number,
       format = this.formats[type];
 
@@ -80,7 +80,7 @@ export class FormatChecker {
       if (message.length !== format.length) {
         return false;
       }
-      for (var i = 0, n = message.length; i < n; i += 1) {
+      for (let i = 0, n = message.length; i < n; i += 1) {
         if (format[i] === 'n' && typeof message[i] !== 'number') {
           return false;
         }

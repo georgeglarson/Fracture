@@ -87,7 +87,8 @@ export const logger = pino({
             }
           }
           // Extract module from merged bindings (child logger context)
-          if ((this as any)?.module) mod = (this as any).module;
+          const loggerCtx = this as { module?: string };
+          if (loggerCtx.module) mod = loggerCtx.module;
           if (data.module) { mod = data.module as string; delete data.module; }
 
           debugLogHook({ time: Date.now(), level: levelName, module: mod, msg, data });

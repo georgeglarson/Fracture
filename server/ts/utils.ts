@@ -49,7 +49,8 @@ export class Utils {
   }
 
   static randomOrientation(): number {
-    var o: number = Types.Orientations.DOWN, r = Utils.random(4);
+    let o: number = Types.Orientations.DOWN;
+    const r = Utils.random(4);
 
     if (r === 0)
       o = Types.Orientations.LEFT;
@@ -65,7 +66,7 @@ export class Utils {
 
   static Mixin(target: Record<string, any>, source: Record<string, any>): Record<string, any> {
     if (source) {
-      for (var key, keys = Object.keys(source), l = keys.length; l--;) {
+      for (let key, keys = Object.keys(source), l = keys.length; l--;) {
         key = keys[l];
 
         if (source.hasOwnProperty(key)) {
@@ -77,8 +78,8 @@ export class Utils {
   }
 
   static distanceTo(x: number, y: number, x2: number, y2: number): number {
-    var distX = Math.abs(x - x2);
-    var distY = Math.abs(y - y2);
+    const distX = Math.abs(x - x2);
+    const distY = Math.abs(y - y2);
 
     return (distX > distY) ? distX : distY;
   }

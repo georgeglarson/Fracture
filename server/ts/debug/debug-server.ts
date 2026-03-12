@@ -121,7 +121,8 @@ function getZoneName(x: number, y: number, zoneManager: any): string {
   try {
     const zone = zoneManager.getZoneAt(x, y);
     return zone?.id || '?';
-  } catch {
+  } catch (err) {
+    log.debug({ err }, 'Zone name lookup failed');
     return '?';
   }
 }
@@ -187,12 +188,12 @@ function buildSnapshot(world: any): DebugSnapshot {
   if (world.spatialManager) {
     const allGroups = world.spatialManager.groups || {};
     for (const [gid, group] of Object.entries(allGroups)) {
-      const g = group as any;
+      const g = group as { entities?: Record<string | number, { name?: string }> };
       const entities = g.entities ? Object.values(g.entities) : [];
       let pc = 0;
       let mc = 0;
       for (const e of entities) {
-        if ((e as any).name !== undefined) pc++;
+        if (e.name !== undefined) pc++;
         else mc++;
       }
       if (pc > 0 || mc > 0) {
@@ -239,7 +240,7 @@ export function startDebugServer(world: any, port = 8001): WebSocketServer {
   let snapshotInterval: ReturnType<typeof setInterval> | null = null;
 
   wss.on('connection', (ws) => {
-    log.info({ port, clients: wss!.clients.size }, 'Debug client connected');
+    log.info({ port, clients: wss?.clients.size ?? 0 }, 'Debug client connected');
 
     // Send initial snapshot immediately
     try {
@@ -263,7 +264,7 @@ export function startDebugServer(world: any, port = 8001): WebSocketServer {
     });
 
     ws.on('close', () => {
-      log.info({ clients: wss!.clients.size }, 'Debug client disconnected');
+      log.info({ clients: wss?.clients.size ?? 0 }, 'Debug client disconnected');
     });
   });
 
@@ -280,6 +281,7 @@ export function startDebugServer(world: any, port = 8001): WebSocketServer {
       });
     } catch (e) {
       // Don't crash the game server for debug failures
+      log.debug({ err: e }, 'Debug snapshot broadcast failed');
     }
   }, 500);
 

@@ -989,7 +989,7 @@ describe('Item (entity class)', () => {
     expect(item.isFromChest).toBe(false);
     expect(item.blinkTimeout).toBeNull();
     expect(item.despawnTimeout).toBeNull();
-    expect(item.respawn_callback).toBeNull();
+    expect(item.respawnCallback).toBeNull();
   });
 
   it('should allow setting isStatic and isFromChest', () => {
@@ -1166,7 +1166,7 @@ describe('Item (entity class)', () => {
       const item = new Item(1, FLASK, 0, 0);
       const cb = vi.fn();
       item.onRespawn(cb);
-      expect(item.respawn_callback).toBe(cb);
+      expect(item.respawnCallback).toBe(cb);
     });
 
     it('should overwrite a previous callback', () => {
@@ -1175,7 +1175,7 @@ describe('Item (entity class)', () => {
       const cb2 = vi.fn();
       item.onRespawn(cb1);
       item.onRespawn(cb2);
-      expect(item.respawn_callback).toBe(cb2);
+      expect(item.respawnCallback).toBe(cb2);
     });
   });
 

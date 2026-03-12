@@ -20,6 +20,11 @@ export interface VeniceClientOptions {
   timeout?: number;
 }
 
+interface VeniceResponse {
+  choices?: Array<{ message?: { content?: string } }>;
+  usage?: { total_tokens?: number };
+}
+
 // ─── Error Classification ────────────────────────────────────
 
 type ErrorCategory = 'timeout' | 'auth' | 'rate_limit' | 'server_error' | 'network' | 'unknown';
@@ -211,8 +216,8 @@ export class VeniceClient {
 
     this.circuitBreaker = new CircuitBreaker({
       failureThreshold: 5,
-      recoveryTimeMs: 30_000,
-      halfOpenMaxAttempts: 2,
+      recoveryTimeMs: 10_000,
+      halfOpenMaxAttempts: 3,
     });
 
     log.info({ model: this.model, timeout: this.timeout }, 'Venice client initialized');
@@ -274,9 +279,10 @@ export class VeniceClient {
             'ai.success': true,
           });
 
-          const content = (response as any)?.choices?.[0]?.message?.content;
+          const result = response as VeniceResponse;
+          const content = result?.choices?.[0]?.message?.content;
           if (content) {
-            const tokens = (response as any)?.usage?.total_tokens;
+            const tokens = result?.usage?.total_tokens;
             if (tokens) span.setAttribute('ai.total_tokens', tokens);
 
             span.end();
@@ -369,7 +375,7 @@ export class VeniceClient {
       ]);
 
       const latencyMs = Date.now() - start;
-      const hasContent = !!(response as any)?.choices?.[0]?.message?.content;
+      const hasContent = !!(response as VeniceResponse)?.choices?.[0]?.message?.content;
       return {
         ok: hasContent,
         latencyMs,

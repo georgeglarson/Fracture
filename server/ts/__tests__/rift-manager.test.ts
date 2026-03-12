@@ -264,8 +264,9 @@ describe('RiftManager', () => {
       expect(result).not.toBeNull();
       expect(result!.run.isComplete).toBe(true);
       expect(result!.run.completedDepth).toBe(1);
-      expect(result!.finalRewards.xp).toBe(1 * 100 + result!.run.killCount * 5);
-      expect(result!.finalRewards.gold).toBe(1 * 50 + result!.run.killCount * 2);
+      // Exponential: xp = floor(1.5^depth * 50) + kills*5, gold = floor(1.5^depth * 25) + kills*2
+      expect(result!.finalRewards.xp).toBe(Math.floor(Math.pow(1.5, 1) * 50) + result!.run.killCount * 5);
+      expect(result!.finalRewards.gold).toBe(Math.floor(Math.pow(1.5, 1) * 25) + result!.run.killCount * 2);
     });
 
     it('should remove the run from active runs', () => {
@@ -288,9 +289,9 @@ describe('RiftManager', () => {
       mgr.recordKill(PLAYER_ID, 101);
 
       const result = mgr.endRun(PLAYER_ID, 'exit');
-      // completedDepth=0, killCount=2
-      expect(result!.finalRewards.xp).toBe(0 * 100 + 2 * 5);
-      expect(result!.finalRewards.gold).toBe(0 * 50 + 2 * 2);
+      // completedDepth=0, killCount=2 — exponential formula
+      expect(result!.finalRewards.xp).toBe(Math.floor(Math.pow(1.5, 0) * 50) + 2 * 5);
+      expect(result!.finalRewards.gold).toBe(Math.floor(Math.pow(1.5, 0) * 25) + 2 * 2);
     });
 
     it('should not update leaderboard if completedDepth is 0', () => {
@@ -718,8 +719,9 @@ describe('RiftManager', () => {
       const result = mgr.endRun(1, 'death');
       const totalKills = getRequiredKills(1) + getRequiredKills(2);
 
-      expect(result!.finalRewards.xp).toBe(2 * 100 + totalKills * 5);
-      expect(result!.finalRewards.gold).toBe(2 * 50 + totalKills * 2);
+      // Exponential rewards: floor(1.5^depth * 50) + kills*5
+      expect(result!.finalRewards.xp).toBe(Math.floor(Math.pow(1.5, 2) * 50) + totalKills * 5);
+      expect(result!.finalRewards.gold).toBe(Math.floor(Math.pow(1.5, 2) * 25) + totalKills * 2);
     });
   });
 

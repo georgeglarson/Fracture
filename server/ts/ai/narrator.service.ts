@@ -7,6 +7,7 @@ import { VeniceClient } from './venice-client';
 import { ProfileService } from './profile.service';
 import { PlayerProfile } from './types';
 import { FishAudioService, getFishAudioService } from './fish-audio.service';
+import { sanitizeForPrompt } from './prompt-utils';
 import { createModuleLogger } from '../utils/logger.js';
 
 const log = createModuleLogger('Narrator');
@@ -178,7 +179,7 @@ ${dimensionContext}
 EVENT: ${eventContext}
 
 PLAYER STATS:
-- Name: ${playerName}
+- Name: ${sanitizeForPrompt(playerName)}
 - Total Kills: ${profile.totalKills}
 - Deaths: ${profile.deaths}
 - Areas Explored: ${profile.areas.length > 0 ? profile.areas.join(', ') : 'Just starting'}

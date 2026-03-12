@@ -31,6 +31,7 @@ export interface SkillPlayerContext {
   level: number;
   weapon: number;
   armor: number;
+  weaponLevel: number;
   hitPoints: number;
   maxHitPoints: number;
 
@@ -47,6 +48,14 @@ export interface SkillPlayerContext {
   getWorld: () => {
     isValidPosition: (x: number, y: number) => boolean;
     forEachMob: (callback: (mob: any) => void) => void;
+    handleMobHate: (mobId: number, playerId: number, damage: number) => void;
+    handleHurtEntity: (entity: any, attacker: any, damage: number) => void;
+    getEntityById: (id: number) => any;
+  };
+
+  getCombatTracker: () => {
+    getMobsAttacking: (playerId: number) => number[];
+    clearPlayerAggro: (playerId: number) => void;
   };
 
   // Combat reference for damage calculation
@@ -184,22 +193,27 @@ function executePhaseShift(ctx: SkillPlayerContext, duration: number): boolean {
   skillState.phaseShiftExpires = expires;
   ctx.setPhaseShift(true, expires);
 
-  // Make all mobs completely forget this player
-  // This removes them from hate lists and makes mobs return to spawn if no other targets
-  ctx.getWorld().forEachMob((mob: any) => {
-    // Clear target if mob was actively targeting this player
-    if (mob.target === ctx.id) {
+  // Only clear aggro from mobs actually attacking this player (via CombatTracker)
+  const tracker = ctx.getCombatTracker();
+  const world = ctx.getWorld();
+  const attackingMobIds = tracker.getMobsAttacking(ctx.id);
+
+  for (const mobId of attackingMobIds) {
+    const mob = world.getEntityById(mobId);
+    if (mob) {
       if (mob.clearTarget) {
         mob.clearTarget();
       }
+      if (mob.forgetPlayer) {
+        mob.forgetPlayer(ctx.id);
+      }
     }
-    // Remove from aggro/hate tracking
-    if (mob.forgetPlayer) {
-      mob.forgetPlayer(ctx.id);
-    }
-  });
+  }
 
-  log.info({ player: ctx.name, durationMs: duration }, 'Activated Phase Shift');
+  // Clear all aggro relationships for this player
+  tracker.clearPlayerAggro(ctx.id);
+
+  log.info({ player: ctx.name, durationMs: duration, clearedMobs: attackingMobIds.length }, 'Activated Phase Shift');
   return true;
 }
 
@@ -257,21 +271,23 @@ function executeWarCry(ctx: SkillPlayerContext, radius: number, stunDuration: nu
 function executeWhirlwind(ctx: SkillPlayerContext, radius: number, damagePercent: number): boolean {
   const weaponDmg = ctx.getWeaponDamage();
 
-  // Calculate damage as percentage of weapon average
+  // Use Formulas-style level bonus: base from weapon avg, scaled by damagePercent
   const avgDamage = (weaponDmg.min + weaponDmg.max) / 2;
-  const damage = Math.floor(avgDamage * (damagePercent / 100));
+  const levelBonus = ctx.weaponLevel + ctx.level;
+  const baseDamage = avgDamage + levelBonus;
+  const damage = Math.floor(baseDamage * (damagePercent / 100));
 
   let hitCount = 0;
+  const world = ctx.getWorld();
 
-  ctx.getWorld().forEachMob((mob: any) => {
+  world.forEachMob((mob: any) => {
     const dist = getDistance(ctx.x, ctx.y, mob.x, mob.y);
     if (dist <= radius && !mob.isDead) {
-      // Deal damage directly
-      mob.receiveDamage(damage);
+      mob.receiveDamage(damage, ctx.id);
+      world.handleMobHate(mob.id, ctx.id, damage);
+      world.handleHurtEntity(mob, ctx, damage);
       hitCount++;
 
-      // Send damage feedback to the player who used the skill
-      // Using ctx.send() since broadcastToZone requires serialize()
       ctx.send([Types.Messages.DAMAGE, mob.id, damage]);
     }
   });

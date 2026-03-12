@@ -139,8 +139,8 @@ export function saveToStorage(ctx: PersistencePlayerContext, storage: IStorageSe
       weaponKind: ctx.weapon || null,
       x: ctx.x,
       y: ctx.y,
-      ascensionCount: (ctx as any).ascensionCount || 0,
-      restedXp: (ctx as any).restedXp || 0,
+      ascensionCount: ctx.ascensionCount || 0,
+      restedXp: ctx.restedXp || 0,
       lastLogoutTime: Date.now()
     },
     inventory: ctx.getInventory().getSerializedSlots(),
@@ -179,8 +179,8 @@ export function getSaveState(ctx: PersistencePlayerContext): PlayerSaveState | n
       weaponKind: ctx.weapon || null,
       x: ctx.x,
       y: ctx.y,
-      ascensionCount: (ctx as any).ascensionCount || 0,
-      restedXp: (ctx as any).restedXp || 0,
+      ascensionCount: ctx.ascensionCount || 0,
+      restedXp: ctx.restedXp || 0,
       lastLogoutTime: Date.now()
     },
     inventory: ctx.getInventory().getSerializedSlots(),

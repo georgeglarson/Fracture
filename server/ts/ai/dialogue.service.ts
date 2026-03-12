@@ -7,6 +7,7 @@ import { VeniceClient } from './venice-client';
 import { ProfileService } from './profile.service';
 import { ConversationExchange, PlayerProfile } from './types';
 import { NPC_PERSONALITIES } from './npc-personalities';
+import { sanitizeForPrompt } from './prompt-utils';
 import { createModuleLogger } from '../utils/logger.js';
 
 const log = createModuleLogger('Dialogue');
@@ -60,7 +61,7 @@ RULES:
 - Reference past conversations if relevant
 - Acknowledge player achievements naturally
 
-The player "${playerName}" approaches. Respond in character:`;
+The player "${sanitizeForPrompt(playerName)}" approaches. Respond in character:`;
 
     try {
       const response = await this.client.call(prompt);

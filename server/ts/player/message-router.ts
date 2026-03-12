@@ -18,117 +18,25 @@ import { trace, SpanStatusCode } from '@opentelemetry/api';
 import * as VeniceHandler from './venice.handler';
 import * as PartyHandler from './party.handler';
 import * as InventoryHandler from './inventory.handler';
+import { persistInventory } from './inventory.handler';
 import * as AchievementHandler from './achievement.handler';
 import * as ShopHandler from './shop.handler';
 import * as EquipmentHandler from './equipment.handler';
 import * as SkillHandler from './skill.handler';
-import { MELEE_RANGE } from '../combat/combat-constants.js';
+import * as AuthHandler from './auth.handler';
+import * as CombatHandler from './combat.handler';
+import * as LootHandler from './loot.handler';
+import type { Player } from '../player'; // Type-only import — no circular runtime dependency
 
 const log = createModuleLogger('MessageRouter');
 
-/**
- * Interface for a message handler context
- * Provides access to player state and dependencies
- */
-export interface MessageHandlerContext {
-  // Player identity
-  id: number;
-  name: string;
-  kind: number;
-  clientIp: string;
-
-  // Player state
-  hasEnteredGame: boolean;
-  isDead: boolean;
-  spawnProtectionUntil: number;
-  hitPoints: number;
-  maxHitPoints: number;
-  x: number;
-  y: number;
-  orientation: number;
-
-  // Progression
-  level: number;
-  xp: number;
-  gold: number;
-
-  // Equipment (kind numbers)
-  weapon: number;
-  armor: number;
-  weaponLevel: number;
-  armorLevel: number;
-
-  // Checkpoints
-  lastCheckpoint: { id: number; x: number; y: number } | null;
-
-  // World reference
-  world: any;
-
-  // Communication
-  send(message: any): void;
-  broadcast(message: any, ignoreSelf?: boolean): void;
-  broadcastToZone(message: any, ignoreSelf?: boolean): void;
-
-  // State modification
-  setPosition(x: number, y: number): void;
-  clearTarget(): void;
-  setTarget(target: any): void;
-  resetHitPoints(hp: number): void;
-  regenHealthBy(amount: number): void;
-  hasFullHealth(): boolean;
-  health(): any;
-  updateHitPoints(): void;
-
-  // Equipment
-  equipArmor(kind: number): void;
-  equipWeapon(kind: number): void;
-  equipItem(item: any): void;
-  equip(kind: number): any;
-
-  // Progression
-  grantXP(amount: number): void;
-  grantGold(amount: number): void;
-  setGold(gold: number): void;
-
-  // Zone & position
-  checkZoneChange(x: number, y: number): void;
-  updatePosition(): void;
-
-  // Progression system (complex state logic, stays on Player)
-  initProgressionSystem(): void;
-  handleAscendRequest(): void;
-
-  // Daily reward (complex state logic, stays on Player)
-  handleDailyCheck(lastLoginDate: string | null, currentStreak: number): void;
-
-  // Fracture Rift system (complex context building, stays on Player)
-  handleRiftEnter(): void;
-  handleRiftExit(): void;
-  handleRiftLeaderboardRequest(): void;
-
-  // Callbacks
-  zone_callback?: () => void;
-  move_callback?: (x: number, y: number) => void;
-  lootmove_callback?: (x: number, y: number) => void;
-  message_callback?: (message: any[]) => void;
-
-  // Storage persistence
-  characterId: string | null;
-  loadFromStorage(storage: any): boolean;
-  saveToStorage(storage: any): void;
-
-  // Timeouts
-  firepotionTimeout: NodeJS.Timeout | null;
-
-  // Skill state checks
-  isPhased(): boolean;
-  consumePowerStrike(): number;
-}
+/** Maximum tiles a player can move in one MOVE message (prevents speed hacks) */
+const MAX_MOVE_DISTANCE = 3;
 
 /**
  * Message handler function type
  */
-export type MessageHandler = (ctx: MessageHandlerContext, message: any[]) => void | Promise<void>;
+export type MessageHandler = (player: Player, message: any[]) => void | Promise<void>;
 
 /**
  * Rate limit type for a handler
@@ -146,20 +54,6 @@ interface HandlerConfig {
 }
 
 /**
- * Persist inventory to storage (called after inventory mutations)
- */
-function persistInventory(ctx: MessageHandlerContext): void {
-  if (!ctx.characterId) return;
-  try {
-    const storage = ctx.world.getStorageService();
-    const inventory = (ctx as any).getInventory();
-    storage.saveInventory(ctx.characterId, inventory.getSerializedSlots());
-  } catch (e) {
-    log.error({ err: e, playerId: ctx.id }, 'Failed to persist inventory');
-  }
-}
-
-/**
  * Creates the message handler registry
  * Maps message types to their handlers
  */
@@ -173,145 +67,60 @@ export function createMessageHandlers(
 
   // HELLO - Initial handshake (special case, allowed before game entry)
   handlers.set(Types.Messages.HELLO, {
-    rateLimit: 'auth', // 5 attempts per minute per IP
-    handler: async (ctx, msg) => {
-      const name = Utils.sanitize(msg[1]);
-      const password = msg[5] || ''; // Password is now at index 5
-      ctx.name = (name === '') ? 'lorem ipsum' : name.substr(0, 15);
-      ctx.kind = Types.Entities.WARRIOR;
-
-      const storage = ctx.world.getStorageService();
-      const characterExists = storage.characterExists(ctx.name);
-
-      if (characterExists) {
-        // Existing character - verify password
-        if (!storage.verifyPassword(ctx.name, password)) {
-          log.warn({ playerName: ctx.name }, 'Wrong password');
-          ctx.send([Types.Messages.AUTH_FAIL, 'wrong_password']);
-          return; // Don't proceed - client should disconnect
-        }
-
-        // Password correct - load character
-        const loaded = ctx.loadFromStorage(storage);
-        if (loaded) {
-          log.info({ playerName: ctx.name }, 'Loaded returning player');
-        }
-      } else {
-        // New character - password is required
-        if (!password || password.length < 3) {
-          log.warn({ playerName: ctx.name }, 'Password too short for new character');
-          ctx.send([Types.Messages.AUTH_FAIL, 'password_required']);
-          return;
-        }
-
-        // Create new character with password
-        const newChar = storage.createCharacter(ctx.name, password);
-        ctx.characterId = newChar.id;
-
-        // Apply client-provided starting equipment
-        ctx.equipArmor(msg[2]);
-        ctx.equipWeapon(msg[3]);
-        ctx.setGold(msg[4] || 0);
-        log.info({ playerName: ctx.name, characterId: ctx.characterId }, 'Created new character');
-      }
-
-      ctx.orientation = Utils.randomOrientation();
-      ctx.updateHitPoints();
-      ctx.updatePosition();
-
-      // Set spawn protection BEFORE adding to world so aggro tick can't target us
-      ctx.isDead = false;
-      ctx.spawnProtectionUntil = Date.now() + 10000; // 10 second aggro immunity on spawn
-
-      ctx.world.addPlayer(ctx);
-      ctx.world.enter_callback(ctx);
-
-      // Get player's XP to next level (using Formulas)
-      const xpToNext = Formulas.xpToNextLevel(ctx.level || 1);
-
-      // Send expanded WELCOME with full player state
-      // [WELCOME, id, name, x, y, hp, maxHp, level, xp, xpToNext, gold]
-      ctx.send([
-        Types.Messages.WELCOME,
-        ctx.id,
-        ctx.name,
-        ctx.x,
-        ctx.y,
-        ctx.hitPoints,
-        ctx.maxHitPoints,
-        ctx.level || 1,
-        ctx.xp || 0,
-        xpToNext,
-        ctx.gold || 0
-      ]);
-      ctx.hasEnteredGame = true;
-
-      AchievementHandler.initAchievements(ctx as any);
-      await VeniceHandler.triggerNarration(ctx as any, 'join');
-
-      // Send inventory state to client
-      InventoryHandler.sendInventoryInit(ctx as any);
-
-      // Send skill state to client
-      SkillHandler.sendSkillInit(ctx as any);
-
-      // Initialize progression system (efficiency, rested XP, ascension)
-      ctx.initProgressionSystem();
-
-      // Send current equipment to client (so UI can display it)
-      if (ctx.weapon) {
-        ctx.send([Types.Messages.EQUIP, ctx.id, ctx.weapon]);
-      }
-      if (ctx.armor) {
-        ctx.send([Types.Messages.EQUIP, ctx.id, ctx.armor]);
-      }
-    },
+    rateLimit: 'auth',
+    handler: async (player, msg) => AuthHandler.handleHello(player, msg, Utils, Formulas),
     requiresGame: false
   });
 
   // WHO - Entity info request
   handlers.set(Types.Messages.WHO, {
-    handler: (ctx, msg) => {
-      // Use slice to avoid mutating the original message array
+    handler: (player, msg) => {
       const entityIds = msg.slice(1);
-      ctx.world.pushSpawnsToPlayer(ctx, entityIds);
+      player.getWorld().pushSpawnsToPlayer(player, entityIds);
     }
   });
 
   // ZONE - Zone transition
   handlers.set(Types.Messages.ZONE, {
-    handler: (ctx) => {
-      if (ctx.zone_callback) {
-        ctx.zone_callback();
+    handler: (player) => {
+      if (player.zoneCallback) {
+        player.zoneCallback();
       }
     }
   });
 
   // CHAT - Chat message
   handlers.set(Types.Messages.CHAT, {
-    rateLimit: 'chat', // 5 messages per 10 seconds
-    handler: (ctx, msg) => {
+    rateLimit: 'chat',
+    handler: (player, msg) => {
       let chatMsg = Utils.sanitize(msg[1]);
       if (chatMsg && chatMsg !== '') {
         chatMsg = chatMsg.substr(0, 60);
-        ctx.broadcastToZone(new Messages.Chat(ctx, chatMsg), false);
+        player.broadcastToZone(new Messages.Chat(player, chatMsg), false);
       }
     }
   });
 
   // MOVE - Player movement
   handlers.set(Types.Messages.MOVE, {
-    handler: (ctx, msg) => {
-      if (ctx.move_callback) {
+    handler: (player, msg) => {
+      if (player.moveCallback) {
         const x = msg[1];
         const y = msg[2];
 
-        if (ctx.world.isValidPosition(x, y)) {
-          ctx.setPosition(x, y);
-          ctx.clearTarget();
-          ctx.broadcast(new Messages.Move(ctx));
-          ctx.move_callback(ctx.x, ctx.y);
-          ctx.checkZoneChange(x, y);
+        if (player.getWorld().isValidPosition(x, y)) {
+          const moveDx = Math.abs(x - player.x);
+          const moveDy = Math.abs(y - player.y);
+          const moveDistance = Math.max(moveDx, moveDy);
+          if (moveDistance > MAX_MOVE_DISTANCE) {
+            log.warn({ playerName: player.name, from: { x: player.x, y: player.y }, to: { x, y }, distance: moveDistance }, 'MOVE rejected: distance exceeds max');
+            return;
+          }
+          player.setPosition(x, y);
+          player.clearTarget();
+          player.broadcast(new Messages.Move(player));
+          player.moveCallback(player.x, player.y);
+          player.checkZoneChange(x, y);
         }
       }
     }
@@ -319,17 +128,18 @@ export function createMessageHandlers(
 
   // LOOTMOVE - Move to loot
   handlers.set(Types.Messages.LOOTMOVE, {
-    handler: (ctx, msg) => {
-      if (ctx.lootmove_callback) {
+    requiresAlive: true,
+    handler: (player, msg) => {
+      if (player.lootmoveCallback) {
         const x = msg[1], y = msg[2];
-        if (!ctx.world.isValidPosition(x, y)) return;
-        ctx.setPosition(x, y);
+        if (!player.getWorld().isValidPosition(x, y)) return;
+        player.setPosition(x, y);
 
-        const item = ctx.world.getEntityById(msg[3]);
+        const item = player.getWorld().getEntityById(msg[3]);
         if (item) {
-          ctx.clearTarget();
-          ctx.broadcast(new Messages.LootMove(ctx, item));
-          ctx.lootmove_callback(ctx.x, ctx.y);
+          player.clearTarget();
+          player.broadcast(new Messages.LootMove(player, item));
+          player.lootmoveCallback(player.x, player.y);
         }
       }
     }
@@ -337,331 +147,238 @@ export function createMessageHandlers(
 
   // AGGRO - Mob aggro
   handlers.set(Types.Messages.AGGRO, {
-    handler: (ctx, msg) => {
-      if (ctx.move_callback) {
-        ctx.world.handleMobHate(msg[1], ctx.id, 5);
+    handler: (player, msg) => {
+      if (player.moveCallback) {
+        const mobId = parseInt(msg[1]);
+        if (!isNaN(mobId)) {
+          player.getWorld().handleMobHate(mobId, player.id, 5);
+        }
       }
     }
   });
 
   // ATTACK - Target attack
   handlers.set(Types.Messages.ATTACK, {
-    handler: (ctx, msg) => {
-      const mob = ctx.world.getEntityById(msg[1]);
-      if (mob) {
-        ctx.setTarget(mob);
-        ctx.world.broadcastAttacker(ctx);
-      }
-    }
+    handler: (player, msg) => CombatHandler.handleAttack(player, msg)
   });
 
   // HIT - Deal damage to mob
   handlers.set(Types.Messages.HIT, {
-    rateLimit: 'combat', // 20 hits per second
-    handler: (ctx, msg) => {
-      // Attacking clears spawn protection - you chose to fight
-      ctx.spawnProtectionUntil = 0;
-
-      const mob = ctx.world.getEntityById(msg[1]);
-      // Check mob exists and is not already dead (prevents hitting during death animation)
-      if (mob && !mob.isDead) {
-        // Apply Power Strike multiplier (consumes the buff if active)
-        const powerStrikeMultiplier = ctx.consumePowerStrike();
-        const baseDmg = Formulas.dmg(ctx.weaponLevel, mob.armorLevel, ctx.level);
-        const dmg = Math.floor(baseDmg * powerStrikeMultiplier);
-        if (dmg > 0) {
-          mob.receiveDamage(dmg, ctx.id);
-          ctx.world.handleMobHate(mob.id, ctx.id, dmg);
-          ctx.world.handleHurtEntity(mob, ctx, dmg);
-        }
-      }
-    }
+    rateLimit: 'combat',
+    handler: (player, msg) => CombatHandler.handleHit(player, msg)
   });
 
   // HURT - Receive damage from mob
   handlers.set(Types.Messages.HURT, {
-    handler: (ctx, msg) => {
-      const mob = ctx.world.getEntityById(msg[1]);
-      // Check mob exists, is alive (isDead flag + hitPoints > 0), and player is alive
-      // Double-check (hitPoints > 0) prevents damage from mobs in death animation
-      // Phase shift makes player immune to damage
-      // Stunned mobs (War Cry) can't deal damage
-      const isStunned = mob?.stunUntil && Date.now() < mob.stunUntil;
-      if (mob && !mob.isDead && mob.hitPoints > 0 && !ctx.isDead && ctx.hitPoints > 0 && !ctx.isPhased() && !isStunned) {
-        // Range check: mob must be adjacent (melee range) to deal damage
-        const dx = Math.abs(ctx.x - mob.x);
-        const dy = Math.abs(ctx.y - mob.y);
-        const distance = Math.max(dx, dy); // Chebyshev distance in tiles
-
-        if (distance > MELEE_RANGE) {
-          // Mob is too far away to deal damage this tick — skip but keep aggro
-          // (clearing aggro here causes a stuck state: mob stays in player.attackers
-          // but loses its target, and chooseMobTarget won't re-acquire)
-          log.trace({ mobId: mob.id, distance, meleeRange: MELEE_RANGE, playerName: ctx.name, mobPos: { x: mob.x, y: mob.y }, playerPos: { x: ctx.x, y: ctx.y } }, 'HURT rejected: mob out of range');
-          return;
-        }
-
-        // Create attack link if not already attacking (for mobs that chased from far away)
-        // This broadcasts the attack to clients so they know the mob is now hitting
-        const player = ctx as any; // ctx is Player but typed as MessageHandlerContext
-        if (player.attackers && !(mob.id in player.attackers)) {
-          if (player.addAttacker) player.addAttacker(mob);
-          ctx.world.broadcastAttacker(mob);
-        }
-
-        ctx.hitPoints = Math.max(0, ctx.hitPoints - Formulas.dmg(mob.weaponLevel, ctx.armorLevel, mob.level ?? 1));
-        ctx.world.handleHurtEntity(ctx);
-
-        if (ctx.hitPoints <= 0) {
-          ctx.isDead = true;
-          if (ctx.firepotionTimeout) {
-            clearTimeout(ctx.firepotionTimeout);
-          }
-        }
-      }
-    }
+    handler: (player, msg) => CombatHandler.handleHurt(player, msg)
   });
 
   // LOOT - Pick up item
   handlers.set(Types.Messages.LOOT, {
-    handler: (ctx, msg) => {
-      const item = ctx.world.getEntityById(msg[1]);
-
-      if (item) {
-        const kind = item.kind;
-
-        if (Types.isItem(kind)) {
-          // Equipment goes to inventory instead of auto-equipping
-          if (Types.isArmor(kind) || Types.isWeapon(kind)) {
-            InventoryHandler.handleInventoryPickup(ctx as any, item.id);
-            persistInventory(ctx);
-            return;
-          }
-
-          // Consumables are used immediately (original behavior)
-          ctx.broadcast(item.despawn());
-          ctx.world.removeEntity(item);
-
-          if (kind === Types.Entities.FIREPOTION) {
-            ctx.updateHitPoints();
-            ctx.broadcast(ctx.equip(Types.Entities.FIREFOX));
-            ctx.firepotionTimeout = setTimeout(() => {
-              ctx.broadcast(ctx.equip(ctx.armor));
-              ctx.firepotionTimeout = null;
-            }, 15000);
-            ctx.send(new Messages.HitPoints(ctx.maxHitPoints).serialize());
-          } else if (Types.isHealingItem(kind)) {
-            let amount = 0;
-            switch (kind) {
-              case Types.Entities.FLASK:
-                amount = 40;
-                break;
-              case Types.Entities.BURGER:
-                amount = 100;
-                break;
-            }
-
-            if (!ctx.hasFullHealth()) {
-              ctx.regenHealthBy(amount);
-              ctx.world.pushToPlayer(ctx, ctx.health());
-            }
-          }
-        }
-      }
-    }
+    requiresAlive: true,
+    handler: (player, msg) => LootHandler.handleLoot(player, msg)
   });
 
   // TELEPORT - Teleport player
   handlers.set(Types.Messages.TELEPORT, {
-    handler: (ctx, msg) => {
+    requiresAlive: true,
+    handler: (player, msg) => {
       const x = msg[1];
       const y = msg[2];
+      const world = player.getWorld();
 
-      if (ctx.world.isValidPosition(x, y)) {
-        ctx.setPosition(x, y);
-        ctx.clearTarget();
-        ctx.broadcast(new Messages.Teleport(ctx));
-        ctx.world.handlePlayerVanish(ctx);
-        ctx.world.pushRelevantEntityListTo(ctx);
+      if (world.isValidPosition(x, y)) {
+        player.spawnProtectionUntil = 0;
+        player.setPosition(x, y);
+        player.clearTarget();
+        player.broadcast(new Messages.Teleport(player));
+        world.handlePlayerVanish(player);
+        world.pushRelevantEntityListTo(player);
       }
     }
   });
 
   // OPEN - Open chest
   handlers.set(Types.Messages.OPEN, {
-    handler: (ctx, msg) => {
-      const chest = ctx.world.getEntityById(msg[1]);
+    handler: (player, msg) => {
+      const world = player.getWorld();
+      const chest = world.getEntityById(msg[1]);
       if (chest && chest instanceof Chest) {
-        ctx.world.handleOpenedChest(chest, ctx);
+        world.handleOpenedChest(chest, player);
       }
     }
   });
 
   // CHECK - Checkpoint
   handlers.set(Types.Messages.CHECK, {
-    handler: (ctx, msg) => {
-      const checkpoint = ctx.world.map.getCheckpoint(msg[1]);
+    handler: (player, msg) => {
+      const checkpoint = player.getWorld().map?.getCheckpoint(msg[1]);
       if (checkpoint) {
-        ctx.lastCheckpoint = checkpoint;
+        player.lastCheckpoint = checkpoint;
       }
     }
   });
 
   // NPCTALK - NPC dialogue
   handlers.set(Types.Messages.NPCTALK, {
-    handler: async (ctx, msg) => {
-      await VeniceHandler.handleNpcTalk(ctx as any, msg[1]);
+    requiresAlive: true,
+    handler: async (player, msg) => {
+      await VeniceHandler.handleNpcTalk(player, msg[1]);
     }
   });
 
   // REQUEST_QUEST - Quest request
   handlers.set(Types.Messages.REQUEST_QUEST, {
-    handler: async (ctx, msg) => {
-      await VeniceHandler.handleRequestQuest(ctx as any, msg[1]);
+    requiresAlive: true,
+    handler: async (player, msg) => {
+      await VeniceHandler.handleRequestQuest(player, msg[1]);
     }
   });
 
   // NEWS_REQUEST - Newspaper request
   handlers.set(Types.Messages.NEWS_REQUEST, {
-    handler: async (ctx) => {
-      await VeniceHandler.handleNewsRequest(ctx as any);
+    handler: async (player) => {
+      await VeniceHandler.handleNewsRequest(player);
     }
   });
 
   // DROP_ITEM - Drop equipped item
   handlers.set(Types.Messages.DROP_ITEM, {
-    handler: (ctx, msg) => {
-      EquipmentHandler.handleDropItem(ctx as any, msg[1]);
+    handler: (player, msg) => {
+      EquipmentHandler.handleDropItem(player, msg[1]);
     }
   });
 
   // DAILY_CHECK - Daily reward check
   handlers.set(Types.Messages.DAILY_CHECK, {
-    handler: (ctx, msg) => {
-      const lastLoginDate = msg[1] || null;
-      const currentStreak = msg[2] || 0;
-      ctx.handleDailyCheck(lastLoginDate === '' ? null : lastLoginDate, currentStreak);
+    handler: (player, msg) => {
+      const lastLoginDate = typeof msg[1] === 'string' && msg[1] !== '' ? msg[1] : null;
+      const currentStreak = typeof msg[2] === 'number' ? Math.max(0, Math.floor(msg[2])) : 0;
+      player.handleDailyCheck(lastLoginDate, currentStreak);
     }
   });
 
   // SHOP_BUY - Shop purchase
   handlers.set(Types.Messages.SHOP_BUY, {
-    rateLimit: 'shop', // 10 transactions per minute
-    handler: (ctx, msg) => {
-      ShopHandler.handleShopBuy(ctx as any, msg[1], msg[2]);
+    rateLimit: 'shop',
+    handler: (player, msg) => {
+      ShopHandler.handleShopBuy(player, msg[1], msg[2]);
     }
   });
 
   // SHOP_SELL - Shop sell
   handlers.set(Types.Messages.SHOP_SELL, {
-    handler: (ctx, msg) => {
-      ShopHandler.handleShopSell(ctx as any, msg[1]);
+    handler: (player, msg) => {
+      ShopHandler.handleShopSell(player, msg[1]);
     }
   });
 
   // ACHIEVEMENT_SELECT_TITLE - Select title
   handlers.set(Types.Messages.ACHIEVEMENT_SELECT_TITLE, {
-    handler: (ctx, msg) => {
-      AchievementHandler.handleSelectTitle(ctx as any, msg[1] === '' ? null : msg[1]);
+    handler: (player, msg) => {
+      AchievementHandler.handleSelectTitle(player, msg[1] === '' ? null : msg[1]);
     }
   });
 
   // Party system messages
   handlers.set(Types.Messages.PARTY_INVITE, {
-    handler: (ctx, msg) => {
-      PartyHandler.handlePartyInvite(ctx as any, msg[1]);
+    handler: (player, msg) => {
+      PartyHandler.handlePartyInvite(player, msg[1]);
     }
   });
 
   handlers.set(Types.Messages.PARTY_ACCEPT, {
-    handler: (ctx, msg) => {
-      PartyHandler.handlePartyAccept(ctx as any, msg[1]);
+    handler: (player, msg) => {
+      PartyHandler.handlePartyAccept(player, msg[1]);
     }
   });
 
   handlers.set(Types.Messages.PARTY_DECLINE, {
-    handler: (ctx, msg) => {
-      PartyHandler.handlePartyDecline(ctx as any, msg[1]);
+    handler: (player, msg) => {
+      PartyHandler.handlePartyDecline(player, msg[1]);
     }
   });
 
   handlers.set(Types.Messages.PARTY_LEAVE, {
-    handler: (ctx) => {
-      PartyHandler.handlePartyLeave(ctx as any);
+    handler: (player) => {
+      PartyHandler.handlePartyLeave(player);
     }
   });
 
   handlers.set(Types.Messages.PARTY_KICK, {
-    handler: (ctx, msg) => {
-      PartyHandler.handlePartyKick(ctx as any, msg[1]);
+    handler: (player, msg) => {
+      PartyHandler.handlePartyKick(player, msg[1]);
     }
   });
 
   handlers.set(Types.Messages.PARTY_CHAT, {
-    handler: (ctx, msg) => {
+    handler: (player, msg) => {
       let chatMsg = Utils.sanitize(msg[1]);
       if (chatMsg && chatMsg !== '') {
         chatMsg = chatMsg.substr(0, 100);
-        PartyHandler.handlePartyChat(ctx as any, chatMsg);
+        PartyHandler.handlePartyChat(player, chatMsg);
       }
     }
   });
 
   // Player inspect
   handlers.set(Types.Messages.PLAYER_INSPECT, {
-    handler: (ctx, msg) => {
-      PartyHandler.handlePlayerInspect(ctx as any, msg[1]);
+    handler: (player, msg) => {
+      PartyHandler.handlePlayerInspect(player, msg[1]);
     }
   });
 
   // Inventory system messages
   handlers.set(Types.Messages.INVENTORY_USE, {
-    handler: (ctx, msg) => {
-      InventoryHandler.handleInventoryUse(ctx as any, msg[1]);
-      persistInventory(ctx);
+    requiresAlive: true,
+    handler: (player, msg) => {
+      InventoryHandler.handleInventoryUse(player, msg[1]);
+      persistInventory(player);
     }
   });
 
   handlers.set(Types.Messages.INVENTORY_EQUIP, {
-    handler: (ctx, msg) => {
-      InventoryHandler.handleInventoryEquip(ctx as any, msg[1]);
-      persistInventory(ctx);
+    requiresAlive: true,
+    handler: (player, msg) => {
+      InventoryHandler.handleInventoryEquip(player, msg[1]);
+      persistInventory(player);
     }
   });
 
   handlers.set(Types.Messages.INVENTORY_DROP, {
-    handler: (ctx, msg) => {
-      InventoryHandler.handleInventoryDrop(ctx as any, msg[1]);
-      persistInventory(ctx);
+    handler: (player, msg) => {
+      InventoryHandler.handleInventoryDrop(player, msg[1]);
+      persistInventory(player);
     }
   });
 
   handlers.set(Types.Messages.INVENTORY_SWAP, {
-    handler: (ctx, msg) => {
-      InventoryHandler.handleInventorySwap(ctx as any, msg[1], msg[2]);
-      persistInventory(ctx);
+    handler: (player, msg) => {
+      InventoryHandler.handleInventorySwap(player, msg[1], msg[2]);
+      persistInventory(player);
     }
   });
 
   handlers.set(Types.Messages.INVENTORY_PICKUP, {
-    handler: (ctx, msg) => {
-      InventoryHandler.handleInventoryPickup(ctx as any, msg[1]);
-      persistInventory(ctx);
+    requiresAlive: true,
+    handler: (player, msg) => {
+      InventoryHandler.handleInventoryPickup(player, msg[1]);
+      persistInventory(player);
     }
   });
 
   handlers.set(Types.Messages.UNEQUIP_TO_INVENTORY, {
-    handler: (ctx, msg) => {
-      InventoryHandler.handleUnequipToInventory(ctx as any, msg[1]);
-      persistInventory(ctx);
+    handler: (player, msg) => {
+      InventoryHandler.handleUnequipToInventory(player, msg[1]);
+      persistInventory(player);
     }
   });
 
   // Boss Leaderboard
   handlers.set(Types.Messages.LEADERBOARD_REQUEST, {
-    handler: (ctx, msg) => {
-      const leaderboard = ctx.world.roamingBossManager?.getLeaderboard() || [];
-      ctx.send(new Messages.LeaderboardResponse(leaderboard).serialize());
+    handler: (player) => {
+      const leaderboard = player.getWorld().roamingBossManager?.getLeaderboard() || [];
+      player.send(new Messages.LeaderboardResponse(leaderboard).serialize());
     }
   });
 
@@ -669,8 +386,8 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.SKILL_USE, {
     rateLimit: 'combat',
     requiresAlive: true,
-    handler: (ctx, msg) => {
-      SkillHandler.handleSkillUse(ctx as any, msg[1]);
+    handler: (player, msg) => {
+      SkillHandler.handleSkillUse(player, msg[1]);
     }
   });
 
@@ -678,8 +395,8 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.ASCEND_REQUEST, {
     rateLimit: 'shop',
     requiresAlive: true,
-    handler: (ctx) => {
-      ctx.handleAscendRequest();
+    handler: (player) => {
+      player.handleAscendRequest();
     }
   });
 
@@ -687,8 +404,8 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.RIFT_ENTER, {
     rateLimit: 'shop',
     requiresAlive: true,
-    handler: (ctx) => {
-      ctx.handleRiftEnter();
+    handler: (player) => {
+      player.handleRiftEnter();
     }
   });
 
@@ -696,8 +413,8 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.RIFT_EXIT, {
     rateLimit: 'none',
     requiresAlive: false,
-    handler: (ctx) => {
-      ctx.handleRiftExit();
+    handler: (player) => {
+      player.handleRiftExit();
     }
   });
 
@@ -705,8 +422,8 @@ export function createMessageHandlers(
   handlers.set(Types.Messages.RIFT_LEADERBOARD_REQ, {
     rateLimit: 'shop',
     requiresAlive: false,
-    handler: (ctx) => {
-      ctx.handleRiftLeaderboardRequest();
+    handler: (player) => {
+      player.handleRiftLeaderboardRequest();
     }
   });
 
@@ -733,7 +450,7 @@ export class MessageRouter {
    * @returns true if allowed, false if rate limited
    */
   private async checkRateLimit(
-    ctx: MessageHandlerContext,
+    player: Player,
     rateLimit: RateLimitType | undefined
   ): Promise<RateLimitResult> {
     if (!rateLimit || rateLimit === 'none') {
@@ -741,7 +458,7 @@ export class MessageRouter {
     }
 
     // Use IP for auth (pre-login), player ID for everything else
-    const key = rateLimit === 'auth' ? ctx.clientIp : String(ctx.id);
+    const key = rateLimit === 'auth' ? player.clientIp : String(player.id);
 
     switch (rateLimit) {
       case 'auth':
@@ -761,7 +478,7 @@ export class MessageRouter {
    * Route a message to its handler
    * Returns true if handled, false if no handler found or rate limited
    */
-  async route(ctx: MessageHandlerContext, message: any[]): Promise<boolean> {
+  async route(player: Player, message: any[]): Promise<boolean> {
     const action = parseInt(message[0]);
     const config = this.handlers.get(action);
 
@@ -771,16 +488,21 @@ export class MessageRouter {
 
     // Check game entry requirement (default true)
     const requiresGame = config.requiresGame !== false;
-    if (requiresGame && !ctx.hasEnteredGame) {
+    if (requiresGame && !player.hasEnteredGame) {
+      return false;
+    }
+
+    // Check alive requirement
+    if (config.requiresAlive && player.isDead) {
       return false;
     }
 
     // Check rate limit
     if (config.rateLimit) {
-      const rateLimitResult = await this.checkRateLimit(ctx, config.rateLimit);
+      const rateLimitResult = await this.checkRateLimit(player, config.rateLimit);
       if (!rateLimitResult.allowed) {
         log.warn(
-          { playerId: ctx.id, action, rateLimit: config.rateLimit, retryAfter: rateLimitResult.retryAfter },
+          { playerId: player.id, action, rateLimit: config.rateLimit, retryAfter: rateLimitResult.retryAfter },
           'Rate limit exceeded'
         );
         // Silently drop rate-limited messages
@@ -795,13 +517,13 @@ export class MessageRouter {
     if (SKIP_TRACE.has(action)) {
       // Execute without span for hot-path messages
       try {
-        const result = config.handler(ctx, message);
+        const result = config.handler(player, message);
         if (result instanceof Promise) {
           await result;
         }
       } catch (error) {
         log.error(
-          { playerId: ctx.id, action, messageType, error },
+          { playerId: player.id, action, messageType, error },
           'Handler error - message dropped'
         );
       }
@@ -813,19 +535,19 @@ export class MessageRouter {
     return tracer.startActiveSpan(`player.message.${messageType}`, async (span) => {
       span.setAttributes({
         'message.type': messageType,
-        'player.name': ctx.name,
-        'player.id': ctx.id,
+        'player.name': player.name,
+        'player.id': player.id,
       });
 
       try {
-        const result = config.handler(ctx, message);
+        const result = config.handler(player, message);
         if (result instanceof Promise) {
           await result;
         }
       } catch (error) {
         span.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
         log.error(
-          { playerId: ctx.id, action, messageType, error },
+          { playerId: player.id, action, messageType, error },
           'Handler error - message dropped'
         );
       } finally {

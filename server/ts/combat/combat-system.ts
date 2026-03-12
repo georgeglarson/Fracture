@@ -22,7 +22,8 @@ export interface Entity {
   name?: string;
   group?: string;
   hitPoints: number;
-  armorLevel?: number;  // For XP calculation
+  level?: number;  // Mob level for XP calculation
+  armorLevel?: number;  // For gold calculation
   weaponLevel?: number;  // For damage calculation
   x?: number;  // Pixel position X
   y?: number;  // Pixel position Y
@@ -148,25 +149,26 @@ export class CombatSystem {
       return;
     }
 
-    const playerId = mob.getHatedPlayerId?.(hateRank);
-    if (!playerId) return;
+    for (let rank = hateRank || 1; rank <= 20; rank++) {
+      const playerId = mob.getHatedPlayerId?.(rank);
+      if (!playerId) return;
 
-    const player = this.world.getEntityById(playerId);
+      const player = this.world.getEntityById(playerId);
 
-    // Skip phased players - they are invisible/invulnerable
-    if (player && player.isPhased?.()) {
-      // Try next most hated player instead
-      this.chooseMobTarget(mob, (hateRank || 1) + 1);
+      // Skip phased players - they are invisible/invulnerable
+      if (player && player.isPhased?.()) {
+        continue;
+      }
+
+      // If the mob's current target differs from the chosen player, switch targets
+      if (player && mob.target !== playerId) {
+        this.clearMobAggroLink(mob);
+
+        mob.setTarget?.(player);
+        player.addAttacker?.(mob);
+        this.broadcastAttacker(mob);
+      }
       return;
-    }
-
-    // If the mob's current target differs from the chosen player, switch targets
-    if (player && mob.target !== playerId) {
-      this.clearMobAggroLink(mob);
-
-      mob.setTarget?.(player);
-      player.addAttacker?.(mob);
-      this.broadcastAttacker(mob);
     }
   }
 
@@ -205,6 +207,7 @@ export class CombatSystem {
 
     // If the entity is about to die
     if (entity.hitPoints <= 0) {
+      entity.isDead = true;  // Prevent re-entry from same tick
       this.handleEntityDeath(entity, attacker);
     }
   }
@@ -228,10 +231,6 @@ export class CombatSystem {
    * Handle mob death - drops, kill tracking, etc.
    */
   private handleMobDeath(mob: Entity, attacker?: Entity): void {
-    // CRITICAL: Set isDead flag IMMEDIATELY to prevent further damage processing
-    // This must happen before any messages are sent to prevent race conditions
-    mob.isDead = true;
-
     const item = this.world.getDroppedItem(mob);
 
     if (attacker) {
@@ -256,7 +255,7 @@ export class CombatSystem {
       }
 
       // Grant XP and gold with party sharing and streak bonuses
-      if (mob.armorLevel) {
+      if (mob.armorLevel != null) {
         this.distributePartyRewards(attacker, mob, streakResult.xpMultiplier, streakResult.goldMultiplier);
       }
 
@@ -289,8 +288,8 @@ export class CombatSystem {
         mobName: mobType || 'unknown',
         killerId: attacker.id as number,
         killerName: attacker.name || 'unknown',
-        x: (mob as any).x ?? 0,
-        y: (mob as any).y ?? 0
+        x: mob.x ?? 0,
+        y: mob.y ?? 0
       });
     }
 
@@ -327,8 +326,8 @@ export class CombatSystem {
       playerName: player.name || 'unknown',
       killerId: attacker?.id as number | undefined,
       killerType: attacker?.kind,
-      x: (player as any).x ?? 0,
-      y: (player as any).y ?? 0
+      x: player.x ?? 0,
+      y: player.y ?? 0
     });
 
     this.handlePlayerVanish(player);
@@ -386,24 +385,29 @@ export class CombatSystem {
     const attackerY = attacker.y ?? 0;
 
     // Apply streak multipliers to base rewards
-    const baseXp = Math.floor(Formulas.xpFromMob(mob.armorLevel!) * xpMultiplier);
+    const baseXp = Math.floor(Formulas.xpFromMob(mob.level!) * xpMultiplier);
     const baseGold = Math.floor(Formulas.goldFromMob(mob.armorLevel!) * goldMultiplier);
 
     // Check if attacker is in a party
     if (partyService.isInParty(attackerId)) {
-      // Get nearby party members (within 15 tiles)
+      // Get nearby party members (within 15 tiles) who participated in combat
       const nearbyMembers = partyService.getMembersInRange(attackerId, attackerX, attackerY, 15);
+      const mobId = mob.id as number;
+      const combatTracker = getCombatTracker();
+      const participants = nearbyMembers.filter(
+        memberId => memberId === attackerId || combatTracker.hasAggro(mobId, memberId)
+      );
 
-      if (nearbyMembers.length > 1) {
-        // Calculate party bonus
-        const xpBonus = partyService.calculatePartyXpBonus(nearbyMembers.length);
+      if (participants.length > 1) {
+        // Calculate party bonus based on participants only
+        const xpBonus = partyService.calculatePartyXpBonus(participants.length);
         const totalXp = Math.floor(baseXp * xpBonus);
-        const xpPerMember = Math.floor(totalXp / nearbyMembers.length);
+        const xpPerMember = Math.floor(totalXp / participants.length);
 
-        log.info({ memberCount: nearbyMembers.length, totalXp, baseXp, xpBonus: xpBonus.toFixed(2), xpPerMember }, 'Party XP sharing');
+        log.info({ memberCount: participants.length, totalXp, baseXp, xpBonus: xpBonus.toFixed(2), xpPerMember }, 'Party XP sharing');
 
-        // Distribute XP to all nearby party members
-        for (const memberId of nearbyMembers) {
+        // Distribute XP to participating party members
+        for (const memberId of participants) {
           const member = this.world.getEntityById(memberId);
           if (member && member.grantXP) {
             member.grantXP(xpPerMember);

@@ -23,7 +23,7 @@ import {EquipmentManager} from './equipment/equipment-manager';
 import {PlayerAchievements} from '../../shared/ts/achievements';
 import {Inventory} from './inventory/inventory';
 import {SerializedInventorySlot} from '../../shared/ts/inventory/inventory-types';
-import {MessageRouter, MessageHandlerContext} from './player/message-router';
+import {MessageRouter} from './player/message-router';
 import {getDailyRewardService} from './player/daily-reward.service';
 import {ProgressionService, createProgressionService} from './player/progression.service';
 import {IStorageService, PlayerSaveState} from './storage/storage.interface';
@@ -54,7 +54,6 @@ export class Player extends Character {
   }
 
   hasEnteredGame = false;
-  isDead = false;
   spawnProtectionUntil = 0; // Timestamp until which player is immune to mob aggro
   lastCheckpoint: Checkpoint | null = null;
   disconnectTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -107,20 +106,18 @@ export class Player extends Character {
   lastLogoutTime: number = 0;
   sessionStartTime: number = Date.now();
 
-  zone_callback: ((zoneId: number) => void) | null = null;
-  move_callback: ((x: number, y: number) => void) | null = null;
-  lootmove_callback: ((x: number, y: number) => void) | null = null;
-  message_callback: ((message: unknown[]) => void) | null = null;
-  exit_callback: (() => void) | null = null;
-  broadcast_callback: ((message: MessagePayload, ignoreSelf: boolean) => void) | null = null;
-  broadcastzone_callback: ((message: MessagePayload, ignoreSelf: boolean) => void) | null = null;
-  orient_callback: ((orientation: number) => void) | null = null;
-  requestpos_callback: (() => { x: number; y: number }) | null = null;
+  zoneCallback: (() => void) | null = null;
+  moveCallback: ((x: number, y: number) => void) | null = null;
+  lootmoveCallback: ((x: number, y: number) => void) | null = null;
+  messageCallback: ((message: unknown[]) => void) | null = null;
+  exitCallback: (() => void) | null = null;
+  broadcastCallback: ((message: MessagePayload, ignoreSelf: boolean) => void) | null = null;
+  broadcastzoneCallback: ((message: MessagePayload, ignoreSelf: boolean) => void) | null = null;
+  orientCallback: ((orientation: number) => void) | null = null;
+  requestposCallback: (() => { x: number; y: number }) | null = null;
 
   constructor(private connection: Connection, private world: World) {
     super(connection.id, 'player', Types.Entities.WARRIOR, 0, 0);
-
-    var self = this;
 
     this.formatChecker = new FormatChecker();
 
@@ -134,48 +131,47 @@ export class Player extends Character {
       getName: () => this.name
     });
 
-    this.connection.listen(async function (message: unknown[]) {
+    this.connection.listen(async (message: unknown[]) => {
       try {
-        var action = parseInt(String(message[0]));
+        const action = parseInt(String(message[0]));
 
-        if (!self.formatChecker.check(message)) {
-          self.connection.close('Invalid ' + Types.getMessageTypeAsString(action) + ' message format: ' + message);
+        if (!this.formatChecker.check(message)) {
+          this.connection.close('Invalid ' + Types.getMessageTypeAsString(action) + ' message format: ' + message);
           return;
         }
 
-        if (!self.hasEnteredGame && action !== Types.Messages.HELLO) { // HELLO must be the first message
-          self.connection.close('Invalid handshake message: ' + message);
+        if (!this.hasEnteredGame && action !== Types.Messages.HELLO) { // HELLO must be the first message
+          this.connection.close('Invalid handshake message: ' + message);
           return;
         }
-        if (self.hasEnteredGame && !self.isDead && action === Types.Messages.HELLO) { // HELLO can be sent only once
-          self.connection.close('Cannot initiate handshake twice: ' + message);
+        if (this.hasEnteredGame && !this.isDead && action === Types.Messages.HELLO) { // HELLO can be sent only once
+          this.connection.close('Cannot initiate handshake twice: ' + message);
           return;
         }
 
-        self.resetTimeout();
+        this.resetTimeout();
 
         // Route message through MessageRouter - delegates to appropriate handler
-        // Cast needed because Player has private world but MessageHandlerContext expects public
-        const handled = await Player.getMessageRouter().route(self as unknown as MessageHandlerContext, message);
+        const handled = await Player.getMessageRouter().route(this, message);
 
         // If not handled by router, pass to message callback
-        if (!handled && self.message_callback) {
-          self.message_callback(message);
+        if (!handled && this.messageCallback) {
+          this.messageCallback(message);
         }
       } catch (error) {
-        log.error({ err: error, playerName: self.name }, 'Error handling message');
+        log.error({ err: error, playerName: this.name }, 'Error handling message');
       }
     });
 
-    this.connection.onClose(function () {
-      if (self.firepotionTimeout) {
-        clearTimeout(self.firepotionTimeout);
+    this.connection.onClose(() => {
+      if (this.firepotionTimeout) {
+        clearTimeout(this.firepotionTimeout);
       }
-      if (self.disconnectTimeout) {
-        clearTimeout(self.disconnectTimeout);
+      if (this.disconnectTimeout) {
+        clearTimeout(this.disconnectTimeout);
       }
-      if (self.exit_callback) {
-        self.exit_callback();
+      if (this.exitCallback) {
+        this.exitCallback();
       }
     });
 
@@ -183,20 +179,18 @@ export class Player extends Character {
   }
 
   destroy() {
-    var self = this;
-
-    this.forEachAttacker(function (mob) {
+    this.forEachAttacker((mob) => {
       mob.clearTarget();
       // Tell each attacking mob to forget this player so it returns to spawn
-      if ('forgetPlayer' in mob && typeof (mob as any).forgetPlayer === 'function') {
-        (mob as any).forgetPlayer(self.id);
+      if ('forgetPlayer' in mob && typeof mob.forgetPlayer === 'function') {
+        mob.forgetPlayer(this.id);
       }
     });
     this.attackers = {};
 
     // Tell each mob that has aggro on us to forget us
-    this.forEachHater(function (mob) {
-      mob.forgetPlayer(self.id);
+    this.forEachHater((mob) => {
+      mob.forgetPlayer(this.id);
     });
     // CombatTracker is the single source of truth - clear all aggro for this player
     getCombatTracker().clearPlayerAggro(this.id as number);
@@ -211,7 +205,7 @@ export class Player extends Character {
   }
 
   getState() {
-    var basestate = this._getBaseState(),
+    const basestate = this._getBaseState(),
       state = [this.name, this.orientation, this.armor, this.weapon];
 
     if (this.target) {
@@ -227,6 +221,10 @@ export class Player extends Character {
 
   getWorld() {
     return this.world;
+  }
+
+  getCombatTracker() {
+    return getCombatTracker();
   }
 
   getInventory() {
@@ -264,47 +262,47 @@ export class Player extends Character {
   }
 
   broadcast(message: MessagePayload, ignoreSelf?: boolean) {
-    if (this.broadcast_callback) {
-      this.broadcast_callback(message, ignoreSelf === undefined ? true : ignoreSelf);
+    if (this.broadcastCallback) {
+      this.broadcastCallback(message, ignoreSelf === undefined ? true : ignoreSelf);
     }
   }
 
   broadcastToZone(message: MessagePayload, ignoreSelf?: boolean) {
-    if (this.broadcastzone_callback) {
-      this.broadcastzone_callback(message, ignoreSelf === undefined ? true : ignoreSelf);
+    if (this.broadcastzoneCallback) {
+      this.broadcastzoneCallback(message, ignoreSelf === undefined ? true : ignoreSelf);
     }
   }
 
   onExit(callback: () => void) {
-    this.exit_callback = callback;
+    this.exitCallback = callback;
   }
 
   onMove(callback: (x: number, y: number) => void) {
-    this.move_callback = callback;
+    this.moveCallback = callback;
   }
 
   onLootMove(callback: (x: number, y: number) => void) {
-    this.lootmove_callback = callback;
+    this.lootmoveCallback = callback;
   }
 
-  onZone(callback: (zoneId: number) => void) {
-    this.zone_callback = callback;
+  onZone(callback: () => void) {
+    this.zoneCallback = callback;
   }
 
   onOrient(callback: (orientation: number) => void) {
-    this.orient_callback = callback;
+    this.orientCallback = callback;
   }
 
   onMessage(callback: (message: unknown[]) => void) {
-    this.message_callback = callback;
+    this.messageCallback = callback;
   }
 
   onBroadcast(callback: (message: MessagePayload, ignoreSelf: boolean) => void) {
-    this.broadcast_callback = callback;
+    this.broadcastCallback = callback;
   }
 
   onBroadcastToZone(callback: (message: MessagePayload, ignoreSelf: boolean) => void) {
-    this.broadcastzone_callback = callback;
+    this.broadcastzoneCallback = callback;
   }
 
   equip(item: number) {
@@ -359,8 +357,8 @@ export class Player extends Character {
   }
 
   updatePosition() {
-    if (this.requestpos_callback) {
-      var pos = this.requestpos_callback();
+    if (this.requestposCallback) {
+      const pos = this.requestposCallback();
       this.setPosition(pos.x, pos.y);
     }
   }
@@ -549,7 +547,7 @@ export class Player extends Character {
   }
 
   onRequestPosition(callback: () => { x: number; y: number }) {
-    this.requestpos_callback = callback;
+    this.requestposCallback = callback;
   }
 
   resetTimeout() {

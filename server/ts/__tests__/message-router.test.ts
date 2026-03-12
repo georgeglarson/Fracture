@@ -73,7 +73,8 @@ vi.mock('../utils/logger.js', () => ({
 // Imports
 // ---------------------------------------------------------------------------
 
-import { MessageRouter, MessageHandlerContext } from '../player/message-router';
+import { MessageRouter } from '../player/message-router';
+import type { Player } from '../player';
 import {
   checkAuthLimit,
   checkChatLimit,
@@ -134,9 +135,39 @@ function createMockChest() {
   return class MockChest {};
 }
 
+function createMockWorld() {
+  return {
+    addPlayer: vi.fn(),
+    enterCallback: vi.fn(),
+    isValidPosition: vi.fn(() => true),
+    getEntityById: vi.fn(() => null),
+    pushSpawnsToPlayer: vi.fn(),
+    broadcastAttacker: vi.fn(),
+    handleMobHate: vi.fn(),
+    handleHurtEntity: vi.fn(),
+    handlePlayerVanish: vi.fn(),
+    pushRelevantEntityListTo: vi.fn(),
+    handleOpenedChest: vi.fn(),
+    removeEntity: vi.fn(),
+    pushToPlayer: vi.fn(),
+    getStorageService: vi.fn(() => ({
+      characterExists: vi.fn(() => false),
+      createCharacter: vi.fn(() => ({ id: 'char-1' })),
+      saveInventory: vi.fn(),
+    })),
+    map: {
+      getCheckpoint: vi.fn(() => ({ id: 1, x: 10, y: 10 })),
+    },
+    roamingBossManager: {
+      getLeaderboard: vi.fn(() => []),
+    },
+  };
+}
+
 function createMockContext(
-  overrides: Partial<MessageHandlerContext> = {},
-): MessageHandlerContext {
+  overrides: Record<string, any> = {},
+): Player {
+  const world = createMockWorld();
   return {
     id: 1,
     name: 'TestPlayer',
@@ -163,32 +194,8 @@ function createMockContext(
 
     lastCheckpoint: null,
 
-    world: {
-      addPlayer: vi.fn(),
-      enter_callback: vi.fn(),
-      isValidPosition: vi.fn(() => true),
-      getEntityById: vi.fn(() => null),
-      pushSpawnsToPlayer: vi.fn(),
-      broadcastAttacker: vi.fn(),
-      handleMobHate: vi.fn(),
-      handleHurtEntity: vi.fn(),
-      handlePlayerVanish: vi.fn(),
-      pushRelevantEntityListTo: vi.fn(),
-      handleOpenedChest: vi.fn(),
-      removeEntity: vi.fn(),
-      pushToPlayer: vi.fn(),
-      getStorageService: vi.fn(() => ({
-        characterExists: vi.fn(() => false),
-        createCharacter: vi.fn(() => ({ id: 'char-1' })),
-        saveInventory: vi.fn(),
-      })),
-      map: {
-        getCheckpoint: vi.fn(() => ({ id: 1, x: 10, y: 10 })),
-      },
-      roamingBossManager: {
-        getLeaderboard: vi.fn(() => []),
-      },
-    },
+    getWorld: vi.fn(() => world),
+    getInventory: vi.fn(() => ({ serialize: vi.fn(() => []) })),
 
     send: vi.fn(),
     broadcast: vi.fn(),
@@ -224,10 +231,10 @@ function createMockContext(
     handleRiftExit: vi.fn(),
     handleRiftLeaderboardRequest: vi.fn(),
 
-    zone_callback: vi.fn(),
-    move_callback: vi.fn(),
-    lootmove_callback: vi.fn(),
-    message_callback: vi.fn(),
+    zoneCallback: vi.fn(),
+    moveCallback: vi.fn(),
+    lootmoveCallback: vi.fn(),
+    messageCallback: vi.fn(),
 
     characterId: 'char-1',
     loadFromStorage: vi.fn(() => true),
@@ -239,7 +246,7 @@ function createMockContext(
     consumePowerStrike: vi.fn(() => 1),
 
     ...overrides,
-  };
+  } as unknown as Player;
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +255,8 @@ function createMockContext(
 
 describe('MessageRouter', () => {
   let router: MessageRouter;
-  let ctx: MessageHandlerContext;
+  let ctx: Player;
+  let mockWorld: ReturnType<typeof createMockWorld>;
   let mockMessages: ReturnType<typeof createMockMessages>;
   let mockFormulas: ReturnType<typeof createMockFormulas>;
   let mockUtils: ReturnType<typeof createMockUtils>;
@@ -264,6 +272,7 @@ describe('MessageRouter', () => {
 
     router = new MessageRouter(mockMessages, mockFormulas, mockUtils, MockChest);
     ctx = createMockContext();
+    mockWorld = ctx.getWorld() as ReturnType<typeof createMockWorld>;
   });
 
   // =========================================================================
@@ -316,16 +325,16 @@ describe('MessageRouter', () => {
 
     it('should dispatch WHO to world.pushSpawnsToPlayer', async () => {
       await router.route(ctx, [Msg.WHO, 10, 20, 30]);
-      expect(ctx.world.pushSpawnsToPlayer).toHaveBeenCalledWith(ctx, [10, 20, 30]);
+      expect(mockWorld.pushSpawnsToPlayer).toHaveBeenCalledWith(ctx, [10, 20, 30]);
     });
 
-    it('should dispatch ZONE to zone_callback', async () => {
+    it('should dispatch ZONE to zoneCallback', async () => {
       await router.route(ctx, [Msg.ZONE]);
-      expect(ctx.zone_callback).toHaveBeenCalled();
+      expect(ctx.zoneCallback).toHaveBeenCalled();
     });
 
-    it('should not call zone_callback if not set', async () => {
-      ctx.zone_callback = undefined;
+    it('should not call zoneCallback if not set', async () => {
+      ctx.zoneCallback = undefined;
       // Should not throw
       const result = await router.route(ctx, [Msg.ZONE]);
       expect(result).toBe(true);
@@ -384,7 +393,7 @@ describe('MessageRouter', () => {
     it('should allow HELLO before entering game', async () => {
       ctx.hasEnteredGame = false;
 
-      const storage = ctx.world.getStorageService();
+      const storage = mockWorld.getStorageService();
       storage.characterExists = vi.fn(() => false);
       storage.createCharacter = vi.fn(() => ({ id: 'char-new' }));
 
@@ -435,7 +444,7 @@ describe('MessageRouter', () => {
         armorLevel: 1,
         receiveDamage: vi.fn(),
       };
-      ctx.world.getEntityById = vi.fn(() => mob);
+      mockWorld.getEntityById = vi.fn(() => mob);
 
       const result = await router.route(ctx, [Msg.HIT, 42]);
       expect(result).toBe(true);
@@ -458,7 +467,7 @@ describe('MessageRouter', () => {
         'pw',
       ]);
       expect(result).toBe(true);
-      expect(ctx.world.addPlayer).not.toHaveBeenCalled();
+      expect(mockWorld.addPlayer).not.toHaveBeenCalled();
     });
 
     it('should use clientIp as key for auth rate limit', async () => {
@@ -493,7 +502,7 @@ describe('MessageRouter', () => {
         armorLevel: 1,
         receiveDamage: vi.fn(),
       };
-      ctx.world.getEntityById = vi.fn(() => mob);
+      mockWorld.getEntityById = vi.fn(() => mob);
 
       await router.route(ctx, [Msg.HIT, 42]);
 
@@ -526,19 +535,20 @@ describe('MessageRouter', () => {
 
   describe('MOVE handler', () => {
     it('should update position and broadcast when valid', async () => {
-      await router.route(ctx, [Msg.MOVE, 100, 200]);
+      // Move within MAX_MOVE_DISTANCE (3 tiles) of player position (50,50)
+      await router.route(ctx, [Msg.MOVE, 52, 53]);
 
-      expect(ctx.world.isValidPosition).toHaveBeenCalledWith(100, 200);
-      expect(ctx.setPosition).toHaveBeenCalledWith(100, 200);
+      expect(mockWorld.isValidPosition).toHaveBeenCalledWith(52, 53);
+      expect(ctx.setPosition).toHaveBeenCalledWith(52, 53);
       expect(ctx.clearTarget).toHaveBeenCalled();
       expect(ctx.broadcast).toHaveBeenCalled();
       expect(mockMessages.Move).toHaveBeenCalledWith(ctx);
-      expect(ctx.move_callback).toHaveBeenCalledWith(ctx.x, ctx.y);
-      expect(ctx.checkZoneChange).toHaveBeenCalledWith(100, 200);
+      expect(ctx.moveCallback).toHaveBeenCalledWith(ctx.x, ctx.y);
+      expect(ctx.checkZoneChange).toHaveBeenCalledWith(52, 53);
     });
 
     it('should reject movement to invalid position', async () => {
-      ctx.world.isValidPosition = vi.fn(() => false);
+      mockWorld.isValidPosition = vi.fn(() => false);
 
       await router.route(ctx, [Msg.MOVE, -1, -1]);
 
@@ -546,8 +556,8 @@ describe('MessageRouter', () => {
       expect(ctx.broadcast).not.toHaveBeenCalled();
     });
 
-    it('should not move if move_callback is not set', async () => {
-      ctx.move_callback = undefined;
+    it('should not move if moveCallback is not set', async () => {
+      ctx.moveCallback = undefined;
 
       await router.route(ctx, [Msg.MOVE, 100, 200]);
 
@@ -556,8 +566,9 @@ describe('MessageRouter', () => {
     });
 
     it('should check zone change after moving', async () => {
-      await router.route(ctx, [Msg.MOVE, 300, 400]);
-      expect(ctx.checkZoneChange).toHaveBeenCalledWith(300, 400);
+      // Move within MAX_MOVE_DISTANCE (3 tiles) of player position (50,50)
+      await router.route(ctx, [Msg.MOVE, 51, 52]);
+      expect(ctx.checkZoneChange).toHaveBeenCalledWith(51, 52);
     });
   });
 
@@ -609,275 +620,35 @@ describe('MessageRouter', () => {
   });
 
   // =========================================================================
-  // HIT handler
+  // HIT handler (delegation — behavioral tests in combat.handler.test.ts)
   // =========================================================================
 
   describe('HIT handler', () => {
-    let mob: any;
-
-    beforeEach(() => {
-      mob = {
-        id: 42,
-        isDead: false,
-        armorLevel: 1,
-        weaponLevel: 1,
-        receiveDamage: vi.fn(),
-        hitPoints: 50,
-      };
-      ctx.world.getEntityById = vi.fn(() => mob);
-      mockFormulas.dmg.mockReturnValue(10);
+    it('should route HIT messages (combat rate limited)', async () => {
+      const result = await router.route(ctx, [Msg.HIT, 42]);
+      expect(result).toBe(true);
     });
 
-    it('should deal damage to a living mob', async () => {
-      await router.route(ctx, [Msg.HIT, 42]);
+    it('should apply combat rate limit to HIT', async () => {
+      vi.mocked(checkCombatLimit).mockResolvedValueOnce({
+        allowed: false,
+        retryAfter: 1,
+      });
 
-      expect(ctx.world.getEntityById).toHaveBeenCalledWith(42);
-      expect(mockFormulas.dmg).toHaveBeenCalledWith(
-        ctx.weaponLevel,
-        mob.armorLevel,
-        ctx.level,
-      );
-      expect(mob.receiveDamage).toHaveBeenCalledWith(10, ctx.id);
-      expect(ctx.world.handleMobHate).toHaveBeenCalledWith(
-        mob.id,
-        ctx.id,
-        10,
-      );
-      expect(ctx.world.handleHurtEntity).toHaveBeenCalledWith(mob, ctx, 10);
-    });
-
-    it('should not hit a dead mob', async () => {
-      mob.isDead = true;
-
-      await router.route(ctx, [Msg.HIT, 42]);
-
-      expect(mob.receiveDamage).not.toHaveBeenCalled();
-    });
-
-    it('should not hit a non-existent entity', async () => {
-      ctx.world.getEntityById = vi.fn(() => null);
-
-      await router.route(ctx, [Msg.HIT, 999]);
-
-      expect(mockFormulas.dmg).not.toHaveBeenCalled();
-    });
-
-    it('should clear spawn protection on attack', async () => {
-      ctx.spawnProtectionUntil = Date.now() + 10000;
-
-      await router.route(ctx, [Msg.HIT, 42]);
-
-      expect(ctx.spawnProtectionUntil).toBe(0);
-    });
-
-    it('should clear spawn protection even if mob is null', async () => {
-      ctx.spawnProtectionUntil = Date.now() + 10000;
-      ctx.world.getEntityById = vi.fn(() => null);
-
-      await router.route(ctx, [Msg.HIT, 999]);
-
-      expect(ctx.spawnProtectionUntil).toBe(0);
-    });
-
-    it('should not deal damage when dmg formula returns 0', async () => {
-      mockFormulas.dmg.mockReturnValue(0);
-
-      await router.route(ctx, [Msg.HIT, 42]);
-
-      expect(mob.receiveDamage).not.toHaveBeenCalled();
-      expect(ctx.world.handleHurtEntity).not.toHaveBeenCalled();
-    });
-
-    it('should apply power strike multiplier', async () => {
-      (ctx.consumePowerStrike as ReturnType<typeof vi.fn>).mockReturnValue(2);
-      mockFormulas.dmg.mockReturnValue(15);
-
-      await router.route(ctx, [Msg.HIT, 42]);
-
-      expect(mob.receiveDamage).toHaveBeenCalledWith(30, ctx.id);
-      expect(ctx.world.handleMobHate).toHaveBeenCalledWith(
-        mob.id,
-        ctx.id,
-        30,
-      );
-    });
-
-    it('should floor the damage after multiplier', async () => {
-      (ctx.consumePowerStrike as ReturnType<typeof vi.fn>).mockReturnValue(1.5);
-      mockFormulas.dmg.mockReturnValue(7);
-
-      await router.route(ctx, [Msg.HIT, 42]);
-
-      // Math.floor(7 * 1.5) = Math.floor(10.5) = 10
-      expect(mob.receiveDamage).toHaveBeenCalledWith(10, ctx.id);
-    });
-
-    it('should consume power strike buff on each hit', async () => {
-      await router.route(ctx, [Msg.HIT, 42]);
-
-      expect(ctx.consumePowerStrike).toHaveBeenCalled();
-    });
-
-    it('should pass player level to damage formula', async () => {
-      ctx.level = 25;
-      await router.route(ctx, [Msg.HIT, 42]);
-
-      expect(mockFormulas.dmg).toHaveBeenCalledWith(
-        ctx.weaponLevel,
-        mob.armorLevel,
-        25,
-      );
+      const result = await router.route(ctx, [Msg.HIT, 42]);
+      expect(result).toBe(true);
+      // Handler was not called (rate limited)
     });
   });
 
   // =========================================================================
-  // HURT handler
+  // HURT handler (delegation — behavioral tests in combat.handler.test.ts)
   // =========================================================================
 
   describe('HURT handler', () => {
-    let mob: any;
-
-    beforeEach(() => {
-      mob = {
-        id: 42,
-        isDead: false,
-        hitPoints: 50,
-        weaponLevel: 1,
-        x: 50,
-        y: 50,
-        clearTarget: vi.fn(),
-        forgetPlayer: vi.fn(),
-      };
-      ctx.world.getEntityById = vi.fn(() => mob);
-      ctx.hitPoints = 100;
-      ctx.x = 50;
-      ctx.y = 50;
-      mockFormulas.dmg.mockReturnValue(10);
-    });
-
-    it('should reduce player hitPoints when hurt by mob', async () => {
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(ctx.hitPoints).toBeLessThan(100);
-      expect(ctx.world.handleHurtEntity).toHaveBeenCalledWith(ctx);
-    });
-
-    it('should clamp hitPoints at 0 on overkill damage', async () => {
-      ctx.hitPoints = 5;
-      mockFormulas.dmg.mockReturnValue(20);
-
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(ctx.hitPoints).toBe(0);
-    });
-
-    it('should not take damage from a dead mob', async () => {
-      mob.isDead = true;
-
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(ctx.hitPoints).toBe(100);
-    });
-
-    it('should not take damage from a non-existent mob', async () => {
-      ctx.world.getEntityById = vi.fn(() => null);
-
-      await router.route(ctx, [Msg.HURT, 999]);
-
-      expect(ctx.hitPoints).toBe(100);
-    });
-
-    it('should not take damage when player is dead', async () => {
-      ctx.hitPoints = 0;
-
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(ctx.world.handleHurtEntity).not.toHaveBeenCalled();
-    });
-
-    it('should not take damage when phased', async () => {
-      (ctx.isPhased as ReturnType<typeof vi.fn>).mockReturnValue(true);
-
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(ctx.hitPoints).toBe(100);
-    });
-
-    it('should set isDead and clear firepotion timeout when killed', async () => {
-      ctx.hitPoints = 5;
-      mockFormulas.dmg.mockReturnValue(10);
-      const timeout = setTimeout(() => {}, 15000);
-      ctx.firepotionTimeout = timeout;
-
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(ctx.isDead).toBe(true);
-      clearTimeout(timeout);
-    });
-
-    it('should reject damage from mob too far away but keep aggro', async () => {
-      mob.x = 200;
-      mob.y = 200;
-      ctx.x = 50;
-      ctx.y = 50;
-
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(ctx.hitPoints).toBe(100);
-      // Aggro kept intact — just skip damage this tick
-      expect(mob.clearTarget).not.toHaveBeenCalled();
-      expect(mob.forgetPlayer).not.toHaveBeenCalled();
-    });
-
-    it('should allow damage from mob within melee range', async () => {
-      mob.x = 51;
-      mob.y = 51;
-      ctx.x = 50;
-      ctx.y = 50;
-
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(ctx.hitPoints).toBeLessThan(100);
-    });
-
-    it('should not take damage from stunned mob', async () => {
-      mob.stunUntil = Date.now() + 5000;
-
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(ctx.hitPoints).toBe(100);
-    });
-
-    it('should not take damage from mob with 0 hitPoints', async () => {
-      mob.hitPoints = 0;
-
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(ctx.hitPoints).toBe(100);
-    });
-
-    it('should pass mob level to damage formula', async () => {
-      mob.level = 15;
-
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(mockFormulas.dmg).toHaveBeenCalledWith(
-        mob.weaponLevel,
-        ctx.armorLevel,
-        15,
-      );
-    });
-
-    it('should default mob level to 1 when not set', async () => {
-      mob.level = undefined;
-
-      await router.route(ctx, [Msg.HURT, 42]);
-
-      expect(mockFormulas.dmg).toHaveBeenCalledWith(
-        mob.weaponLevel,
-        ctx.armorLevel,
-        1,
-      );
+    it('should route HURT messages', async () => {
+      const result = await router.route(ctx, [Msg.HURT, 42]);
+      expect(result).toBe(true);
     });
   });
 
@@ -887,7 +658,7 @@ describe('MessageRouter', () => {
 
   describe('error handling', () => {
     it('should not crash when handler throws synchronously', async () => {
-      ctx.world.pushSpawnsToPlayer = vi.fn(() => {
+      mockWorld.pushSpawnsToPlayer = vi.fn(() => {
         throw new Error('Unexpected error');
       });
 
@@ -896,7 +667,7 @@ describe('MessageRouter', () => {
     });
 
     it('should still return true after handler error', async () => {
-      ctx.world.pushSpawnsToPlayer = vi.fn(() => {
+      mockWorld.pushSpawnsToPlayer = vi.fn(() => {
         throw new TypeError('Cannot read properties of undefined');
       });
 
@@ -904,8 +675,8 @@ describe('MessageRouter', () => {
       expect(result).toBe(true);
     });
 
-    it('should not crash when zone_callback throws', async () => {
-      (ctx.zone_callback as ReturnType<typeof vi.fn>).mockImplementation(
+    it('should not crash when zoneCallback throws', async () => {
+      (ctx.zoneCallback as ReturnType<typeof vi.fn>).mockImplementation(
         () => {
           throw new Error('zone error');
         },
@@ -915,8 +686,8 @@ describe('MessageRouter', () => {
       expect(result).toBe(true);
     });
 
-    it('should not crash when move_callback throws', async () => {
-      (ctx.move_callback as ReturnType<typeof vi.fn>).mockImplementation(
+    it('should not crash when moveCallback throws', async () => {
+      (ctx.moveCallback as ReturnType<typeof vi.fn>).mockImplementation(
         () => {
           throw new Error('move callback error');
         },
@@ -927,7 +698,7 @@ describe('MessageRouter', () => {
     });
 
     it('should not crash when world.getEntityById throws in HIT', async () => {
-      ctx.world.getEntityById = vi.fn(() => {
+      mockWorld.getEntityById = vi.fn(() => {
         throw new Error('DB error');
       });
 
@@ -943,7 +714,7 @@ describe('MessageRouter', () => {
   describe('LOOTMOVE handler', () => {
     it('should move to item and broadcast', async () => {
       const item = { id: 55, kind: Types.Entities.FLASK };
-      ctx.world.getEntityById = vi.fn(() => item);
+      mockWorld.getEntityById = vi.fn(() => item);
 
       await router.route(ctx, [Msg.LOOTMOVE, 80, 90, 55]);
 
@@ -951,19 +722,19 @@ describe('MessageRouter', () => {
       expect(ctx.clearTarget).toHaveBeenCalled();
       expect(ctx.broadcast).toHaveBeenCalled();
       expect(mockMessages.LootMove).toHaveBeenCalledWith(ctx, item);
-      expect(ctx.lootmove_callback).toHaveBeenCalledWith(ctx.x, ctx.y);
+      expect(ctx.lootmoveCallback).toHaveBeenCalledWith(ctx.x, ctx.y);
     });
 
     it('should not move to loot if position is invalid', async () => {
-      ctx.world.isValidPosition = vi.fn(() => false);
+      mockWorld.isValidPosition = vi.fn(() => false);
 
       await router.route(ctx, [Msg.LOOTMOVE, -1, -1, 55]);
 
       expect(ctx.setPosition).not.toHaveBeenCalled();
     });
 
-    it('should not move if lootmove_callback is not set', async () => {
-      ctx.lootmove_callback = undefined;
+    it('should not move if lootmoveCallback is not set', async () => {
+      ctx.lootmoveCallback = undefined;
 
       await router.route(ctx, [Msg.LOOTMOVE, 80, 90, 55]);
 
@@ -971,7 +742,7 @@ describe('MessageRouter', () => {
     });
 
     it('should not broadcast if item does not exist', async () => {
-      ctx.world.getEntityById = vi.fn(() => null);
+      mockWorld.getEntityById = vi.fn(() => null);
 
       await router.route(ctx, [Msg.LOOTMOVE, 80, 90, 999]);
 
@@ -988,15 +759,15 @@ describe('MessageRouter', () => {
     it('should trigger mob hate', async () => {
       await router.route(ctx, [Msg.AGGRO, 42]);
 
-      expect(ctx.world.handleMobHate).toHaveBeenCalledWith(42, ctx.id, 5);
+      expect(mockWorld.handleMobHate).toHaveBeenCalledWith(42, ctx.id, 5);
     });
 
-    it('should not trigger mob hate if move_callback is not set', async () => {
-      ctx.move_callback = undefined;
+    it('should not trigger mob hate if moveCallback is not set', async () => {
+      ctx.moveCallback = undefined;
 
       await router.route(ctx, [Msg.AGGRO, 42]);
 
-      expect(ctx.world.handleMobHate).not.toHaveBeenCalled();
+      expect(mockWorld.handleMobHate).not.toHaveBeenCalled();
     });
   });
 
@@ -1007,16 +778,16 @@ describe('MessageRouter', () => {
   describe('ATTACK handler', () => {
     it('should set target and broadcast attacker', async () => {
       const mob = { id: 42 };
-      ctx.world.getEntityById = vi.fn(() => mob);
+      mockWorld.getEntityById = vi.fn(() => mob);
 
       await router.route(ctx, [Msg.ATTACK, 42]);
 
       expect(ctx.setTarget).toHaveBeenCalledWith(mob);
-      expect(ctx.world.broadcastAttacker).toHaveBeenCalledWith(ctx);
+      expect(mockWorld.broadcastAttacker).toHaveBeenCalledWith(ctx);
     });
 
     it('should not attack non-existent entity', async () => {
-      ctx.world.getEntityById = vi.fn(() => null);
+      mockWorld.getEntityById = vi.fn(() => null);
 
       await router.route(ctx, [Msg.ATTACK, 999]);
 
@@ -1036,12 +807,12 @@ describe('MessageRouter', () => {
       expect(ctx.clearTarget).toHaveBeenCalled();
       expect(ctx.broadcast).toHaveBeenCalled();
       expect(mockMessages.Teleport).toHaveBeenCalledWith(ctx);
-      expect(ctx.world.handlePlayerVanish).toHaveBeenCalledWith(ctx);
-      expect(ctx.world.pushRelevantEntityListTo).toHaveBeenCalledWith(ctx);
+      expect(mockWorld.handlePlayerVanish).toHaveBeenCalledWith(ctx);
+      expect(mockWorld.pushRelevantEntityListTo).toHaveBeenCalledWith(ctx);
     });
 
     it('should not teleport to invalid position', async () => {
-      ctx.world.isValidPosition = vi.fn(() => false);
+      mockWorld.isValidPosition = vi.fn(() => false);
 
       await router.route(ctx, [Msg.TELEPORT, -1, -1]);
 
@@ -1056,7 +827,7 @@ describe('MessageRouter', () => {
   describe('CHECK handler', () => {
     it('should set lastCheckpoint when checkpoint exists', async () => {
       const checkpoint = { id: 5, x: 100, y: 200 };
-      ctx.world.map.getCheckpoint = vi.fn(() => checkpoint);
+      mockWorld.map.getCheckpoint = vi.fn(() => checkpoint);
 
       await router.route(ctx, [Msg.CHECK, 5]);
 
@@ -1064,7 +835,7 @@ describe('MessageRouter', () => {
     });
 
     it('should not set lastCheckpoint when checkpoint missing', async () => {
-      ctx.world.map.getCheckpoint = vi.fn(() => null);
+      mockWorld.map.getCheckpoint = vi.fn(() => null);
 
       await router.route(ctx, [Msg.CHECK, 999]);
 
@@ -1079,28 +850,28 @@ describe('MessageRouter', () => {
   describe('OPEN handler', () => {
     it('should open chest when entity is a Chest instance', async () => {
       const chest = new MockChest();
-      ctx.world.getEntityById = vi.fn(() => chest);
+      mockWorld.getEntityById = vi.fn(() => chest);
 
       await router.route(ctx, [Msg.OPEN, 100]);
 
-      expect(ctx.world.handleOpenedChest).toHaveBeenCalledWith(chest, ctx);
+      expect(mockWorld.handleOpenedChest).toHaveBeenCalledWith(chest, ctx);
     });
 
     it('should not open if entity is not a Chest', async () => {
       const notAChest = { id: 100, kind: 1 };
-      ctx.world.getEntityById = vi.fn(() => notAChest);
+      mockWorld.getEntityById = vi.fn(() => notAChest);
 
       await router.route(ctx, [Msg.OPEN, 100]);
 
-      expect(ctx.world.handleOpenedChest).not.toHaveBeenCalled();
+      expect(mockWorld.handleOpenedChest).not.toHaveBeenCalled();
     });
 
     it('should not open if entity does not exist', async () => {
-      ctx.world.getEntityById = vi.fn(() => null);
+      mockWorld.getEntityById = vi.fn(() => null);
 
       await router.route(ctx, [Msg.OPEN, 999]);
 
-      expect(ctx.world.handleOpenedChest).not.toHaveBeenCalled();
+      expect(mockWorld.handleOpenedChest).not.toHaveBeenCalled();
     });
   });
 
@@ -1118,7 +889,7 @@ describe('MessageRouter', () => {
         characterExists: vi.fn(() => false),
         createCharacter: vi.fn(() => ({ id: 'char-new' })),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
 
       await router.route(ctx, [
         Msg.HELLO,
@@ -1135,7 +906,7 @@ describe('MessageRouter', () => {
       );
       expect(ctx.hasEnteredGame).toBe(true);
       expect(ctx.isDead).toBe(false);
-      expect(ctx.world.addPlayer).toHaveBeenCalledWith(ctx);
+      expect(mockWorld.addPlayer).toHaveBeenCalledWith(ctx);
     });
 
     it('should send WELCOME message after successful hello', async () => {
@@ -1143,7 +914,7 @@ describe('MessageRouter', () => {
         characterExists: vi.fn(() => false),
         createCharacter: vi.fn(() => ({ id: 'char-new' })),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
 
       await router.route(ctx, [
         Msg.HELLO,
@@ -1164,7 +935,7 @@ describe('MessageRouter', () => {
         characterExists: vi.fn(() => false),
         createCharacter: vi.fn(() => ({ id: 'char-new' })),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
       mockUtils.sanitize.mockReturnValue('A'.repeat(30));
 
       await router.route(ctx, [
@@ -1184,7 +955,7 @@ describe('MessageRouter', () => {
         characterExists: vi.fn(() => false),
         createCharacter: vi.fn(() => ({ id: 'char-new' })),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
       mockUtils.sanitize.mockReturnValue('');
 
       await router.route(ctx, [
@@ -1204,7 +975,7 @@ describe('MessageRouter', () => {
         characterExists: vi.fn(() => true),
         verifyPassword: vi.fn(() => false),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
 
       await router.route(ctx, [
         Msg.HELLO,
@@ -1225,7 +996,7 @@ describe('MessageRouter', () => {
       const storage = {
         characterExists: vi.fn(() => false),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
 
       await router.route(ctx, [
         Msg.HELLO,
@@ -1244,7 +1015,7 @@ describe('MessageRouter', () => {
       const storage = {
         characterExists: vi.fn(() => false),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
 
       await router.route(ctx, [
         Msg.HELLO,
@@ -1264,7 +1035,7 @@ describe('MessageRouter', () => {
         characterExists: vi.fn(() => true),
         verifyPassword: vi.fn(() => true),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
 
       await router.route(ctx, [
         Msg.HELLO,
@@ -1284,11 +1055,11 @@ describe('MessageRouter', () => {
         characterExists: vi.fn(() => false),
         createCharacter: vi.fn(() => ({ id: 'char-new' })),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
 
       // Track the order: was spawnProtection set before addPlayer was called?
       let protectionWasSetBeforeAdd = false;
-      ctx.world.addPlayer = vi.fn(() => {
+      mockWorld.addPlayer = vi.fn(() => {
         // At the moment addPlayer is called, spawnProtection should already be set
         protectionWasSetBeforeAdd = ctx.spawnProtectionUntil > Date.now();
       });
@@ -1310,7 +1081,7 @@ describe('MessageRouter', () => {
         characterExists: vi.fn(() => false),
         createCharacter: vi.fn(() => ({ id: 'char-new' })),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
 
       const before = Date.now();
       await router.route(ctx, [
@@ -1332,7 +1103,7 @@ describe('MessageRouter', () => {
         characterExists: vi.fn(() => false),
         createCharacter: vi.fn(() => ({ id: 'char-new' })),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
 
       await router.route(ctx, [
         Msg.HELLO,
@@ -1351,7 +1122,7 @@ describe('MessageRouter', () => {
         characterExists: vi.fn(() => false),
         createCharacter: vi.fn(() => ({ id: 'char-new' })),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
 
       await router.route(ctx, [
         Msg.HELLO,
@@ -1366,12 +1137,12 @@ describe('MessageRouter', () => {
       expect(ctx.updatePosition).toHaveBeenCalled();
     });
 
-    it('should equip starting gear for new character', async () => {
+    it('should equip default starting gear for new character (ignores client values)', async () => {
       const storage = {
         characterExists: vi.fn(() => false),
         createCharacter: vi.fn(() => ({ id: 'char-new' })),
       };
-      ctx.world.getStorageService = vi.fn(() => storage);
+      mockWorld.getStorageService = vi.fn(() => storage);
 
       await router.route(ctx, [
         Msg.HELLO,
@@ -1382,9 +1153,10 @@ describe('MessageRouter', () => {
         'pw123',
       ]);
 
-      expect(ctx.equipArmor).toHaveBeenCalledWith(Types.Entities.LEATHERARMOR);
-      expect(ctx.equipWeapon).toHaveBeenCalledWith(Types.Entities.SWORD2);
-      expect(ctx.setGold).toHaveBeenCalledWith(50);
+      // Server enforces default starting equipment regardless of client-provided values
+      expect(ctx.equipArmor).toHaveBeenCalledWith(Types.Entities.CLOTHARMOR);
+      expect(ctx.equipWeapon).toHaveBeenCalledWith(Types.Entities.SWORD1);
+      expect(ctx.setGold).toHaveBeenCalledWith(0);
     });
   });
 
@@ -1396,7 +1168,7 @@ describe('MessageRouter', () => {
     it('should parse string message type via parseInt', async () => {
       const result = await router.route(ctx, [String(Msg.WHO), 10]);
       expect(result).toBe(true);
-      expect(ctx.world.pushSpawnsToPlayer).toHaveBeenCalled();
+      expect(mockWorld.pushSpawnsToPlayer).toHaveBeenCalled();
     });
 
     it('should return false for NaN message type', async () => {

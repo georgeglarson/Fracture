@@ -125,12 +125,12 @@ export class CombatService {
   /**
    * Calculate XP reward for killing a mob
    *
-   * @param mobArmorLevel - The mob's armor level (toughness)
+   * @param mobLevel - The mob's level (for XP scaling)
    * @param zoneXpBonus - Zone XP bonus multiplier (0-1)
    * @returns XP amount to grant
    */
-  calculateKillXP(mobArmorLevel: number, zoneXpBonus: number = 0): number {
-    const baseXP = Formulas.xpFromMob(mobArmorLevel);
+  calculateKillXP(mobLevel: number, zoneXpBonus: number = 0): number {
+    const baseXP = Formulas.xpFromMob(mobLevel);
     const bonusXP = Math.floor(baseXP * zoneXpBonus);
     return baseXP + bonusXP;
   }

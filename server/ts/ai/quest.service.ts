@@ -7,6 +7,9 @@ import { VeniceClient } from './venice-client';
 import { ProfileService } from './profile.service';
 import { Quest, QuestResult } from './types';
 import { QUEST_TEMPLATES } from './npc-personalities';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('QuestService');
 
 export class QuestService {
   private client: VeniceClient;
@@ -40,11 +43,15 @@ export class QuestService {
     const suitable = templates.filter(t => {
       if (questType === 'kill') {
         const target = t.target || '';
-        const required =
+        const killThreshold =
           target === 'rat' ? 0 :
           target === 'crab' ? 5 :
           target === 'goblin' ? 20 : 50;
-        return profile.totalKills >= required;
+        const levelThreshold =
+          target === 'rat' ? 1 :
+          target === 'crab' ? 3 :
+          target === 'goblin' ? 8 : 15;
+        return profile.totalKills >= killThreshold || profile.level >= levelThreshold;
       }
       return true;
     });
@@ -65,7 +72,8 @@ Write a SHORT quest description (under 100 chars). Sound urgent but friendly:`;
     try {
       description = await this.client.call(prompt) ||
         `Defeat ${template.count || 1} ${template.target || template.area}!`;
-    } catch {
+    } catch (err) {
+      log.debug({ err }, 'Quest description generation failed');
       description = `Defeat ${template.count || 1} ${template.target || template.area}!`;
     }
 

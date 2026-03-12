@@ -1,4 +1,4 @@
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import {Checkpoint} from './checkpoint';
 import {Utils} from './utils';
 import { createModuleLogger } from './utils/logger.js';
@@ -85,21 +85,16 @@ export class Map {
   startingAreas: Checkpoint[] = [];
 
   constructor(filepath: string) {
-    var self = this;
-
-
-    fs.exists(filepath, function (exists) {
-      if (!exists) {
-        log.error({ filepath }, 'Map file does not exist');
-        return;
+    (async () => {
+      try {
+        const file = await fs.readFile(filepath);
+        const json = JSON.parse(file.toString());
+        this.initMap(json);
+      } catch (err) {
+        log.error({ filepath, err }, 'Failed to load map file');
+        throw new Error(`Failed to load map: ${filepath}`);
       }
-
-      fs.readFile(filepath, function (err, file) {
-        var json = JSON.parse(file.toString());
-
-        self.initMap(json);
-      });
-    });
+    })();
   }
 
   initMap(map: MapData) {
@@ -131,10 +126,10 @@ export class Map {
   }
 
   tileIndexToGridPosition(tileNum: number) {
-    var x = 0,
+    let x = 0,
       y = 0;
 
-    var getX = function (num: number, w: number) {
+    const getX = (num: number, w: number) => {
       if (num == 0) {
         return 0;
       }
@@ -156,19 +151,15 @@ export class Map {
     this.grid = [];
 
     if (this.isLoaded) {
-      var tileIndex = 0;
-      for (var j, i = 0; i < this.height; i++) {
+      const collisionSet = new Set(this.collisions);
+      let tileIndex = 0;
+      for (let j, i = 0; i < this.height; i++) {
         this.grid[i] = [];
         for (j = 0; j < this.width; j++) {
-          if (this.collisions.includes(tileIndex)) {
-            this.grid[i][j] = 1;
-          } else {
-            this.grid[i][j] = 0;
-          }
+          this.grid[i][j] = collisionSet.has(tileIndex) ? 1 : 0;
           tileIndex += 1;
         }
       }
-      //console.info("Collision grid generated.");
     }
   }
 
@@ -178,30 +169,30 @@ export class Map {
 
   isColliding(x: number, y: number) {
     if (this.isOutOfBounds(x, y)) {
-      return false;
+      return true;
     }
     return this.grid[y][x] === 1;
   }
 
   GroupIdToGroupPosition(id: string): Position {
-    var posArray = id.split('-');
+    const posArray = id.split('-');
 
     return pos(parseInt(posArray[0]), parseInt(posArray[1]));
   }
 
   forEachGroup(callback: (groupId: string) => void) {
-    var width = this.groupWidth,
+    const width = this.groupWidth,
       height = this.groupHeight;
 
-    for (var x = 0; x < width; x += 1) {
-      for (var y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      for (let y = 0; y < height; y += 1) {
         callback(x + '-' + y);
       }
     }
   }
 
   getGroupIdFromPosition(x: number, y: number) {
-    var w = this.zoneWidth,
+    const w = this.zoneWidth,
       h = this.zoneHeight,
       gx = Math.floor((x - 1) / w),
       gy = Math.floor((y - 1) / h);
@@ -210,8 +201,7 @@ export class Map {
   }
 
   getAdjacentGroupPositions(id: string) {
-    var self = this,
-      position = this.GroupIdToGroupPosition(id),
+    const position = this.GroupIdToGroupPosition(id),
       x = position.x,
       y = position.y,
       // surrounding groups
@@ -221,57 +211,49 @@ export class Map {
 
     // groups connected via doors
     if (this.connectedGroups[id]) {
-      this.connectedGroups[id].forEach(function (position: Position) {
+      this.connectedGroups[id].forEach((position: Position) => {
         // don't add a connected group if it's already part of the surrounding ones.
-        if (!list.some(function (groupPos: Position) {
-            return equalPositions(groupPos, position);
-          })) {
+        if (!list.some((groupPos: Position) => equalPositions(groupPos, position))) {
           list.push(position);
         }
       });
     }
 
-    return list.filter(function (p: Position) {
-      return p.x >= 0 && p.y >= 0 && p.x < self.groupWidth && p.y < self.groupHeight;
-    });
+    return list.filter((p: Position) => p.x >= 0 && p.y >= 0 && p.x < this.groupWidth && p.y < this.groupHeight);
   }
 
   forEachAdjacentGroup(groupId: string, callback: (groupId: string) => void) {
     if (groupId) {
-      this.getAdjacentGroupPositions(groupId).forEach(function (p: Position) {
+      this.getAdjacentGroupPositions(groupId).forEach((p: Position) => {
         callback(p.x + '-' + p.y);
       });
     }
   }
 
   initConnectedGroups(doors: DoorData[]) {
-    var self = this;
-
     this.connectedGroups = {};
-    doors.forEach(function (door: DoorData) {
-      var groupId = self.getGroupIdFromPosition(door.x, door.y),
-        connectedGroupId = self.getGroupIdFromPosition(door.tx, door.ty),
-        connectedPosition = self.GroupIdToGroupPosition(connectedGroupId);
+    doors.forEach((door: DoorData) => {
+      const groupId = this.getGroupIdFromPosition(door.x, door.y),
+        connectedGroupId = this.getGroupIdFromPosition(door.tx, door.ty),
+        connectedPosition = this.GroupIdToGroupPosition(connectedGroupId);
 
-      if (groupId in self.connectedGroups) {
-        self.connectedGroups[groupId].push(connectedPosition);
+      if (groupId in this.connectedGroups) {
+        this.connectedGroups[groupId].push(connectedPosition);
       } else {
-        self.connectedGroups[groupId] = [connectedPosition];
+        this.connectedGroups[groupId] = [connectedPosition];
       }
     });
   }
 
   initCheckpoints(cpList: CheckpointData[]) {
-    var self = this;
-
     this.checkpoints = {};
     this.startingAreas = [];
 
-    cpList.forEach(function (cp: CheckpointData) {
-      var checkpoint = new Checkpoint(cp.id, cp.x, cp.y, cp.w, cp.h);
-      self.checkpoints[checkpoint.id] = checkpoint;
+    cpList.forEach((cp: CheckpointData) => {
+      const checkpoint = new Checkpoint(cp.id, cp.x, cp.y, cp.w, cp.h);
+      this.checkpoints[checkpoint.id] = checkpoint;
       if (cp.s === 1) {
-        self.startingAreas.push(checkpoint);
+        this.startingAreas.push(checkpoint);
       }
     });
   }
@@ -281,9 +263,12 @@ export class Map {
   }
 
   getRandomStartingPosition() {
-    var nbAreas = this.startingAreas.length;
-    var i = Utils.randomInt(0, nbAreas - 1);
-    var area = this.startingAreas[i];
+    const nbAreas = this.startingAreas.length;
+    if (nbAreas === 0) {
+      return { x: 0, y: 0 };
+    }
+    const i = Utils.randomInt(0, nbAreas - 1);
+    const area = this.startingAreas[i];
 
     return area.getRandomPosition();
   }
@@ -293,21 +278,21 @@ export class Map {
    * Falls back to starting position if no other checkpoints exist
    */
   getRandomNonStartingPosition() {
-    var nonStarting = Object.values(this.checkpoints).filter(
+    const nonStarting = Object.values(this.checkpoints).filter(
       (cp: Checkpoint) => !this.startingAreas.includes(cp)
     );
     if (nonStarting.length === 0) {
       return this.getRandomStartingPosition();
     }
-    var i = Utils.randomInt(0, nonStarting.length - 1);
+    const i = Utils.randomInt(0, nonStarting.length - 1);
     return nonStarting[i].getRandomPosition();
   }
 }
 
-var pos = function (x: number, y: number): Position {
+const pos = (x: number, y: number): Position => {
   return {x: x, y: y};
 };
 
-var equalPositions = function (pos1: Position, pos2: Position) {
+const equalPositions = (pos1: Position, pos2: Position) => {
   return pos1.x === pos2.x && pos1.y === pos2.y;
 };

@@ -16,6 +16,21 @@ import { createModuleLogger } from '../utils/logger.js';
 const log = createModuleLogger('Inventory');
 
 /**
+ * Persist inventory to storage (called after inventory mutations).
+ * Accepts any player-like object with characterId, getWorld, and getInventory.
+ */
+export function persistInventory(player: any): void {
+  if (!player.characterId) return;
+  try {
+    const storage = player.getWorld().getStorageService();
+    const inventory = player.getInventory();
+    storage.saveInventory(player.characterId, inventory.getSerializedSlots());
+  } catch (e) {
+    log.error({ err: e, playerId: player.id }, 'Failed to persist inventory');
+  }
+}
+
+/**
  * Player context for inventory operations
  */
 export interface InventoryPlayerContext {

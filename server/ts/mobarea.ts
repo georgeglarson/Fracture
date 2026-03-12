@@ -15,6 +15,7 @@ export class MobArea extends Area {
   kind: string;
   respawns: unknown[] = [];
   declare world: MobAreaWorld; // Override parent type
+  private roamingInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(id: number, nb: number, kind: string, x: number, y: number, width: number, height: number, world: MobAreaWorld) {
     super(id, x, y, width, height, world);
@@ -26,13 +27,13 @@ export class MobArea extends Area {
   }
 
   spawnMobs() {
-    for (var i = 0; i < this.nb; i += 1) {
+    for (let i = 0; i < this.nb; i += 1) {
       this.addToArea(this._createMobInsideArea());
     }
   }
 
   _createMobInsideArea() {
-    var k = Types.getKindFromString(this.kind),
+    const k = Types.getKindFromString(this.kind),
       pos = this._getRandomPositionInsideArea(),
       mob = new Mob('1' + this.id + '' + k + '' + this.entities.length, k, pos.x, pos.y);
 
@@ -42,12 +43,10 @@ export class MobArea extends Area {
   }
 
   respawnMob(mob: Mob, delay: number) {
-    var self = this;
-
     this.removeFromArea(mob);
 
-    setTimeout(function () {
-      var pos = self._getRandomPositionInsideArea();
+    setTimeout(() => {
+      const pos = this._getRandomPositionInsideArea();
 
       mob.x = pos.x;
       mob.y = pos.y;
@@ -58,8 +57,8 @@ export class MobArea extends Area {
       // Ensure clean state on respawn - no target or attackers
       mob.clearTarget();
       mob.attackers = {};
-      self.addToArea(mob);
-      self.world.addMob(mob);
+      this.addToArea(mob);
+      this.world.addMob(mob);
     }, delay);
   }
 
@@ -71,17 +70,15 @@ export class MobArea extends Area {
   }
 
   initRoaming() {
-    var self = this;
-
-    setInterval(function () {
-      self.entities.forEach(function (entity) {
+    this.roamingInterval = setInterval(() => {
+      this.entities.forEach((entity) => {
         const mob = entity as Mob;
-        var canRoam = (Utils.random(20) === 1),
-          pos;
+        const canRoam = (Utils.random(20) === 1);
+        let pos;
 
         if (canRoam) {
           if (!mob.hasTarget() && !mob.isDead) {
-            pos = self._getRandomPositionInsideArea();
+            pos = this._getRandomPositionInsideArea();
             mob.move(pos.x, pos.y);
           }
         }
@@ -89,8 +86,15 @@ export class MobArea extends Area {
     }, 500);
   }
 
+  stopRoaming() {
+    if (this.roamingInterval) {
+      clearInterval(this.roamingInterval);
+      this.roamingInterval = null;
+    }
+  }
+
   createReward() {
-    var pos = this._getRandomPositionInsideArea();
+    const pos = this._getRandomPositionInsideArea();
 
     return {x: pos.x, y: pos.y, kind: Types.Entities.CHEST};
   }

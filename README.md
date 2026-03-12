@@ -12,7 +12,7 @@ Most of my career has been taking old systems and making them maintainable. Frac
 
 The starting point was [BrowserQuest](https://github.com/mozilla/BrowserQuest), Mozilla's 2012 HTML5 demo. A JavaScript prototype with no types, no tests, God-object classes, and everything coupled to everything. I picked it because it's a good stand-in for what legacy modernization actually looks like: code that works but can't scale, can't be safely changed, and has no safety net.
 
-What you're looking at now is **250 TypeScript files**, **2,689 passing tests**, a real-time multiplayer game with AI-driven NPCs, zone-based combat, persistent player progression, and a production deployment behind nginx with SSL. The original codebase is still in there (every entity, every sprite, every tile) but the architecture around it is unrecognizable.
+What you're looking at now is **~215 TypeScript source files** (280 including tests), **3,161 passing tests**, a real-time multiplayer game with AI-driven NPCs, zone-based combat, persistent player progression, and a production deployment behind nginx with SSL. The original codebase is still in there (every entity, every sprite, every tile) but the architecture around it is unrecognizable.
 
 ## The legacy modernization story
 
@@ -20,9 +20,9 @@ This is the same approach that works on enterprise software. It works on games t
 
 **1. Understand before changing.** Read every file. Map the dependency graph. Identify the blast radius. The original had circular dependencies, `var self = this` patterns, `as any` casts holding things together, and zero separation of concerns. You can't fix what you don't understand.
 
-**2. Add a safety net first.** Before refactoring anything, write tests. 2,255 of them. That's what makes the rest possible. When I decomposed the Player God-object from 1,100 lines to 720, every extracted method was verified. When I rewrote the aggro system, policy tests caught edge cases I'd have shipped as bugs.
+**2. Add a safety net first.** Before refactoring anything, write tests. 3,161 of them. That's what makes the rest possible. When I decomposed the Player God-object from 1,100 lines to 720, every extracted method was verified. When I rewrote the aggro system, policy tests caught edge cases I'd have shipped as bugs.
 
-**3. Refactor incrementally.** No big rewrites. Extract a module, test it, ship it. The MessageRouter was one change. Each handler module was one change. The CombatTracker was one change. At every step the game kept running.
+**3. Refactor incrementally.** No big rewrites. Extract a module, test it, ship it. The MessageRouter was one change. Each handler module (auth, combat, loot, inventory, equipment, skills, party, shop) was one change. The CombatTracker was one change. At every step the game kept running.
 
 **4. Make the architecture earn its keep.** Every abstraction exists because it solved a real problem. The SpatialManager exists because the aggro tick was O(n\*m) and needed spatial partitioning. The AggroPolicy exists because safe zones, density caps, and level scaling were scattered across three files. The EventBus exists because mob death needed to notify five decoupled systems.
 
@@ -34,7 +34,7 @@ This is the same approach that works on enterprise software. It works on games t
 
 ### Systems architecture
 
-Decomposed an 1,100-line God-object Player class into focused modules using SRP. Introduced a MessageRouter for declarative message dispatch, handler modules for each game system, and a CombatTracker singleton that replaced scattered aggro state. The server has clear boundaries now: combat, inventory, party, progression, zones, AI, persistence, each in its own module with its own tests.
+Decomposed an 1,100-line God-object Player class into focused modules using SRP. Introduced a MessageRouter as a pure dispatcher with 13 dedicated handler modules (auth, combat, loot, inventory, equipment, skills, party, shop, achievements, venice, progression, persistence, zones) — each with its own tests. A CombatTracker singleton replaced scattered aggro state. The server has clear boundaries now: combat, inventory, party, progression, zones, AI, persistence, each in its own module with its own tests.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -57,8 +57,8 @@ Decomposed an 1,100-line God-object Player class into focused modules using SRP.
 │  └───────────────────────────────────────────────────┘  │
 ├─────────────────────────────────────────────────────────┤
 │  Observability                                          │
-│  Pino → OTel Collector → ClickHouse ← SigNoz UI        │
-│  Structured logs, distributed traces, span metrics      │
+│  Pino → OTel Collector → ClickHouse ← SigNoz / Grafana │
+│  Structured logs, distributed traces, dashboards        │
 ├─────────────────────────────────────────────────────────┤
 │  Shared (4k LOC TypeScript)                             │
 │  Game types, zone data, skills, items, events           │
@@ -91,23 +91,33 @@ Production-grade monitoring stack using the same tools and patterns as commercia
 
 **Log-trace correlation.** `pino-opentelemetry-transport` injects `trace_id` and `span_id` into every log line and ships logs via OTLP to the same collector that receives traces. Click a trace in SigNoz, see every log that happened during that request.
 
-**Self-hosted dashboards.** SigNoz (ClickHouse-backed) with dashboards for server operations and AI/persistence monitoring. Public Grafana dashboards for portfolio demos. All running on the same VPS with ClickHouse capped at 2GB.
+**Self-hosted dashboards.** Two dashboard layers, both reading from the same ClickHouse backend:
 
-**Venice AI resilience.** Circuit breaker (opens after 5 failures, 30s recovery), retry with backoff for transient errors, error classification (timeout, auth, rate_limit, server_error, network), latency histogram, and per-call metrics. Survives API outages without impacting gameplay.
+- **SigNoz** (`localhost:3301`) — Internal observability: distributed trace explorer, log search with trace correlation, span-level latency analysis. This is the tool for debugging production issues.
+- **Grafana** (`localhost:3302`) — Public-facing portfolio dashboards: server operations metrics (player count, mob count, tick rate), AI call latency and success rates. Anonymous read-only access enabled, designed to be embedded in portfolio pages.
 
-**Debug CLI.** A non-interactive diagnostic probe (`tools/debug-cli.js`) that connects to the game server's debug WebSocket and reports: player/mob state, aggro links, server stats, structured logs, automated health checks (10 anomaly detectors), and Venice AI metrics with live connectivity tests. Designed to be invoked by AI development tools during troubleshooting sessions.
+Both run on the same VPS via Docker Compose with ClickHouse capped at 2GB.
+
+**Venice AI resilience.** Circuit breaker (opens after 5 failures, 10s recovery), retry with backoff for transient errors, error classification (timeout, auth, rate_limit, server_error, network), latency histogram, and per-call metrics. Survives API outages without impacting gameplay.
+
+**Debug tools.** The game server runs a debug WebSocket on port 8001 (`NO_DEBUG=1` to disable). Two tools connect to it:
+
+- **Debug CLI** (`tools/debug-cli.js`) — Non-interactive diagnostic probe for AI-assisted troubleshooting. Reports player/mob state, aggro links, server stats, structured logs, automated health checks (10 anomaly detectors), and Venice AI metrics with live connectivity tests.
+- **TUI** (`tools/tui.js`) — Live terminal dashboard built with blessed. Renders a spatial map with entity indicators, an entity inspector, aggro link visualization, performance stats, and a real-time log stream. Navigate with arrow keys/hjkl, Tab to cycle panels.
 
 ```
 Game Server ──OTLP HTTP──→ OTel Collector ──→ ClickHouse
-  │ Pino (JSON logs)            │                  ↑
-  │ OTel SDK (traces)           │            SigNoz UI
-  └─────────────────────────────┘       (dashboards, alerts)
+  │ Pino (JSON logs)            │                  ↑     ↑
+  │ OTel SDK (traces)           │            SigNoz UI   Grafana
+  │                             │           (internal)  (public)
+  ├──WebSocket :8001──→ TUI / Debug CLI
+  └─────────────────────────────┘
 ```
 
 ## Test suite
 
 ```
-55 test files | 2,689 tests | 0 failures
+65 test files | 3,161 tests | 0 failures
 ```
 
 | Module | Coverage |
@@ -130,7 +140,7 @@ Vitest with v8 coverage. Storage tests use in-memory SQLite. Coverage thresholds
 | **Server** | Node.js, TypeScript 5.8, Socket.IO 4 |
 | **Database** | SQLite (better-sqlite3) |
 | **AI** | Venice AI SDK (llama-3.3-70b), Fish Audio TTS |
-| **Observability** | OpenTelemetry, Pino, SigNoz, ClickHouse |
+| **Observability** | OpenTelemetry, Pino, SigNoz, Grafana, ClickHouse |
 | **Testing** | Vitest 4, v8 coverage |
 | **Production** | nginx, Let's Encrypt SSL, Docker Compose |
 | **Package manager** | pnpm |
@@ -148,7 +158,7 @@ cp .env.example .env
 
 # Build and run
 pnpm run build:server && pnpm run build:client
-node dist/server/ts/main.js
+pnpm start                   # or: node dist/server/ts/main.js
 
 # Or use dev mode (auto-rebuild)
 pnpm run dev
@@ -156,27 +166,50 @@ pnpm run dev
 # Tests
 pnpm test
 pnpm test:coverage
+pnpm test:ui                 # Vitest browser UI
+
+# Live terminal dashboard (requires running server)
+pnpm run tui
 
 # Debug CLI (requires running server)
 pnpm run debug health        # Anomaly detection
 pnpm run debug players       # Connected players
 pnpm run debug venice health # Venice AI connectivity test
 pnpm run debug watch 10      # Stream state for 10s
+
+# Server management
+pnpm run restart             # Kill + restart server
+pnpm run stop                # Clean shutdown
 ```
 
-Client connects to `localhost:8000` by default. For production, configure `client/config/config.prod.json`.
+Client connects to `localhost:8000` by default. Debug WebSocket runs on `localhost:8001` (disable with `NO_DEBUG=1`). For production, configure `client/config/config.prod.json`.
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NODE_ENV` | `development` | `production` enables JSON logs, OTel export, production sampling |
+| `LOG_LEVEL` | `debug` (dev) / `info` (prod) | Pino log level: `trace`, `debug`, `info`, `warn`, `error` |
+| `VENICE_API_KEY` | — | Venice AI SDK key for NPC dialogue and narration |
+| `VENICE_MODEL` | `llama-3.3-70b` | Venice model ID |
+| `VENICE_TIMEOUT` | `5000` | Venice API timeout in ms |
+| `FISH_AUDIO_API_KEY` | — | Fish Audio key for TTS voice synthesis |
+| `CORS_ORIGINS` | — | Comma-separated allowed origins |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTel Collector HTTP endpoint |
+| `NO_DEBUG` | — | Set to `1` to disable debug WebSocket server |
 
 ### Observability stack (optional)
 
 ```bash
-# Start SigNoz (ClickHouse + OTel Collector + UI)
+# Start the full stack (ClickHouse, Zookeeper, OTel Collector, SigNoz, Grafana)
 docker compose -f docker-compose.signoz.yml up -d
 
 # Start the server with OTel export enabled
 NODE_ENV=production OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
   node dist/server/ts/main.js
 
-# SigNoz UI at http://localhost:3301
+# SigNoz UI at http://localhost:3301  (traces, logs, internal dashboards)
+# Grafana   at http://localhost:3302  (public portfolio dashboards)
 ```
 
 In dev mode (`NODE_ENV !== 'production'`), traces print to the console and logs use pino-pretty. No collector needed for local development.
@@ -191,15 +224,15 @@ Fracture/
 │   ├── network/         # Socket.IO client, message dispatch
 │   ├── renderer/        # Canvas rendering, camera, particles
 │   └── ui/              # HUD, inventory, shop, achievement panels
-├── server/ts/           # Game server (128 files)
+├── server/ts/           # Game server (154 files)
 │   ├── tracing.ts       # OTel SDK bootstrap (imported first)
 │   ├── ai/              # Venice AI, narration, TTS
 │   ├── combat/          # Aggro policy, combat tracker, kill streaks, nemesis
-│   ├── player/          # MessageRouter + handler modules
+│   ├── player/          # MessageRouter + 13 handler modules (auth, combat, loot, ...)
 │   ├── storage/         # SQLite persistence (instrumented with spans)
 │   ├── utils/logger.ts  # Pino structured logging + OTel transport
 │   ├── world/           # Spatial manager, spawn manager, game loop
-│   └── __tests__/       # Test suite (45+ files)
+│   └── __tests__/       # Test suite (60 files)
 ├── shared/ts/           # Shared types (27 files)
 │   ├── zones/           # Zone boundaries and bonuses
 │   ├── skills/          # Skill definitions
@@ -222,7 +255,7 @@ Fracture/
 - **Systems design.** Combat, inventory, progression, zones, AI, persistence, real-time networking, all integrated and tested.
 - **Observability engineering.** Structured logging, distributed tracing, and self-hosted monitoring wired end-to-end. The same OTel + Pino + SigNoz stack used in production microservices, applied to a game server.
 - **AI-augmented development.** Built with Claude as a development partner, showing what one engineer can ship with AI tooling.
-- **Testing discipline.** 2,300+ tests, coverage thresholds enforced, tests written before refactors.
+- **Testing discipline.** 3,161 tests across 65 test files, coverage thresholds enforced, tests written before refactors.
 - **Production operations.** SSL, reverse proxy, rate limiting, anti-exploit guards, Docker Compose infrastructure, deployed and running.
 
 ## Credits

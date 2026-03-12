@@ -12,6 +12,7 @@ export interface NpcPersonality {
 export interface PlayerProfile {
   kills: Record<string, number>;
   totalKills: number;
+  level: number;
   areas: string[];
   items: string[];
   deaths: number;

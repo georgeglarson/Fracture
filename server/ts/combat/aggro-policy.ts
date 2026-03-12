@@ -196,7 +196,7 @@ export function isDensityAllowed(
   playerLevel: number,
 ): boolean {
   // Higher-level mobs get bonus cap slots
-  const levelBonus = Math.max(0, Math.floor((mobLevel - playerLevel) / 5));
+  const levelBonus = Math.max(0, Math.ceil((mobLevel - playerLevel) / 5));
   const cap = AGGRO_CONFIG.MAX_SIMULTANEOUS_AGGRO + levelBonus;
   return currentAggroOnPlayer < cap;
 }

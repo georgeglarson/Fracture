@@ -111,8 +111,8 @@ function createMockPlayer(id: number, name: string, overrides: Record<string, an
     level: 5,
     hitPoints: 80,
     maxHitPoints: 80,
-    x: 64,
-    y: 128,
+    x: 165,   // Within MAX_PARTY_INVITE_DISTANCE (20) of ctx at (160,320)
+    y: 325,
     title: null,
     weapon: 10,
     armor: 20,
@@ -167,7 +167,8 @@ describe('PartyHandler', () => {
     });
 
     it('should pass tile coordinates as gridX/gridY', () => {
-      const target = createMockPlayer(2, 'Target', { x: 33, y: 47 });
+      // Target within 20 tiles of ctx (160,320)
+      const target = createMockPlayer(2, 'Target', { x: 170, y: 325 });
       addEntityToCtx(ctx, target);
 
       handlePartyInvite(ctx, 2);
@@ -176,9 +177,9 @@ describe('PartyHandler', () => {
       // ctx.x=160, ctx.y=320 -> gridX=160, gridY=320
       expect(inviterRef.gridX).toBe(160);
       expect(inviterRef.gridY).toBe(320);
-      // target.x=33, target.y=47 -> gridX=33, gridY=47
-      expect(targetRef.gridX).toBe(33);
-      expect(targetRef.gridY).toBe(47);
+      // target.x=170, target.y=325 -> gridX=170, gridY=325
+      expect(targetRef.gridX).toBe(170);
+      expect(targetRef.gridY).toBe(325);
     });
 
     it('should not call sendInvite when target entity does not exist', () => {

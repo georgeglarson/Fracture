@@ -24,6 +24,9 @@ import { NarratorService, NarrationResult } from './narrator.service';
 import { ThoughtService, ThoughtState, ThoughtContext, EntityThoughtRequest, EntityThoughtResult } from './thought.service';
 import { NewsService, NewspaperResult, QuickStats } from './news.service';
 import { PlayerProfile, Quest, QuestResult } from './types';
+import { createModuleLogger } from '../utils/logger.js';
+
+const log = createModuleLogger('VeniceService');
 
 export class VeniceService {
   // Sub-services
@@ -227,7 +230,8 @@ Make it sound legendary and interesting:`;
       const lore = await this.client.call(prompt) || `An item of ${context.era} origin.`;
       this.itemLoreCache.set(itemType, lore);
       return lore;
-    } catch {
+    } catch (err) {
+      log.debug({ err }, 'Item lore generation failed');
       const fallback = `An item of ${context.era} origin.`;
       this.itemLoreCache.set(itemType, fallback);
       return fallback;

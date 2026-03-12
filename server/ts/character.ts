@@ -21,6 +21,9 @@ export abstract class Character extends Entity {
   /** Flag to distinguish AIPlayer from human Player (both have type === 'player') */
   isAI: boolean = false;
 
+  /** Death flag to prevent processing dead entities */
+  isDead: boolean = false;
+
   constructor(id: string | number, type: string, kind: number, x: number, y: number) {
     super(id, type, kind, x, y);
 
@@ -45,8 +48,8 @@ export abstract class Character extends Entity {
   }
 
   regenHealthBy(value: number): void {
-    var hp = this.hitPoints,
-      max = this.maxHitPoints;
+    const hp = this.hitPoints;
+    const max = this.maxHitPoints;
 
     if (hp < max) {
       if (hp + value <= max) {

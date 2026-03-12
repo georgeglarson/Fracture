@@ -52,13 +52,17 @@ export class DailyRewardService {
 
     // Calculate new streak
     const yesterday = this.getYesterdayUTC();
+    const twoDaysAgo = this.getTwoDaysAgoUTC();
     let newStreak: number;
 
     if (lastLoginDate === yesterday) {
       // Consecutive day - increment streak (max 7, then wrap to 1)
       newStreak = currentStreak >= 7 ? 1 : currentStreak + 1;
+    } else if (lastLoginDate === twoDaysAgo) {
+      // 1-day grace: maintain streak but don't advance
+      newStreak = currentStreak || 1;
     } else {
-      // Missed a day - reset to day 1
+      // Missed more than 1 day - reset to day 1
       newStreak = 1;
     }
 
@@ -114,6 +118,15 @@ export class DailyRewardService {
     const yesterday = new Date();
     yesterday.setUTCDate(yesterday.getUTCDate() - 1);
     return yesterday.toISOString().split('T')[0];
+  }
+
+  /**
+   * Get the date two days ago in UTC as ISO string (YYYY-MM-DD)
+   */
+  private getTwoDaysAgoUTC(): string {
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setUTCDate(twoDaysAgo.getUTCDate() - 2);
+    return twoDaysAgo.toISOString().split('T')[0];
   }
 }
 

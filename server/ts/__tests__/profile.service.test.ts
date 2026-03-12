@@ -30,7 +30,8 @@ describe('ProfileService', () => {
         items: [],
         deaths: 0,
         lastActive: Date.now(),
-        questsCompleted: 0
+        questsCompleted: 0,
+        level: 1
       });
     });
 

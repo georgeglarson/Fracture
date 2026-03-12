@@ -10,7 +10,7 @@ import {getVeniceService} from './ai/venice.service';
 import {AIPlayerManager} from './ai/aiplayer';
 import {MessageBroadcaster} from './messaging/message-broadcaster';
 import {CombatSystem} from './combat/combat-system';
-import {getCombatTracker} from './combat/combat-tracker';
+import {getCombatTracker, CombatTracker} from './combat/combat-tracker';
 import {nemesisService} from './combat/nemesis.service';
 import {EntityManager} from './entities/entity-manager';
 import {SpatialManager, Group} from './world/spatial-manager';
@@ -90,14 +90,14 @@ export class World {
 
   playerCount = 0;
 
-  removed_callback: (() => void) | null = null;
-  added_callback: (() => void) | null = null;
-  regen_callback: (() => void) | null = null;
-  thought_callback: (() => void) | null = null;
-  aggro_callback: (() => void) | null = null;
+  removedCallback: (() => void) | null = null;
+  addedCallback: (() => void) | null = null;
+  regenCallback: (() => void) | null = null;
+  thoughtCallback: (() => void) | null = null;
+  aggroCallback: (() => void) | null = null;
   init_callback: (() => void) | null = null;
-  connect_callback: ((player: Player) => void) | null = null;
-  enter_callback: ((player: Player) => void) | null = null;
+  connectCallback: ((player: Player) => void) | null = null;
+  enterCallback: ((player: Player) => void) | null = null;
   attack_callback: ((attacker: Character) => void) | null = null;
 
   // AI Players (Westworld feature)
@@ -116,29 +116,27 @@ export class World {
   private storageService: IStorageService | null = null;
 
   constructor(id: string | number, maxPlayers: number, websocketServer: Server) {
-    var self = this;
-
     this.id = id;
     this.maxPlayers = maxPlayers;
     this.server = websocketServer;
     this.zoneManager = getZoneManager();
 
 
-    this.onPlayerConnect(function (player: Player) {
-      player.onRequestPosition(function () {
+    this.onPlayerConnect((player: Player) => {
+      player.onRequestPosition(() => {
         if (player.lastCheckpoint) {
           return player.lastCheckpoint.getRandomPosition();
         } else {
-          return self.map!.getRandomStartingPosition();
+          return this.map?.getRandomStartingPosition() ?? { x: 0, y: 0 };
         }
       });
     });
 
-    this.onPlayerEnter(function (player: Player) {
-      log.info({ playerName: player.name, worldId: self.id }, 'Player joined world');
+    this.onPlayerEnter((player: Player) => {
+      log.info({ playerName: player.name, worldId: this.id }, 'Player joined world');
 
       if (!player.hasEnteredGame) {
-        self.incrementPlayerCount();
+        this.incrementPlayerCount();
       }
 
       // Record world event for Town Crier
@@ -148,29 +146,29 @@ export class World {
       }
 
       // Number of players in this world
-      self.pushToPlayer(player, new Messages.Population(self.playerCount));
-      self.pushRelevantEntityListTo(player);
+      this.pushToPlayer(player, new Messages.Population(this.playerCount));
+      this.pushRelevantEntityListTo(player);
 
-      const move_callback = function (x: number, y: number) {
+      const move_callback = (x: number, y: number) => {
         log.trace({ playerName: player.name, x, y }, 'Player moving');
 
-        player.forEachAttacker(function (attacker) {
+        player.forEachAttacker((attacker) => {
           // Use type guard to ensure attacker is a Mob before using Mob-specific methods
           if (!isMob(attacker)) return;
           const mob = attacker as Mob;
           if (!mob.target) return;
-          var target = self.getEntityById(mob.target);
+          const target = this.getEntityById(mob.target);
           if (target) {
-            var pos = self.findPositionNextTo(mob, target);
+            const pos = this.findPositionNextTo(mob, target);
             // Leash: mob gives up if next position is too far from spawn
-            var leashDist = getLeashDistance(mob.aggroRange);
+            const leashDist = getLeashDistance(mob.aggroRange);
             if (mob.distanceToSpawningPoint(pos.x, pos.y) > leashDist) {
               mob.clearTarget();
               mob.forgetEveryone();
               player.removeAttacker(mob);
               // Return to spawn and broadcast MOVE so client removes exclamation
               mob.resetPosition();
-              self.onMobMoveCallback(mob);
+              this.onMobMoveCallback(mob);
             } else {
               mob.move(pos.x, pos.y);
             }
@@ -181,7 +179,7 @@ export class World {
             player.removeAttacker(mob);
             // Return to spawn and broadcast MOVE so client removes exclamation
             mob.resetPosition();
-            self.onMobMoveCallback(mob);
+            this.onMobMoveCallback(mob);
           }
         });
       };
@@ -189,72 +187,73 @@ export class World {
       player.onMove(move_callback);
       player.onLootMove(move_callback);
 
-      player.onZone(function () {
-        var hasChangedGroups = self.handleEntityGroupMembership(player);
+      player.onZone(() => {
+        const hasChangedGroups = this.handleEntityGroupMembership(player);
 
         if (hasChangedGroups) {
-          self.pushToPreviousGroups(player, new Messages.Destroy(player));
-          self.pushRelevantEntityListTo(player);
+          this.pushToPreviousGroups(player, new Messages.Destroy(player));
+          this.pushRelevantEntityListTo(player);
         }
       });
 
-      player.onBroadcast(function (message, ignoreSelf: boolean) {
-        self.pushToAdjacentGroups(player.group!, message, ignoreSelf ? player.id : null);
+      player.onBroadcast((message, ignoreSelf: boolean) => {
+        this.pushToAdjacentGroups(player.group!, message, ignoreSelf ? player.id : null);
       });
 
-      player.onBroadcastToZone(function (message, ignoreSelf: boolean) {
-        self.pushToGroup(player.group!, message, ignoreSelf ? player.id : null);
+      player.onBroadcastToZone((message, ignoreSelf: boolean) => {
+        this.pushToGroup(player.group!, message, ignoreSelf ? player.id : null);
       });
 
-      player.onExit(function () {
+      player.onExit(() => {
         log.info({ playerName: player.name }, 'Player left the game');
 
         // Save player data to database before removing
-        if (self.storageService && player.characterId) {
+        if (this.storageService && player.characterId) {
           try {
-            player.saveToStorage(self.storageService);
+            player.saveToStorage(this.storageService);
             log.info({ playerName: player.name, characterId: player.characterId }, 'Saved player on exit');
           } catch (e) {
             log.error({ err: e, playerName: player.name }, 'Failed to save player on exit');
           }
         }
 
-        self.removePlayer(player);
-        self.decrementPlayerCount();
+        this.removePlayer(player);
+        this.decrementPlayerCount();
 
-        if (self.removed_callback) {
-          self.removed_callback();
+        if (this.removedCallback) {
+          this.removedCallback();
         }
       });
 
-      if (self.added_callback) {
-        self.added_callback();
+      if (this.addedCallback) {
+        this.addedCallback();
       }
     });
 
     // Called when an entity is attacked by another entity
-    this.onEntityAttack(function (attacker: Character) {
-      var target = self.getEntityById(attacker.target!);
+    this.onEntityAttack((attacker: Character) => {
+      if (!attacker.target) return;
+      const target = this.getEntityById(attacker.target);
       if (target && attacker.type === 'mob') {
-        var pos = self.findPositionNextTo(attacker, target);
+        const pos = this.findPositionNextTo(attacker, target);
         (attacker as Mob).move(pos.x, pos.y);
       }
     });
 
-    this.onRegenTick(function () {
-      self.forEachCharacter(function (character: Character) {
+    this.onRegenTick(() => {
+      this.forEachCharacter((character: Character) => {
         if (!character.hasFullHealth()) {
           character.regenHealthBy(Math.floor(character.maxHitPoints / 25));
 
           if (character.type === 'player') {
-            self.pushToPlayer(character as Player, character.regen());
+            this.pushToPlayer(character as Player, character.regen());
           }
         }
       });
     });
 
     // AI Thought Bubbles - The "Ant Farm" Feature
-    this.onThoughtTick(function () {
+    this.onThoughtTick(() => {
       log.trace('Thoughts tick fired');
       const venice = getVeniceService();
       if (!venice) {
@@ -266,7 +265,7 @@ export class World {
       let totalEntities = 0;
 
       // For each group with players, generate thoughts for nearby mobs/npcs
-      Object.entries(self.groups).forEach(([groupId, group]: [string, Group]) => {
+      Object.entries(this.groups).forEach(([groupId, group]: [string, Group]) => {
         if (!group.players || group.players.length === 0) return;
         groupsWithPlayers++;
 
@@ -284,7 +283,7 @@ export class World {
         const shuffled = [...entities].sort(() => Math.random() - 0.5);
         const toProcess = shuffled.slice(0, Math.min(3, entities.length));
 
-        toProcess.forEach(function (entity: Entity) {
+        toProcess.forEach((entity: Entity) => {
           // Determine state
           let state: 'idle' | 'combat' | 'playerNearby' = 'idle';
           const charEntity = entity as Character;
@@ -309,7 +308,7 @@ export class World {
             thoughtResult.thought,
             thoughtResult.state
           );
-          self.pushToAdjacentGroups(groupId, message);
+          this.pushToAdjacentGroups(groupId, message);
         });
       });
 
@@ -319,14 +318,14 @@ export class World {
     // Mob Proximity Aggro — zone-aware aggro with density capping
     // Uses AggroPolicy for per-mob decisions based on zone, level, and density.
     // Also enforces leash: mobs drop aggro when target is too far from spawn.
-    this.onAggroTick(function() {
+    this.onAggroTick(() => {
       const combatTracker = getCombatTracker();
       const activeSpan = trace.getActiveSpan();
       if (activeSpan) {
-        activeSpan.setAttribute('mob_count', Object.keys(self.entityManager.mobs).length);
+        activeSpan.setAttribute('mob_count', Object.keys(this.entityManager?.mobs ?? {}).length);
       }
 
-      self.forEachMob(function(mob: Mob) {
+      this.forEachMob((mob: Mob) => {
         if (mob.isDead || !mob.aggroRange || mob.aggroRange <= 0) return;
 
         // Skip stunned mobs (War Cry effect)
@@ -336,8 +335,8 @@ export class World {
 
         // Leash check: if mob already has a target, verify it's still in chase range
         if (mob.hasTarget()) {
-          const target = self.getEntityById(mob.target!);
-          if (!target || (target as any).isDead) {
+          const target = this.getEntityById(mob.target!);
+          if (!target || (target as Character).isDead) {
             // Remove mob from target's attacker list before clearing
             if (target) (target as Character).removeAttacker(mob);
             mob.clearTarget();
@@ -353,13 +352,13 @@ export class World {
             mob.forgetEveryone();
             // Return to spawn and broadcast MOVE so client removes exclamation
             mob.resetPosition();
-            self.onMobMoveCallback(mob);
+            this.onMobMoveCallback(mob);
             return;
           }
           // Re-broadcast attack every aggro tick — keeps client combat state synchronized
           // during chase (mob already has valid target; leash/dead checks above handle invalid states)
           if (mob.group) {
-            self.pushToAdjacentGroups(mob.group, mob.attack());
+            this.pushToAdjacentGroups(mob.group, mob.attack());
           }
           return;
         }
@@ -370,7 +369,7 @@ export class World {
         let closestDistance = mob.aggroRange; // tiles
         let closestDecision: { hateModifier: number } | null = null;
 
-        const nearbyPlayers = mob.group ? self.getPlayersNearGroup(mob.group) : [];
+        const nearbyPlayers = mob.group ? this.getPlayersNearGroup(mob.group) : [];
         for (const player of nearbyPlayers) {
           if (!player || player.isDead) continue;
 
@@ -393,7 +392,7 @@ export class World {
             mobZoneId: mob.zoneId,
             playerX: player.x,
             playerY: player.y,
-            playerLevel: (player as any).level ?? 1,
+            playerLevel: player.level ?? 1,
             distance,
             currentAggroOnPlayer: combatTracker.getPlayerAggroCount(player.id),
           });
@@ -408,7 +407,7 @@ export class World {
         if (closestPlayer && closestDecision) {
           const hateBase = Math.max(1, Math.floor((mob.aggroRange - closestDistance) * 10));
           const hatePoints = Math.max(1, Math.round(hateBase * closestDecision.hateModifier));
-          self.handleMobHate(mob.id, closestPlayer.id, hatePoints);
+          this.handleMobHate(mob.id, closestPlayer.id, hatePoints);
 
           const mobName = Types.getKindAsString(mob.kind);
           log.trace({ mobName, aggroRange: mob.aggroRange, zoneId: mob.zoneId, targetPlayer: closestPlayer.name, distance: +closestDistance.toFixed(1) }, 'Mob aggro targeting');
@@ -418,122 +417,120 @@ export class World {
   }
 
   run(mapFilePath: string) {
-    var self = this;
-
     this.map = new Map(mapFilePath);
 
-    this.map.ready(function () {
-      const map = self.map!; // We know map exists inside ready()
+    this.map.ready(() => {
+      const map = this.map!; // We know map exists inside ready()
 
       // Initialize spatial manager for zone groups
-      self.spatialManager = new SpatialManager();
-      self.spatialManager.setMap(map);
-      self.spatialManager.initZoneGroups();
+      this.spatialManager = new SpatialManager();
+      this.spatialManager.setMap(map);
+      this.spatialManager.initZoneGroups();
 
       // Initialize entity manager
-      self.entityManager = new EntityManager();
-      self.entityManager.setGroupContext({
-        handleEntityGroupMembership: (entity: Entity) => self.handleEntityGroupMembership(entity),
-        removeFromGroups: (entity: Entity) => self.removeFromGroups(entity)
+      this.entityManager = new EntityManager();
+      this.entityManager.setGroupContext({
+        handleEntityGroupMembership: (entity: Entity) => this.handleEntityGroupMembership(entity),
+        removeFromGroups: (entity: Entity) => this.removeFromGroups(entity)
       });
 
       // Initialize message broadcaster now that groups exist
-      self.broadcaster = new MessageBroadcaster(
-        self.server,
-        self.groups,
+      this.broadcaster = new MessageBroadcaster(
+        this.server,
+        this.groups,
         map,
-        { getEntityById: (id: number) => self.getEntityById(id) }
+        { getEntityById: (id: number) => this.getEntityById(id) }
       );
 
       // Wire spatial manager to broadcaster
-      self.spatialManager!.setBroadcaster({
-        pushToGroup: (groupId: string, message: { serialize(): unknown[] }, ignoredPlayerId?: string | number) => self.pushToGroup(groupId, message, ignoredPlayerId)
+      this.spatialManager.setBroadcaster({
+        pushToGroup: (groupId: string, message: { serialize(): unknown[] }, ignoredPlayerId?: string | number) => this.pushToGroup(groupId, message, ignoredPlayerId)
       });
 
       // Initialize combat system
-      self.combatSystem = new CombatSystem({
-        getEntityById: (id) => self.getEntityById(id as number),
-        pushToPlayer: (player, message) => self.pushToPlayer(player as unknown as Player, message),
-        pushToAdjacentGroups: (groupId, message, ignoredPlayer) => self.pushToAdjacentGroups(groupId, message, ignoredPlayer),
-        pushBroadcast: (message) => self.pushBroadcast(message),
-        getDroppedItem: (mob) => self.getDroppedItem(mob as unknown as Mob) as unknown as { id: string | number; type: string; kind: number; hitPoints: number; } | null,
-        handleItemDespawn: (item) => self.handleItemDespawn(item as unknown as Item),
-        removeEntity: (entity) => self.removeEntity(entity as unknown as Entity),
-        handleEntityGroupMembership: (entity) => self.handleEntityGroupMembership(entity as unknown as Entity)
+      this.combatSystem = new CombatSystem({
+        getEntityById: (id) => this.getEntityById(id as number),
+        pushToPlayer: (player, message) => this.pushToPlayer(player as unknown as Player, message),
+        pushToAdjacentGroups: (groupId, message, ignoredPlayer) => this.pushToAdjacentGroups(groupId, message, ignoredPlayer),
+        pushBroadcast: (message) => this.pushBroadcast(message),
+        getDroppedItem: (mob) => this.getDroppedItem(mob as unknown as Mob) as unknown as { id: string | number; type: string; kind: number; hitPoints: number; } | null,
+        handleItemDespawn: (item) => this.handleItemDespawn(item as unknown as Item),
+        removeEntity: (entity) => this.removeEntity(entity as unknown as Entity),
+        handleEntityGroupMembership: (entity) => this.handleEntityGroupMembership(entity as unknown as Entity)
       });
 
       // Wire entity manager dependencies
-      self.entityManager!.setBroadcaster(self.broadcaster!);
-      self.entityManager!.setCombatSystem(self.combatSystem!);
+      this.entityManager.setBroadcaster(this.broadcaster);
+      this.entityManager.setCombatSystem(this.combatSystem);
 
       // Initialize CombatTracker with entity lookup
       const combatTracker = getCombatTracker();
-      combatTracker.setEntityLookup((id: number) => self.getEntityById(id));
+      combatTracker.setEntityLookup((id: number) => this.getEntityById(id));
 
       // Initialize nemesis service context
       nemesisService.setContext({
-        pushBroadcast: (message: { serialize(): unknown[] }) => self.pushBroadcast(message),
+        pushBroadcast: (message: { serialize(): unknown[] }) => this.pushBroadcast(message),
         getMobName: (kind: number) => Types.getKindAsString(kind),
-        getMob: (mobId: number) => self.entityManager?.mobs[mobId],
-        getPlayer: (playerId: number) => self.entityManager?.players[playerId],
+        getMob: (mobId: number) => this.entityManager?.mobs[mobId],
+        getPlayer: (playerId: number) => this.entityManager?.players[playerId],
       });
 
       map.generateCollisionGrid();
 
       // Initialize spawn manager
-      self.spawnManager = new SpawnManager();
-      self.spawnManager.setMap(map);
-      self.spawnManager.setEntityManager({
-        addNpc: (kind: number, x: number, y: number) => self.addNpc(kind, x, y),
-        addMob: (mob: Mob) => self.addMob(mob),
-        addItem: (item: Item) => self.addItem(item),
-        addStaticItem: (item: Item) => self.addStaticItem(item),
-        addItemFromChest: (kind: number, x: number, y: number) => self.addItemFromChest(kind, x, y),
-        createItem: (kind: number, x: number, y: number) => self.createItem(kind, x, y),
-        createChest: (x: number, y: number, items: number[]) => self.createChest(x, y, items),
-        removeEntity: (entity: Entity) => self.removeEntity(entity)
+      this.spawnManager = new SpawnManager();
+      this.spawnManager.setMap(map);
+      this.spawnManager.setEntityManager({
+        addNpc: (kind: number, x: number, y: number) => this.addNpc(kind, x, y),
+        addMob: (mob: Mob) => this.addMob(mob),
+        addItem: (item: Item) => this.addItem(item),
+        addStaticItem: (item: Item) => this.addStaticItem(item),
+        addItemFromChest: (kind: number, x: number, y: number) => this.addItemFromChest(kind, x, y),
+        createItem: (kind: number, x: number, y: number) => this.createItem(kind, x, y),
+        createChest: (x: number, y: number, items: number[]) => this.createChest(x, y, items),
+        removeEntity: (entity: Entity) => this.removeEntity(entity)
       });
-      self.spawnManager.setBroadcaster({
-        pushToAdjacentGroups: (groupId: string, message: { serialize(): unknown[] }) => self.pushToAdjacentGroups(groupId, message)
+      this.spawnManager.setBroadcaster({
+        pushToAdjacentGroups: (groupId: string, message: { serialize(): unknown[] }) => this.pushToAdjacentGroups(groupId, message)
       });
-      self.spawnManager.setWorldContext(self);
+      this.spawnManager.setWorldContext(this);
 
       // Initialize all spawn areas and entities
-      self.spawnManager.initializeAreas();
+      this.spawnManager.initializeAreas();
 
       // Initialize game loop
-      self.gameLoop = new GameLoop(self.ups);
-      self.gameLoop.setSpatialContext({
-        processGroups: () => self.processGroups()
+      this.gameLoop = new GameLoop(this.ups);
+      this.gameLoop.setSpatialContext({
+        processGroups: () => this.processGroups()
       });
-      self.gameLoop.setBroadcasterContext({
-        processQueues: () => self.processQueues()
+      this.gameLoop.setBroadcasterContext({
+        processQueues: () => this.processQueues()
       });
-      self.gameLoop.onRegen(() => {
-        if (self.regen_callback) {
-          self.regen_callback();
+      this.gameLoop.onRegen(() => {
+        if (this.regenCallback) {
+          this.regenCallback();
         }
       });
-      self.gameLoop.onThought(() => {
-        if (self.thought_callback) {
-          self.thought_callback();
+      this.gameLoop.onThought(() => {
+        if (this.thoughtCallback) {
+          this.thoughtCallback();
         }
       });
-      self.gameLoop.onAggro(() => {
-        if (self.aggro_callback) {
-          self.aggro_callback();
+      this.gameLoop.onAggro(() => {
+        if (this.aggroCallback) {
+          this.aggroCallback();
         }
       });
-      self.gameLoop.start();
+      this.gameLoop.start();
 
       // Periodic save: every 60 seconds, save all connected players
       // Fixes level persistence bug: saves were only happening on disconnect
-      self.periodicSaveInterval = setInterval(() => {
-        const storage = self.getStorageService();
+      this.periodicSaveInterval = setInterval(() => {
+        const storage = this.getStorageService();
         let savedCount = 0;
         let failCount = 0;
 
-        self.forEachPlayer((player: Player) => {
+        this.forEachPlayer((player: Player) => {
           if (player.characterId) {
             try {
               player.saveToStorage(storage);
@@ -585,31 +582,31 @@ export class World {
   }
 
   onPlayerConnect(callback: (player: Player) => void) {
-    this.connect_callback = callback;
+    this.connectCallback = callback;
   }
 
   onPlayerEnter(callback: (player: Player) => void) {
-    this.enter_callback = callback;
+    this.enterCallback = callback;
   }
 
   onPlayerAdded(callback: () => void) {
-    this.added_callback = callback;
+    this.addedCallback = callback;
   }
 
   onPlayerRemoved(callback: () => void) {
-    this.removed_callback = callback;
+    this.removedCallback = callback;
   }
 
   onRegenTick(callback: () => void) {
-    this.regen_callback = callback;
+    this.regenCallback = callback;
   }
 
   onThoughtTick(callback: () => void) {
-    this.thought_callback = callback;
+    this.thoughtCallback = callback;
   }
 
   onAggroTick(callback: () => void) {
-    this.aggro_callback = callback;
+    this.aggroCallback = callback;
   }
 
   pushRelevantEntityListTo(player: Player) {
@@ -624,22 +621,20 @@ export class World {
   }
 
   pushSpawnsToPlayer(player: Player, ids: number[]) {
-    var self = this;
-
     // Sort IDs so players (including AIPlayers with id >= 100000) are sent first
     // This ensures mobs' targets are known before the mobs spawn
     const sortedIds = [...ids].sort((a, b) => {
-      const aIsPlayer = a >= 100000 || Types.isPlayer(self.getEntityById(a)?.kind ?? 0);
-      const bIsPlayer = b >= 100000 || Types.isPlayer(self.getEntityById(b)?.kind ?? 0);
+      const aIsPlayer = a >= 100000 || Types.isPlayer(this.getEntityById(a)?.kind ?? 0);
+      const bIsPlayer = b >= 100000 || Types.isPlayer(this.getEntityById(b)?.kind ?? 0);
       if (aIsPlayer && !bIsPlayer) return -1;
       if (!aIsPlayer && bIsPlayer) return 1;
       return 0;
     });
 
-    sortedIds.forEach(function (id: number) {
-      var entity = self.getEntityById(id);
+    sortedIds.forEach((id: number) => {
+      const entity = this.getEntityById(id);
       if (entity) {
-        self.pushToPlayer(player, new Messages.Spawn(entity));
+        this.pushToPlayer(player, new Messages.Spawn(entity));
       }
     });
 
@@ -776,7 +771,9 @@ export class World {
   }
 
   despawn(entity: Entity) {
-    this.pushToAdjacentGroups(entity.group!, entity.despawn());
+    if (entity.group) {
+      this.pushToAdjacentGroups(entity.group, entity.despawn());
+    }
 
     if (entity.id in this.entities) {
       this.removeEntity(entity);
@@ -811,18 +808,18 @@ export class World {
   }
 
   getDroppedItem(mob: Mob) {
-    var kind = Types.getKindAsString(mob.kind) as string,
+    const kind = Types.getKindAsString(mob.kind) as string,
       baseDrops = ((Properties as unknown) as Record<string, { drops: Record<string, number> }>)[kind].drops,
-      v = Utils.random(100),
-      p = 0,
+      v = Utils.random(100);
+    let p = 0,
       item: Item | null = null;
 
     // Get zone at mob position for loot bonuses
     const zone = this.zoneManager.getZoneAt(mob.x, mob.y);
 
     // Check for zone boss legendary drops
-    if ((mob as any).bossId) {
-      const bossId = (mob as any).bossId as string;
+    if ('bossId' in mob && mob.bossId) {
+      const bossId = mob.bossId as string;
       const legendaries = getLegendariesForBoss(bossId);
 
       for (const legendary of legendaries) {
@@ -848,8 +845,8 @@ export class World {
     // Apply zone modifiers to drop table (increased armor/weapon chances)
     const drops = this.zoneManager.modifyDropTable(baseDrops, zone);
 
-    for (var itemName in drops) {
-      var percentage = drops[itemName];
+    for (const itemName in drops) {
+      const percentage = drops[itemName];
 
       p += percentage;
       if (v <= p) {
@@ -870,7 +867,7 @@ export class World {
     const message = `A legendary ${itemName} has dropped from ${bossId.replace(/_/g, ' ')}!`;
     log.info({ message, bossId }, 'Legendary drop broadcast');
     // Use chat broadcast for now - could add a dedicated message type later
-    this.pushBroadcast(new Messages.Chat({ id: 0, name: 'World' } as any, `[LEGENDARY] ${message}`));
+    this.pushBroadcast(new Messages.Chat({ id: 0, name: 'World' } as { id: number; name: string }, `[LEGENDARY] ${message}`));
   }
 
   onMobMoveCallback(mob: Mob) {
@@ -879,8 +876,8 @@ export class World {
   }
 
   findPositionNextTo(entity: Entity, target: Entity) {
-    var valid = false,
-      pos: { x: number; y: number };
+    let valid = false;
+    let pos: { x: number; y: number };
 
     while (!valid) {
       pos = entity.getPositionNextTo(target)!;
@@ -954,5 +951,47 @@ export class World {
 
   updatePopulation(totalPlayers?: number) {
     this.pushBroadcast(new Messages.Population(this.playerCount, totalPlayers ? totalPlayers : this.playerCount));
+  }
+
+  /**
+   * Clean shutdown: stop timers, save all players, tear down subsystems
+   */
+  shutdown(): void {
+    log.info({ worldId: this.id }, 'World shutting down');
+
+    // Clear startup timers
+    for (const timer of this.startupTimers) {
+      clearTimeout(timer);
+    }
+    this.startupTimers = [];
+
+    // Clear periodic save interval
+    if (this.periodicSaveInterval) {
+      clearInterval(this.periodicSaveInterval);
+      this.periodicSaveInterval = null;
+    }
+
+    // Stop game loop
+    this.gameLoop?.stop();
+
+    // Stop AI players
+    this.aiPlayerManager?.stop();
+
+    // Save all connected players
+    const storage = this.getStorageService();
+    this.forEachPlayer((player: Player) => {
+      if (player.characterId) {
+        try {
+          player.saveToStorage(storage);
+        } catch (e) {
+          log.error({ err: e, playerName: player.name }, 'Failed to save player during shutdown');
+        }
+      }
+    });
+
+    // Clear combat tracker
+    CombatTracker.reset();
+
+    log.info({ worldId: this.id }, 'World shutdown complete');
   }
 }

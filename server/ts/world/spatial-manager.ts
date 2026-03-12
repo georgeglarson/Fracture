@@ -57,10 +57,8 @@ export class SpatialManager {
    * Initialize zone groups from map data
    */
   initZoneGroups(): void {
-    const self = this;
-
-    this.map?.forEachGroup(function(id) {
-      self.groups[id] = {
+    this.map?.forEachGroup((id) => {
+      this.groups[id] = {
         entities: {},
         players: [],
         incoming: []
@@ -76,7 +74,6 @@ export class SpatialManager {
    * Returns the list of groups the entity was removed from
    */
   removeFromGroups(entity: any): string[] {
-    const self = this;
     const oldGroups: string[] = [];
 
     if (entity && entity.group) {
@@ -84,14 +81,12 @@ export class SpatialManager {
 
       // Check type instead of instanceof to support AIPlayer
       if (entity.type === 'player') {
-        group.players = group.players.filter(function(id) {
-          return id !== entity.id;
-        });
+        group.players = group.players.filter((id) => id !== entity.id);
       }
 
-      this.map?.forEachAdjacentGroup(entity.group, function(id) {
-        if (entity.id in self.groups[id].entities) {
-          delete self.groups[id].entities[entity.id];
+      this.map?.forEachAdjacentGroup(entity.group, (id) => {
+        if (entity.id in this.groups[id].entities) {
+          delete this.groups[id].entities[entity.id];
           oldGroups.push(id);
         }
       });
@@ -105,14 +100,13 @@ export class SpatialManager {
    * All players inside these groups will receive a Spawn message when processGroups is called.
    */
   addAsIncomingToGroup(entity: any, groupId: string): void {
-    const self = this;
     const isChest = entity && entity instanceof Chest;
     const isItem = entity && entity instanceof Item;
     const isDroppedItem = entity && isItem && !entity.isStatic && !entity.isFromChest;
 
     if (entity && groupId) {
-      this.map?.forEachAdjacentGroup(groupId, function(id) {
-        const group = self.groups[id];
+      this.map?.forEachAdjacentGroup(groupId, (id) => {
+        const group = this.groups[id];
 
         if (group) {
           if (!(entity.id in group.entities)
@@ -130,12 +124,11 @@ export class SpatialManager {
    * Returns the list of new groups the entity was added to
    */
   addToGroup(entity: any, groupId: string): string[] {
-    const self = this;
     const newGroups: string[] = [];
 
     if (entity && groupId && (groupId in this.groups)) {
-      this.map?.forEachAdjacentGroup(groupId, function(id) {
-        self.groups[id].entities[entity.id] = entity;
+      this.map?.forEachAdjacentGroup(groupId, (id) => {
+        this.groups[id].entities[entity.id] = entity;
         newGroups.push(id);
       });
       entity.group = groupId;
@@ -187,20 +180,19 @@ export class SpatialManager {
    * Sends Spawn messages to players in the group
    */
   processGroups(): void {
-    const self = this;
-
     if (this.zoneGroupsReady && this.map && this.broadcaster) {
-      this.map.forEachGroup(function(id) {
-        if (self.groups[id].incoming.length > 0) {
-          self.groups[id].incoming.forEach(function(entity) {
+      const broadcaster = this.broadcaster;
+      this.map.forEachGroup((id) => {
+        if (this.groups[id].incoming.length > 0) {
+          this.groups[id].incoming.forEach((entity) => {
             // Check type instead of instanceof to support AIPlayer
             if (entity.type === 'player') {
-              self.broadcaster!.pushToGroup(id, new Messages.Spawn(entity), entity.id);
+              broadcaster.pushToGroup(id, new Messages.Spawn(entity), entity.id);
             } else {
-              self.broadcaster!.pushToGroup(id, new Messages.Spawn(entity));
+              broadcaster.pushToGroup(id, new Messages.Spawn(entity));
             }
           });
-          self.groups[id].incoming = [];
+          this.groups[id].incoming = [];
         }
       });
     }

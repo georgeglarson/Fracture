@@ -26,8 +26,8 @@ export class Mob extends Character {
   respawnTimeout: ReturnType<typeof setTimeout> | null = null;
   returnTimeout: ReturnType<typeof setTimeout> | null = null;
   isDead: boolean = false;
-  respawn_callback: (() => void) | null = null;
-  move_callback: ((mob: Mob) => void) | null = null;
+  respawnCallback: (() => void) | null = null;
+  moveCallback: ((mob: Mob) => void) | null = null;
 
   constructor(id: string | number, kind: number, x: number, y: number) {
     super(id, 'mob', kind, x, y);
@@ -104,8 +104,7 @@ export class Mob extends Character {
   }
 
   handleRespawn(): void {
-    var delay = 30000,
-      self = this;
+    const delay = 30000;
 
     if (this.area && this.area instanceof MobArea) {
       // Respawn inside the area if part of a MobArea
@@ -116,16 +115,16 @@ export class Mob extends Character {
         this.area.removeFromArea(this);
       }
 
-      setTimeout(function () {
-        if (self.respawn_callback) {
-          self.respawn_callback();
+      setTimeout(() => {
+        if (this.respawnCallback) {
+          this.respawnCallback();
         }
       }, delay);
     }
   }
 
   onRespawn(callback: () => void): void {
-    this.respawn_callback = callback;
+    this.respawnCallback = callback;
   }
 
   resetPosition(): void {
@@ -133,25 +132,24 @@ export class Mob extends Character {
   }
 
   returnToSpawningPosition(waitDuration?: number): void {
-    var self = this,
-      delay = waitDuration || 4000;
+    const delay = waitDuration || 4000;
 
     this.clearTarget();
 
-    this.returnTimeout = setTimeout(function () {
-      self.resetPosition();
-      self.move(self.x, self.y);
+    this.returnTimeout = setTimeout(() => {
+      this.resetPosition();
+      this.move(this.x, this.y);
     }, delay);
   }
 
   onMove(callback: (mob: Mob) => void): void {
-    this.move_callback = callback;
+    this.moveCallback = callback;
   }
 
   move(x: number, y: number): void {
     this.setPosition(x, y);
-    if (this.move_callback) {
-      this.move_callback(this);
+    if (this.moveCallback) {
+      this.moveCallback(this);
     }
   }
 

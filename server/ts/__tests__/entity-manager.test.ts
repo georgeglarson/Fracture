@@ -501,8 +501,8 @@ describe('EntityManager', () => {
     it('should register a respawn callback', () => {
       const item = entityManager.createItem(Types.Entities.FLASK, 5, 5);
       entityManager.addStaticItem(item);
-      expect(item.respawn_callback).toBeDefined();
-      expect(typeof item.respawn_callback).toBe('function');
+      expect(item.respawnCallback).toBeDefined();
+      expect(typeof item.respawnCallback).toBe('function');
     });
 
     it('should add the item to entities and items maps', () => {

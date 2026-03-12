@@ -33,6 +33,7 @@ export class GameLoop {
   private updateCount = 0;
   private thoughtUpdateCount = 0;
   private aggroUpdateCount = 0;
+  private lastTickTime: number = 0;
 
   // Dependencies
   private spatialContext: SpatialContext | null = null;
@@ -104,10 +105,8 @@ export class GameLoop {
       return;
     }
 
-    const self = this;
-
-    this.tickInterval = setInterval(function() {
-      self.tick();
+    this.tickInterval = setInterval(() => {
+      this.tick();
     }, 1000 / this.ups);
 
     log.debug({ ups: this.ups }, 'GameLoop started');
@@ -128,6 +127,20 @@ export class GameLoop {
    * Main tick function - called every frame
    */
   private tick(): void {
+    const now = Date.now();
+    const targetMs = 1000 / this.ups;
+
+    // Detect slow ticks (delta > 2x target interval)
+    let skipThoughts = false;
+    if (this.lastTickTime > 0) {
+      const delta = now - this.lastTickTime;
+      if (delta > targetMs * 2) {
+        log.warn({ delta, target: targetMs }, 'Slow tick detected, skipping thoughts');
+        skipThoughts = true;
+      }
+    }
+    this.lastTickTime = now;
+
     try {
       // Process spatial groups (spawns, despawns)
       this.spatialContext?.processGroups();
@@ -150,11 +163,13 @@ export class GameLoop {
       this.updateCount = 0;
     }
 
-    // Thought bubble timer
+    // Thought bubble timer — skip during slow ticks to prioritize combat/movement
     if (this.thoughtUpdateCount < this.thoughtCount) {
       this.thoughtUpdateCount += 1;
     } else {
-      try { this.thoughtCallback?.(); } catch (e) { log.error({ err: e }, 'Error in thought callback'); }
+      if (!skipThoughts) {
+        try { this.thoughtCallback?.(); } catch (e) { log.error({ err: e }, 'Error in thought callback'); }
+      }
       this.thoughtUpdateCount = 0;
     }
 

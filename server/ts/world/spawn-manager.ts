@@ -90,34 +90,33 @@ export class SpawnManager {
   initializeAreas(): void {
     if (!this.map || !this.worldContext) return;
 
-    const self = this;
-
     // Populate all mob "roaming" areas
-    this.map.mobAreas.forEach(function(a) {
-      const area = new MobArea(a.id, a.nb, a.type, a.x, a.y, a.width, a.height, self.worldContext);
+    this.map.mobAreas.forEach((a) => {
+      const area = new MobArea(a.id, a.nb, a.type, a.x, a.y, a.width, a.height, this.worldContext);
       area.spawnMobs();
-      area.onEmpty(self.handleEmptyMobArea.bind(self, area));
-      self.mobAreas.push(area);
+      area.onEmpty(this.handleEmptyMobArea.bind(this, area));
+      this.mobAreas.push(area);
     });
 
     // Create all chest areas
-    this.map.chestAreas.forEach(function(a) {
-      const area = new ChestArea(a.id, a.x, a.y, a.w, a.h, a.tx, a.ty, a.i, self.worldContext);
-      self.chestAreas.push(area);
-      area.onEmpty(self.handleEmptyChestArea.bind(self, area));
+    this.map.chestAreas.forEach((a) => {
+      const area = new ChestArea(a.id, a.x, a.y, a.w, a.h, a.tx, a.ty, a.i, this.worldContext);
+      this.chestAreas.push(area);
+      area.onEmpty(this.handleEmptyChestArea.bind(this, area));
     });
 
     // Spawn static chests
-    this.map.staticChests.forEach(function(chest) {
-      const c = self.entityManager!.createChest(chest.x, chest.y, chest.i);
-      self.entityManager!.addStaticItem(c);
+    const em = this.entityManager;
+    this.map.staticChests.forEach((chest) => {
+      const c = em.createChest(chest.x, chest.y, chest.i);
+      em.addStaticItem(c);
     });
 
     // Spawn static entities
     this.spawnStaticEntities();
 
     // Set maximum number of entities contained in each chest area
-    this.chestAreas.forEach(function(area) {
+    this.chestAreas.forEach((area) => {
       area.setNumberOfEntities(area.entities.length);
     });
   }
@@ -128,32 +127,34 @@ export class SpawnManager {
   spawnStaticEntities(): void {
     if (!this.map || !this.entityManager || !this.worldContext) return;
 
-    const self = this;
+    const map = this.map;
+    const em = this.entityManager;
+    const world = this.worldContext;
     let count = 0;
 
-    Object.entries(this.map.staticEntities).forEach(([tid, kindName]: [string, string]) => {
+    Object.entries(map.staticEntities).forEach(([tid, kindName]: [string, string]) => {
       const kind = Types.getKindFromString(kindName);
       if (kind === undefined) return;
-      const pos = self.map!.tileIndexToGridPosition(parseInt(tid));
+      const pos = map.tileIndexToGridPosition(parseInt(tid));
 
       if (Types.isNpc(kind)) {
-        self.entityManager!.addNpc(kind, pos.x + 1, pos.y);
+        em.addNpc(kind, pos.x + 1, pos.y);
       }
       if (Types.isMob(kind)) {
         const mob = new Mob('7' + kind + count++, kind, pos.x + 1, pos.y);
-        mob.onRespawn(function() {
+        mob.onRespawn(() => {
           mob.isDead = false;
-          self.entityManager!.addMob(mob);
+          em.addMob(mob);
           if (mob.area && mob.area instanceof ChestArea) {
             mob.area.addToArea(mob);
           }
         });
-        mob.onMove(self.worldContext!.onMobMoveCallback.bind(self.worldContext));
-        self.entityManager!.addMob(mob);
-        self.tryAddingMobToChestArea(mob);
+        mob.onMove(world.onMobMoveCallback.bind(world));
+        em.addMob(mob);
+        this.tryAddingMobToChestArea(mob);
       }
       if (Types.isItem(kind)) {
-        self.entityManager!.addStaticItem(self.entityManager!.createItem(kind, pos.x + 1, pos.y));
+        em.addStaticItem(em.createItem(kind, pos.x + 1, pos.y));
       }
     });
   }
@@ -185,7 +186,7 @@ export class SpawnManager {
    * Try to add a mob to any chest area it's contained in
    */
   tryAddingMobToChestArea(mob: any): void {
-    this.chestAreas.forEach(function(area) {
+    this.chestAreas.forEach((area) => {
       if (area.contains(mob)) {
         area.addToArea(mob);
       }
@@ -200,17 +201,17 @@ export class SpawnManager {
   handleItemDespawn(item: any): void {
     if (!item || !this.broadcaster || !this.entityManager) return;
 
-    const self = this;
-
+    const broadcaster = this.broadcaster;
+    const entityManager = this.entityManager;
     item.handleDespawn({
       beforeBlinkDelay: 10000,
-      blinkCallback() {
-        self.broadcaster!.pushToAdjacentGroups(item.group, new Messages.Blink(item));
+      blinkCallback: () => {
+        broadcaster.pushToAdjacentGroups(item.group, new Messages.Blink(item));
       },
       blinkingDuration: 4000,
-      despawnCallback() {
-        self.broadcaster!.pushToAdjacentGroups(item.group, new Messages.Destroy(item));
-        self.entityManager!.removeEntity(item);
+      despawnCallback: () => {
+        broadcaster.pushToAdjacentGroups(item.group, new Messages.Destroy(item));
+        entityManager.removeEntity(item);
       }
     });
   }
@@ -221,17 +222,17 @@ export class SpawnManager {
   handleChestDespawn(chest: any): void {
     if (!chest || !this.broadcaster || !this.entityManager) return;
 
-    const self = this;
-
+    const broadcaster = this.broadcaster;
+    const entityManager = this.entityManager;
     chest.handleDespawn({
       beforeBlinkDelay: 60000,  // 60 seconds before blinking
-      blinkCallback() {
-        self.broadcaster!.pushToAdjacentGroups(chest.group, new Messages.Blink(chest));
+      blinkCallback: () => {
+        broadcaster.pushToAdjacentGroups(chest.group, new Messages.Blink(chest));
       },
       blinkingDuration: 10000,  // 10 seconds of blinking
-      despawnCallback() {
-        self.broadcaster!.pushToAdjacentGroups(chest.group, new Messages.Destroy(chest));
-        self.entityManager!.removeEntity(chest);
+      despawnCallback: () => {
+        broadcaster.pushToAdjacentGroups(chest.group, new Messages.Destroy(chest));
+        entityManager.removeEntity(chest);
       }
     });
   }
@@ -254,10 +255,12 @@ export class SpawnManager {
 
     if (kind) {
       const item = this.entityManager.addItemFromChest(kind, chest.x, chest.y);
-      log.debug({ itemId: item.id, kind, x: chest.x, y: chest.y }, 'Created item from chest');
-      // Push to adjacent groups - player is already in these groups
-      this.broadcaster.pushToAdjacentGroups(chestGroup, new Messages.Spawn(item));
-      this.handleItemDespawn(item);
+      if (item) {
+        log.debug({ itemId: item.id, kind, x: chest.x, y: chest.y }, 'Created item from chest');
+        // Push to adjacent groups - player is already in these groups
+        this.broadcaster.pushToAdjacentGroups(chestGroup, new Messages.Spawn(item));
+        this.handleItemDespawn(item);
+      }
     } else {
       log.debug({ items: chest.items }, 'No item dropped from chest');
     }

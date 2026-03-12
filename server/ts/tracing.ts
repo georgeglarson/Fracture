@@ -33,10 +33,14 @@ const resource = resourceFromAttributes({
 
 // Dev: console exporter for local visibility
 // Prod: OTLP HTTP to SigNoz collector
+// Note: OTLPTraceExporter's `url` option requires the full signal-specific path.
+// OTEL_EXPORTER_OTLP_ENDPOINT is the base URL (e.g. http://localhost:4318),
+// so we must append /v1/traces — same pattern as pino-opentelemetry-transport in logger.ts.
+const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318';
 const traceExporter = isDev
   ? new ConsoleSpanExporter()
   : new OTLPTraceExporter({
-      url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+      url: `${endpoint}/v1/traces`,
     });
 
 // OTEL_TRACES_SAMPLER_ARG controls prod sampling ratio (0.0–1.0, default 1.0)
@@ -69,4 +73,3 @@ const shutdown = () => {
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
-export { sdk };

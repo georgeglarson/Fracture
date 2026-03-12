@@ -16,6 +16,7 @@ export class ProfileService {
       this.playerProfiles.set(playerId, {
         kills: {},
         totalKills: 0,
+        level: 1,
         areas: [],
         items: [],
         deaths: 0,

@@ -251,7 +251,7 @@ export class AIPlayer extends Character {
   }
 
   private setRandomPosition(): void {
-    const map = this.world?.map as any;
+    const map = this.world?.map;
     if (map) {
       // Use non-starting checkpoints to avoid cluttering the player spawn area
       const pos = map.getRandomNonStartingPosition
@@ -490,7 +490,7 @@ export class AIPlayer extends Character {
     this.targetY = this.y + Math.floor(Math.random() * range * 2) - range;
 
     // Clamp to valid positions
-    const map = this.world?.map as any;
+    const map = this.world?.map;
     if (map) {
       this.targetX = Math.max(0, Math.min(map.width - 1, this.targetX));
       this.targetY = Math.max(0, Math.min(map.height - 1, this.targetY));

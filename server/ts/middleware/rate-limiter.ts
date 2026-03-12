@@ -111,9 +111,9 @@ export async function checkRateLimit(
         remaining: 0,
       };
     }
-    // Unexpected error - allow through but log
+    // Unexpected error - fail closed for safety
     log.error({ error, key }, 'Rate limiter error');
-    return { allowed: true };
+    return { allowed: false, retryAfter: 1, remaining: 0 };
   }
 }
 
@@ -133,7 +133,8 @@ export async function getRateLimitStatus(
       };
     }
     return null;
-  } catch {
+  } catch (err) {
+    log.debug({ err }, 'Rate limit status check failed');
     return null;
   }
 }
@@ -147,8 +148,8 @@ export async function resetRateLimit(
 ): Promise<void> {
   try {
     await limiter.delete(key);
-  } catch {
-    // Ignore errors on reset
+  } catch (err) {
+    log.debug({ err }, 'Rate limit reset failed');
   }
 }
 

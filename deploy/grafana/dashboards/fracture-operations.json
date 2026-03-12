@@ -495,10 +495,249 @@
       ]
     },
     {
+      "id": 50,
+      "title": "Player Activity",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 51,
+      "title": "Player Sessions (24h)",
+      "description": "Player joins and exits over the last 24 hours, bucketed by 30-minute intervals",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 0,
+            "showPoints": "never",
+            "stacking": { "mode": "none" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "joins" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "exits" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["sum"] }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT toStartOfInterval(toDateTime(timestamp / 1000000000), INTERVAL 30 MINUTE) as time, countIf(body = 'Player joined world') as joins, countIf(body = 'Saved player on exit') as exits FROM signoz_logs.logs_v2 WHERE attributes_string['module'] = 'World' AND (body = 'Player joined world' OR body = 'Saved player on exit') AND toDateTime(timestamp / 1000000000) >= now() - INTERVAL 24 HOUR GROUP BY time ORDER BY time",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 2
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "title": "Unique Players (24h)",
+      "description": "Distinct player names seen per hour over the last 24 hours",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": true
+          },
+          "color": { "fixedColor": "blue", "mode": "fixed" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["max", "sum"] }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT toStartOfInterval(toDateTime(timestamp / 1000000000), INTERVAL 1 HOUR) as time, uniq(attributes_string['playerName']) as unique_players FROM signoz_logs.logs_v2 WHERE attributes_string['module'] = 'World' AND body = 'Player joined world' AND toDateTime(timestamp / 1000000000) >= now() - INTERVAL 24 HOUR GROUP BY time ORDER BY time",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 2
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "title": "Total Sessions (24h)",
+      "description": "Total player join events in the last 24 hours",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 32 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "green", "value": 20 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT count() as sessions FROM signoz_logs.logs_v2 WHERE attributes_string['module'] = 'World' AND body = 'Player joined world' AND toDateTime(timestamp / 1000000000) >= now() - INTERVAL 24 HOUR",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "title": "Unique Players (24h)",
+      "description": "Distinct player names that connected in the last 24 hours",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 32 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "green", "value": 10 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT uniq(attributes_string['playerName']) as unique_players FROM signoz_logs.logs_v2 WHERE attributes_string['module'] = 'World' AND body = 'Player joined world' AND toDateTime(timestamp / 1000000000) >= now() - INTERVAL 24 HOUR",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "title": "Zone Visits (24h)",
+      "description": "Player zone transitions grouped by zone name",
+      "type": "piechart",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 32 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value"] },
+        "pieType": "donut",
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT attributes_string['zoneName'] as zone, count() as visits FROM signoz_logs.logs_v2 WHERE attributes_string['module'] = 'ZoneHandler' AND body = 'Player entered zone' AND toDateTime(timestamp / 1000000000) >= now() - INTERVAL 24 HOUR GROUP BY zone ORDER BY visits DESC",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "title": "Peak Concurrent (24h)",
+      "description": "Estimated peak concurrent players based on max joins in any 15-minute window",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 32 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
+          "queryType": "sql",
+          "rawSql": "SELECT max(window_joins) as peak_concurrent FROM (SELECT toStartOfInterval(toDateTime(timestamp / 1000000000), INTERVAL 15 MINUTE) as window, count() as window_joins FROM signoz_logs.logs_v2 WHERE attributes_string['module'] = 'World' AND body = 'Player joined world' AND toDateTime(timestamp / 1000000000) >= now() - INTERVAL 24 HOUR GROUP BY window)",
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1
+        }
+      ]
+    },
+    {
       "id": 30,
       "title": "Logs",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
       "collapsed": false,
       "panels": []
     },
@@ -507,7 +746,7 @@
       "title": "Recent Log Events",
       "description": "Latest structured log records from all server modules",
       "type": "table",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 37 },
       "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
       "fieldConfig": {
         "defaults": {},
@@ -558,7 +797,7 @@
       "id": 40,
       "title": "Traces",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
       "collapsed": false,
       "panels": []
     },
@@ -567,7 +806,7 @@
       "title": "Slowest Operations (last hour)",
       "description": "Top operations by P99 latency — identifies performance bottlenecks",
       "type": "table",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 33 },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 46 },
       "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
       "fieldConfig": {
         "defaults": {},
@@ -603,7 +842,7 @@
       "title": "Error Spans (last hour)",
       "description": "Spans that recorded errors — empty table means zero errors",
       "type": "table",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 33 },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 46 },
       "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-signoz" },
       "fieldConfig": {
         "defaults": {},

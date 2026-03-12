@@ -311,7 +311,8 @@ export class FishAudioService {
         totalSize += stats.size;
       }
       return { files: files.length, size: totalSize };
-    } catch {
+    } catch (err) {
+      log.debug({ err }, 'Cache stats read failed');
       return { files: 0, size: 0 };
     }
   }

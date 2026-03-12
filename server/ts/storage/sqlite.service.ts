@@ -36,6 +36,26 @@ class StorageError extends Error {
   }
 }
 
+interface CharacterRow {
+  id: string; name: string; level: number; xp: number; gold: number;
+  armor_kind: number; weapon_kind: number; x: number; y: number;
+  created_at: string; last_saved: string;
+  ascension_count: number; rested_xp: number; last_logout_time: number;
+}
+interface PasswordRow { password_hash: string; }
+interface InventoryRow { slot: number; item_kind: number; count: number; properties: string | null; }
+interface AchievementRow { achievement_id: string; progress: number; unlocked_at: string | null; }
+interface TitleRow { selected_title: string | null; }
+interface DailyRow { last_login: string; current_streak: number; longest_streak: number; total_logins: number; }
+interface RiftLeaderboardRow {
+  player_name: string;
+  max_depth: number;
+  total_kills: number;
+  completion_time: number;
+  modifier_count: number;
+  timestamp: number;
+}
+
 export class SQLiteStorageService implements IStorageService {
   private db: Database.Database | null = null;
 
@@ -171,6 +191,18 @@ export class SQLiteStorageService implements IStorageService {
       )
     `);
 
+    // Rift leaderboard table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS rift_leaderboard (
+        player_name TEXT PRIMARY KEY,
+        max_depth INTEGER NOT NULL,
+        total_kills INTEGER NOT NULL,
+        completion_time INTEGER NOT NULL,
+        modifier_count INTEGER DEFAULT 0,
+        timestamp INTEGER NOT NULL
+      )
+    `);
+
     // Create indexes for faster lookups
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_characters_name ON characters(name);
@@ -221,7 +253,7 @@ export class SQLiteStorageService implements IStorageService {
         FROM characters WHERE name = ?
       `);
 
-      const row = stmt.get(name) as any;
+      const row = stmt.get(name) as CharacterRow | undefined;
       if (!row) return null;
 
       return {
@@ -259,7 +291,7 @@ export class SQLiteStorageService implements IStorageService {
         FROM characters WHERE id = ?
       `);
 
-      const row = stmt.get(id) as any;
+      const row = stmt.get(id) as CharacterRow | undefined;
       if (!row) return null;
 
       return {
@@ -405,7 +437,7 @@ export class SQLiteStorageService implements IStorageService {
 
     try {
       const stmt = this.db.prepare('SELECT password_hash FROM characters WHERE name = ?');
-      const row = stmt.get(name) as any;
+      const row = stmt.get(name) as PasswordRow | undefined;
       if (!row) return false;
 
       return this.checkPassword(password, row.password_hash);
@@ -430,7 +462,7 @@ export class SQLiteStorageService implements IStorageService {
         ORDER BY slot
       `);
 
-      const rows = stmt.all(characterId) as any[];
+      const rows = stmt.all(characterId) as InventoryRow[];
 
       // Create 20-slot array
       const inventory: (SerializedInventorySlot | null)[] = new Array(20).fill(null);
@@ -506,13 +538,13 @@ export class SQLiteStorageService implements IStorageService {
         SELECT achievement_id, progress, unlocked_at
         FROM achievements WHERE character_id = ?
       `);
-      const rows = achievementStmt.all(characterId) as any[];
+      const rows = achievementStmt.all(characterId) as AchievementRow[];
 
       // Get selected title
       const titleStmt = this.db.prepare(`
         SELECT selected_title FROM character_titles WHERE character_id = ?
       `);
-      const titleRow = titleStmt.get(characterId) as any;
+      const titleRow = titleStmt.get(characterId) as TitleRow | undefined;
 
       const unlocked: string[] = [];
       const progress: Record<string, number> = {};
@@ -598,7 +630,7 @@ export class SQLiteStorageService implements IStorageService {
         FROM daily_logins WHERE character_id = ?
       `);
 
-      const row = stmt.get(characterId) as any;
+      const row = stmt.get(characterId) as DailyRow | undefined;
       if (!row) return null;
 
       return {
@@ -641,6 +673,65 @@ export class SQLiteStorageService implements IStorageService {
     } catch (error) {
       log.error({ err: error, characterId }, 'saveDailyData failed');
       return false;
+    }
+  }
+
+  // ============ Rift Leaderboard Methods ============
+
+  saveRiftEntry(entry: { playerName: string; maxDepth: number; totalKills: number; completionTime: number; modifierCount: number; timestamp: number }): boolean {
+    if (!this.db) {
+      log.error('saveRiftEntry: Database not initialized');
+      return false;
+    }
+
+    try {
+      const stmt = this.db.prepare(`
+        INSERT INTO rift_leaderboard (player_name, max_depth, total_kills, completion_time, modifier_count, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(player_name) DO UPDATE SET
+          max_depth = CASE WHEN excluded.max_depth > rift_leaderboard.max_depth THEN excluded.max_depth
+                          WHEN excluded.max_depth = rift_leaderboard.max_depth AND excluded.completion_time < rift_leaderboard.completion_time THEN excluded.max_depth
+                          ELSE rift_leaderboard.max_depth END,
+          total_kills = CASE WHEN excluded.max_depth > rift_leaderboard.max_depth THEN excluded.total_kills
+                            WHEN excluded.max_depth = rift_leaderboard.max_depth AND excluded.completion_time < rift_leaderboard.completion_time THEN excluded.total_kills
+                            ELSE rift_leaderboard.total_kills END,
+          completion_time = CASE WHEN excluded.max_depth > rift_leaderboard.max_depth THEN excluded.completion_time
+                               WHEN excluded.max_depth = rift_leaderboard.max_depth AND excluded.completion_time < rift_leaderboard.completion_time THEN excluded.completion_time
+                               ELSE rift_leaderboard.completion_time END,
+          modifier_count = CASE WHEN excluded.max_depth > rift_leaderboard.max_depth THEN excluded.modifier_count
+                              WHEN excluded.max_depth = rift_leaderboard.max_depth AND excluded.completion_time < rift_leaderboard.completion_time THEN excluded.modifier_count
+                              ELSE rift_leaderboard.modifier_count END,
+          timestamp = CASE WHEN excluded.max_depth > rift_leaderboard.max_depth THEN excluded.timestamp
+                         WHEN excluded.max_depth = rift_leaderboard.max_depth AND excluded.completion_time < rift_leaderboard.completion_time THEN excluded.timestamp
+                         ELSE rift_leaderboard.timestamp END
+      `);
+
+      stmt.run(entry.playerName, entry.maxDepth, entry.totalKills, entry.completionTime, entry.modifierCount, entry.timestamp);
+      return true;
+    } catch (error) {
+      log.error({ err: error, playerName: entry.playerName }, 'saveRiftEntry failed');
+      return false;
+    }
+  }
+
+  getRiftLeaderboard(limit: number = 100): RiftLeaderboardRow[] {
+    if (!this.db) {
+      log.error('getRiftLeaderboard: Database not initialized');
+      return [];
+    }
+
+    try {
+      const stmt = this.db.prepare(`
+        SELECT player_name, max_depth, total_kills, completion_time, modifier_count, timestamp
+        FROM rift_leaderboard
+        ORDER BY max_depth DESC, completion_time ASC
+        LIMIT ?
+      `);
+
+      return stmt.all(limit) as RiftLeaderboardRow[];
+    } catch (error) {
+      log.error({ err: error }, 'getRiftLeaderboard failed');
+      return [];
     }
   }
 

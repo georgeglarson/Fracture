@@ -94,7 +94,7 @@ function generateBonusProperties(rarity: Rarity, category: ItemCategory): Partia
       // Scale by rarity multiplier for higher rarity = better bonuses
       const multiplier = RarityMultipliers[rarity];
       const value = Math.round(randomInRange(range.min, range.max) * multiplier);
-      (bonuses as any)[bonusType] = value;
+      (bonuses as Record<string, number>)[bonusType] = value;
     }
   }
 

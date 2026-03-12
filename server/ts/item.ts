@@ -38,7 +38,7 @@ export class Item extends Entity {
   /**
    *
    */
-  respawn_callback: (() => void) | null = null;
+  respawnCallback: (() => void) | null = null;
 
   /**
    *
@@ -71,11 +71,9 @@ export class Item extends Entity {
    * @param params
    */
   handleDespawn(params: { blinkCallback: () => void; despawnCallback: () => void; blinkingDuration: number; beforeBlinkDelay: number }) {
-    const self = this;
-
-    this.blinkTimeout = setTimeout(function () {
+    this.blinkTimeout = setTimeout(() => {
       params.blinkCallback();
-      self.despawnTimeout = setTimeout(params.despawnCallback, params.blinkingDuration);
+      this.despawnTimeout = setTimeout(params.despawnCallback, params.blinkingDuration);
     }, params.beforeBlinkDelay);
   }
 
@@ -99,10 +97,9 @@ export class Item extends Entity {
    * @param delay
    */
   scheduleRespawn(delay: number) {
-    const self = this;
-    setTimeout(function () {
-      if (self.respawn_callback) {
-        self.respawn_callback();
+    setTimeout(() => {
+      if (this.respawnCallback) {
+        this.respawnCallback();
       }
     }, delay);
   }
@@ -112,6 +109,6 @@ export class Item extends Entity {
    * @param callback
    */
   onRespawn(callback: () => void) {
-    this.respawn_callback = callback;
+    this.respawnCallback = callback;
   }
 }

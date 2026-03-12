@@ -10,6 +10,7 @@
 
 import { VeniceClient } from './venice-client';
 import { FishAudioService, getFishAudioService, VOICES } from './fish-audio.service';
+import { sanitizeForPrompt } from './prompt-utils';
 import { createModuleLogger } from '../utils/logger.js';
 
 const log = createModuleLogger('IntroService');
@@ -135,25 +136,23 @@ export class IntroService {
       );
       const personalizedStory = personalizedLines.join(' ');
 
-      // Generate TTS now (player waits for this, but text was instant)
-      let audioUrl: string | undefined;
+      // Fire-and-forget TTS — don't block player login
       if (fishAudio) {
-        try {
-          log.info({ playerName, voice: cached.narrator.name }, 'Generating TTS');
-          const ttsResult = await fishAudio.generateIntroSpeech(personalizedStory, cached.narrator.id);
-          if (ttsResult) {
-            audioUrl = ttsResult.audioUrl;
-            log.info({ audioUrl }, 'TTS ready');
-          }
-        } catch (ttsError) {
-          log.warn({ err: ttsError }, 'TTS generation failed');
-        }
+        fishAudio.generateIntroSpeech(personalizedStory, cached.narrator.id)
+          .then(ttsResult => {
+            if (ttsResult) {
+              log.info({ audioUrl: ttsResult.audioUrl }, 'Background TTS ready');
+            }
+          })
+          .catch(ttsError => {
+            log.warn({ err: ttsError }, 'Background TTS generation failed');
+          });
       }
 
       return {
         story: personalizedStory,
         lines: personalizedLines,
-        audioUrl,
+        audioUrl: undefined,
         voiceName: cached.narrator.name,
         cached: true
       };
@@ -190,7 +189,7 @@ LORE REQUIREMENTS (you MUST weave these into your narration):
 - The Hope: ${theHope}
 - The Mystery: ${theMystery}
 
-PLAYER NAME: ${playerName}
+PLAYER NAME: ${sanitizeForPrompt(playerName)}
 
 VOICE STYLE: You are "${narrator.name}" - speak in a ${narrator.style} manner.
 

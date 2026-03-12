@@ -22,7 +22,6 @@ process.on('unhandledRejection', (reason, promise) => {
 
 import {World} from './world';
 import {Server, Connection} from './ws';
-import {Metrics} from './metrics';
 import {Player} from './player';
 import {initVeniceService, initFishAudioService, getVeniceClient} from './ai';
 import {initIntroService} from './ai/intro.service';
@@ -33,12 +32,6 @@ const log = createModuleLogger('Server');
 // Server configuration interface
 interface ServerConfig {
   port: number;
-  metrics_enabled: boolean;
-  // Metrics config (required when metrics_enabled is true)
-  memcached_port: number;
-  memcached_host: string;
-  server_name: string;
-  game_servers: { name: string }[];
   // World config
   nb_worlds: number;
   nb_players_per_world: number;
@@ -94,7 +87,7 @@ function releaseServerLock(): void {
             }
         }
     } catch (e) {
-        // Ignore errors during cleanup
+        log.debug({ err: e }, 'PID file cleanup error');
     }
 }
 
@@ -104,23 +97,9 @@ process.on('SIGINT', () => { releaseServerLock(); process.exit(0); });
 process.on('SIGTERM', () => { releaseServerLock(); process.exit(0); });
 
 function main(config: ServerConfig): void {
-    var WorldServer = World,
-        server = new Server(config.port),
-        metrics = config.metrics_enabled ? new Metrics(config) : null,
-        worlds: World[] = [],
-        lastTotalPlayers = 0,
-        checkPopulationInterval = setInterval(function() {
-            if(metrics && metrics.isReady) {
-                metrics.getTotalPlayers(function(totalPlayers: number) {
-                    if(totalPlayers !== lastTotalPlayers) {
-                        lastTotalPlayers = totalPlayers;
-                        worlds.forEach(function(world: World) {
-                            world.updatePopulation(totalPlayers);
-                        });
-                    }
-                });
-            }
-        }, 1000);
+    const WorldServer = World;
+    const server = new Server(config.port);
+    const worlds: World[] = [];
 
     log.info('Starting Fracture game server');
 
@@ -159,54 +138,30 @@ function main(config: ServerConfig): void {
         log.warn('FishAudio API key not found — NPC voice acting disabled');
     }
 
-    server.onConnect(function(connection: Connection) {
-        var world: World | undefined, // the one in which the player will be spawned
-            connect = function() {
-                if(world && world.connect_callback) {
-                    world.connect_callback(new Player(connection, world));
+    server.onConnect((connection: Connection) => {
+        // Fill each world sequentially until full
+        const world: World | undefined = worlds.find((w: World) => w.playerCount < config.nb_players_per_world);
+        const connect = () => {
+                if(world && world.connectCallback) {
+                    world.connectCallback(new Player(connection, world));
                 }
             };
 
-        if(metrics) {
-            metrics.getOpenWorldCount(function(open_world_count: number) {
-                log.debug({ openWorldCount: open_world_count }, 'Open world count');
-                // choose the least populated world among open worlds
-                world = worlds.find((w: World) => w.playerCount < config.nb_players_per_world && w.playerCount < open_world_count);
-                connect();
-            });
-        }
-        else {
-            // simply fill each world sequentially until they are full
-            world = worlds.find((w: World) => w.playerCount < config.nb_players_per_world);
-            if (world) world.updatePopulation();
-            connect();
-        }
+        if (world) world.updatePopulation();
+        connect();
     });
 
-    server.onError(function() {
-        log.error({ details: Array.prototype.join.call(arguments, ", ") }, 'Server error');
+    server.onError((...args: any[]) => {
+        log.error({ details: args.join(", ") }, 'Server error');
     });
-
-    var onPopulationChange = function() {
-        metrics!.updatePlayerCounters(worlds, function(totalPlayers: number) {
-            worlds.forEach(function(world: World) {
-                world.updatePopulation(totalPlayers);
-            });
-        });
-        metrics!.updateWorldDistribution(getWorldDistribution(worlds));
-    };
 
     Array.from({length: config.nb_worlds}, (_, i) => {
-        var world = new WorldServer('world'+ (i+1), config.nb_players_per_world, server);
+        const world = new WorldServer('world'+ (i+1), config.nb_players_per_world, server);
         world.run(config.map_filepath);
         worlds.push(world);
-        if(metrics) {
-            world.onPlayerAdded(onPopulationChange);
-            world.onPlayerRemoved(onPopulationChange);
-        }
     });
 
-    server.onRequestStatus(function() {
+    server.onRequestStatus(() => {
         return JSON.stringify(getWorldDistribution(worlds));
     });
 
@@ -217,46 +172,37 @@ function main(config: ServerConfig): void {
         startDebugServer(worlds[0], debugPort);
     }
 
-    if(config.metrics_enabled) {
-        metrics!.ready(function() {
-            onPopulationChange(); // initialize all counters to 0 when the server starts
-        });
-    }
-
-    // process.on('uncaughtException', function (e) {
-    //     console.error('uncaughtException: ' + e);
-    // });
 }
 
 function getWorldDistribution(worlds: World[]): number[] {
-    var distribution: number[] = [];
+    const distribution: number[] = [];
 
-    worlds.forEach(function(world: World) {
+    worlds.forEach((world: World) => {
         distribution.push(world.playerCount);
     });
     return distribution;
 }
 
-function getConfigFile(path: string, callback: (config: ServerConfig | null) => void): void {
-    fs.readFile(path, 'utf8', function(err, json_string) {
-        if(err) {
-            log.error({ path: err.path }, 'Could not open config file');
-            callback(null);
-        } else {
-            callback(JSON.parse(json_string) as ServerConfig);
-        }
-    });
+async function getConfigFile(filePath: string): Promise<ServerConfig | null> {
+    try {
+        const json_string = await fs.promises.readFile(filePath, 'utf8');
+        return JSON.parse(json_string) as ServerConfig;
+    } catch (err: any) {
+        log.error({ path: err.path }, 'Could not open config file');
+        return null;
+    }
 }
 
-var configPath = './server/config.json';
+let configPath = './server/config.json';
 
-process.argv.forEach(function (val, index, array) {
+process.argv.forEach((val, index) => {
     if(index === 2) {
         configPath = val;
     }
 });
 
-getConfigFile(configPath, function(config: ServerConfig | null) {
+(async () => {
+    const config = await getConfigFile(configPath);
     // Acquire singleton lock before starting
     if (!acquireServerLock()) {
         process.exit(1);
@@ -266,4 +212,4 @@ getConfigFile(configPath, function(config: ServerConfig | null) {
         process.exit(1);
     }
     main(config);
-});
+})();

@@ -149,7 +149,7 @@ export class RiftManager {
       // Add new modifiers at certain depths
       const newTier = getRiftTier(run.depth);
       if (newTier.modifierCount > run.modifiers.length) {
-        const newMods = selectRandomModifiers(1);
+        const newMods = selectRandomModifiers(1).filter(m => !run.modifiers.includes(m));
         run.modifiers.push(...newMods);
         log.info({ playerId, modifier: newMods[0] }, 'Player gained new rift modifier');
       }
@@ -188,8 +188,8 @@ export class RiftManager {
 
     // Calculate final rewards based on completed depth
     const finalRewards = {
-      xp: run.completedDepth * 100 + run.killCount * 5,
-      gold: run.completedDepth * 50 + run.killCount * 2
+      xp: Math.floor(Math.pow(1.5, run.completedDepth) * 50) + run.killCount * 5,
+      gold: Math.floor(Math.pow(1.5, run.completedDepth) * 25) + run.killCount * 2
     };
 
     // Update leaderboard if this is a good run

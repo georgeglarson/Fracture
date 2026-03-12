@@ -45,6 +45,9 @@ function createMemberRef(player: any) {
   };
 }
 
+/** Max distance (Chebyshev tiles) for party invite */
+const MAX_PARTY_INVITE_DISTANCE = 20;
+
 /**
  * Handle party invite request
  */
@@ -56,6 +59,15 @@ export function handlePartyInvite(ctx: PartyPlayerContext, targetId: number): vo
   // Use isPlayer() to reject AIPlayers and other non-human entities
   if (!targetPlayer || !isPlayer(targetPlayer)) {
     log.warn({ player: ctx.name, targetId }, 'Tried to invite invalid player');
+    return;
+  }
+
+  // Distance check: must be within MAX_PARTY_INVITE_DISTANCE tiles
+  const dx = Math.abs(ctx.x - targetPlayer.x);
+  const dy = Math.abs(ctx.y - targetPlayer.y);
+  const distance = Math.max(dx, dy);
+  if (distance > MAX_PARTY_INVITE_DISTANCE) {
+    log.info({ player: ctx.name, targetId, distance }, 'Invite rejected: target too far');
     return;
   }
 

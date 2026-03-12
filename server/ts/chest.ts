@@ -14,8 +14,8 @@ export class Chest extends Item {
   }
 
   getRandomItem(): number | null {
-    var nbItems = this.items.length,
-      item: number | null = null;
+    const nbItems = this.items.length;
+    let item: number | null = null;
 
     if (nbItems > 0) {
       item = this.items[Utils.random(nbItems)];

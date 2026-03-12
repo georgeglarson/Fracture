@@ -18,6 +18,7 @@ describe('DailyRewardService', () => {
   const TODAY = '2026-03-11';
   const YESTERDAY = '2026-03-10';
   const TWO_DAYS_AGO = '2026-03-09';
+  const THREE_DAYS_AGO = '2026-03-08';
   const WEEK_AGO = '2026-03-04';
 
   beforeEach(() => {
@@ -129,8 +130,16 @@ describe('DailyRewardService', () => {
 
     // ── Streak reset (missed a day) ──────────────────────────
     describe('streak reset (missed one or more days)', () => {
-      it('should reset to day 1 when last login was two days ago', () => {
+      it('should maintain streak (grace) when last login was two days ago', () => {
         const result = service.checkDailyReward(TWO_DAYS_AGO, 5);
+
+        // 1-day grace: streak maintained but not advanced
+        expect(result.streak).toBe(5);
+        expect(result.isNewDay).toBe(true);
+      });
+
+      it('should reset to day 1 when last login was three days ago', () => {
+        const result = service.checkDailyReward(THREE_DAYS_AGO, 5);
 
         expect(result.streak).toBe(1);
         expect(result.gold).toBe(10);
@@ -175,8 +184,8 @@ describe('DailyRewardService', () => {
           // trigger day 1 via a missed-day reset to keep things simple.
           let result: DailyRewardResult;
           if (day === 1) {
-            // Use a missed-day scenario to land on streak 1
-            result = service.checkDailyReward(TWO_DAYS_AGO, 3);
+            // Use a missed-day scenario (>2 days) to land on streak 1
+            result = service.checkDailyReward(THREE_DAYS_AGO, 3);
           } else {
             result = service.checkDailyReward(YESTERDAY, currentStreak);
           }

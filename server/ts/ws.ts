@@ -5,6 +5,7 @@ import * as path from 'path';
 import {Utils} from './utils';
 import { getIntroService } from './ai/intro.service';
 import { createModuleLogger } from './utils/logger.js';
+import { checkFloodLimit } from './middleware/rate-limiter.js';
 
 const log = createModuleLogger('WebSocket');
 
@@ -48,14 +49,13 @@ export class Server {
   _connections: { [id: string]: Connection } = {};
   _counter = 0;
   io: SocketIOServer;
-  connection_callback: ((connection: Connection) => void) | null = null;
-  error_callback: (() => void) | null = null;
-  status_callback: (() => string) | null = null;
+  connectionCallback: ((connection: Connection) => void) | null = null;
+  errorCallback: (() => void) | null = null;
+  statusCallback: (() => string) | null = null;
 
   constructor(port: number, host: string = 'localhost') {
     this.port = port;
     this.host = host;
-    var self = this;
 
     const app = express();
 
@@ -125,26 +125,26 @@ export class Server {
       httpCompression: false
     });
 
-    this.io.on('connection', function (connection) {
+    this.io.on('connection', (connection) => {
       log.info('A user connected');
 
       // connection.ip = connection.handshake.address.address;
-      const c = new Connection(self._createId(), connection, self);
+      const c = new Connection(this._createId(), connection, this);
 
-      if (self.connection_callback) {
-        self.connection_callback(c);
+      if (this.connectionCallback) {
+        this.connectionCallback(c);
       }
-      self.addConnection(c);
+      this.addConnection(c);
     });
 
-    this.io.on('error', function (err) {
+    this.io.on('error', (err) => {
         log.error({ err }, 'Socket.IO error');
-      if (self.error_callback) {
-        self.error_callback();
+      if (this.errorCallback) {
+        this.errorCallback();
       }
     });
 
-    server.listen(port, function () {
+    server.listen(port, () => {
       log.info({ port }, 'Listening');
     });
   }
@@ -154,7 +154,7 @@ export class Server {
   }
 
   broadcast(message: MessagePayload): void {
-    this.forEachConnection(function (connection: Connection) {
+    this.forEachConnection((connection: Connection) => {
       try {
         connection.send(message);
       } catch (error) {
@@ -198,16 +198,16 @@ export class Server {
     }
   }
 
-  onRequestStatus(status_callback: () => string): void {
-    this.status_callback = status_callback;
+  onRequestStatus(statusCallback: () => string): void {
+    this.statusCallback = statusCallback;
   }
 
   onConnect(callback: (connection: Connection) => void): void {
-    this.connection_callback = callback;
+    this.connectionCallback = callback;
   }
 
   onError(callback: () => void): void {
-    this.error_callback = callback;
+    this.errorCallback = callback;
   }
 
   forEachConnection(callback: (connection: Connection) => void): void {
@@ -232,8 +232,8 @@ export class Connection {
   _server: Server;
   id: string;
   clientIp: string;
-  listen_callback: ((message: unknown[]) => void) | null = null;
-  close_callback: (() => void) | null = null;
+  listenCallback: ((message: unknown[]) => void) | null = null;
+  closeCallback: (() => void) | null = null;
   private _currentZone: string | null = null;
 
   constructor(id: string, connection: Socket, server: Server) {
@@ -242,34 +242,38 @@ export class Connection {
     this.id = id;
     // Extract client IP from socket handshake
     this.clientIp = connection.handshake.address || '127.0.0.1';
-    const self = this;
 
     // HANDLE DISPATCHER IN HERE
-    connection.on('dispatch', function (message) {
+    connection.on('dispatch', (message) => {
       log.info('Received dispatch request');
-      self._connection.emit('dispatched', {'status': 'OK', host: server.host, port: server.port});
+      this._connection.emit('dispatched', {'status': 'OK', host: server.host, port: server.port});
     });
 
-    connection.on('message', function (message) {
-      if (self.listen_callback) {
-        self.listen_callback(message);
+    connection.on('message', async (message) => {
+      const floodResult = await checkFloodLimit(id);
+      if (!floodResult.allowed) {
+        log.warn({ connectionId: id }, 'Message flood detected, dropping message');
+        return;
+      }
+      if (this.listenCallback) {
+        this.listenCallback(message);
       }
     });
 
-    connection.on('disconnect', function () {
-      if (self.close_callback) {
-        self.close_callback();
+    connection.on('disconnect', () => {
+      if (this.closeCallback) {
+        this.closeCallback();
       }
-      self._server.removeConnection(self.id);
+      this._server.removeConnection(this.id);
     });
   }
 
   onClose(callback: () => void): void {
-    this.close_callback = callback;
+    this.closeCallback = callback;
   }
 
   listen(callback: (message: unknown[]) => void): void {
-    this.listen_callback = callback;
+    this.listenCallback = callback;
   }
 
   broadcast(message: MessagePayload): void {

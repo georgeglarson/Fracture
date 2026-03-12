@@ -24,39 +24,48 @@ export class Area {
   entities: AreaEntity[] = [];
   hasCompletelyRespawned = true;
   nbEntities: number = 0;
-  empty_callback: (() => void) | null = null;
+  emptyCallback: (() => void) | null = null;
 
   constructor(id: number, x: number, y: number, width: number, height: number, world: WorldLike) {
     this.id = id;
     this.x = x;
     this.y = y;
-    this.width = width;
-    this.height = height;
+    this.width = Math.max(1, width);
+    this.height = Math.max(1, height);
     this.world = world;
 
   }
 
   _getRandomPositionInsideArea(): { x: number; y: number } {
-    var pos: { x: number; y: number } = { x: 0, y: 0 },
-      valid = false;
+    const MAX_SPAWN_ATTEMPTS = 100;
+    let pos: { x: number; y: number } = { x: 0, y: 0 };
+    let valid = false;
+    let attempts = 0;
 
-    while (!valid) {
-      pos.x = this.x + Utils.random(this.width + 1);
-      pos.y = this.y + Utils.random(this.height + 1);
+    while (!valid && attempts < MAX_SPAWN_ATTEMPTS) {
+      pos.x = this.x + Utils.random(this.width);
+      pos.y = this.y + Utils.random(this.height);
       valid = this.world.isValidPosition(pos.x, pos.y);
+      attempts++;
     }
+
+    if (!valid) {
+      pos.x = this.x + Math.floor(this.width / 2);
+      pos.y = this.y + Math.floor(this.height / 2);
+    }
+
     return pos;
   }
 
   removeFromArea(entity: AreaEntity): void {
-    var i = this.entities.findIndex(e => e.id === entity.id);
+    const i = this.entities.findIndex(e => e.id === entity.id);
     if (i >= 0) {
       this.entities.splice(i, 1);
     }
 
-    if (this.isEmpty() && this.hasCompletelyRespawned && this.empty_callback) {
+    if (this.isEmpty() && this.hasCompletelyRespawned && this.emptyCallback) {
       this.hasCompletelyRespawned = false;
-      this.empty_callback();
+      this.emptyCallback();
     }
   }
 
@@ -84,6 +93,6 @@ export class Area {
   }
 
   onEmpty(callback: () => void): void {
-    this.empty_callback = callback;
+    this.emptyCallback = callback;
   }
 }

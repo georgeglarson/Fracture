@@ -84,7 +84,7 @@ export class ThoughtService {
     // Only refresh a subset each cycle to avoid API spam
     const typesToRefresh = [...mobTypes, ...npcTypes]
       .sort(() => Math.random() - 0.5)
-      .slice(0, 3);
+      .slice(0, 5);
 
     log.info({ entityTypes: typesToRefresh }, 'Refreshing AI pool');
 
@@ -93,6 +93,7 @@ export class ThoughtService {
         await this.refreshPoolForType(entityType);
       } catch (err) {
         // Silently fail - fallback thoughts will be used
+        log.debug({ err }, 'Thought pool refresh failed');
       }
     }
 
@@ -138,8 +139,9 @@ Output exactly 5 thoughts, one per line. No numbering or punctuation at start:`;
           log.info({ entityType, count: newThoughts.length }, 'AI pool refreshed');
         }
       }
-    } catch {
+    } catch (err) {
       // Silently fail - use fallback
+      log.debug({ err }, 'Thought refresh failed');
     }
   }
 
@@ -235,7 +237,8 @@ Your thought:`;
     try {
       const response = await this.client.call(prompt);
       return response || baseThought.thought;
-    } catch {
+    } catch (err) {
+      log.debug({ err }, 'AI thought generation failed');
       return baseThought.thought;
     }
   }

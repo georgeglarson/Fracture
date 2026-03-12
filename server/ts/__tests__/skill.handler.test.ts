@@ -27,6 +27,7 @@ import {
 function createMockContext(overrides: Partial<SkillPlayerContext> = {}): SkillPlayerContext {
   const skillState = createInitialSkillState();
   const mobs: any[] = [];
+  const mobMap = new Map<number, any>();
 
   const ctx: SkillPlayerContext = {
     id: 1,
@@ -37,6 +38,7 @@ function createMockContext(overrides: Partial<SkillPlayerContext> = {}): SkillPl
     level: 20,           // High enough to unlock all skills by default
     weapon: 10,
     armor: 5,
+    weaponLevel: 10,
     hitPoints: 100,
     maxHitPoints: 100,
     send: vi.fn(),
@@ -47,6 +49,16 @@ function createMockContext(overrides: Partial<SkillPlayerContext> = {}): SkillPl
     getWorld: vi.fn(() => ({
       isValidPosition: vi.fn(() => true),
       forEachMob: vi.fn((cb: (mob: any) => void) => mobs.forEach(cb)),
+      handleMobHate: vi.fn(),
+      handleHurtEntity: vi.fn(),
+      getEntityById: vi.fn((id: number) => mobMap.get(id) ?? null),
+    })),
+    getCombatTracker: vi.fn(() => ({
+      getMobsAttacking: vi.fn((playerId: number) => {
+        // Return IDs of mobs that target this player
+        return mobs.filter(m => m.target === playerId).map(m => m.id);
+      }),
+      clearPlayerAggro: vi.fn(),
     })),
     getWeaponDamage: vi.fn(() => ({ min: 10, max: 20 })),
     setPowerStrikeBuff: vi.fn(),
@@ -57,7 +69,10 @@ function createMockContext(overrides: Partial<SkillPlayerContext> = {}): SkillPl
   // Attach helpers for test manipulation
   (ctx as any)._skillState = skillState;
   (ctx as any)._mobs = mobs;
-  (ctx as any)._addMob = (mob: any) => mobs.push(mob);
+  (ctx as any)._addMob = (mob: any) => {
+    mobs.push(mob);
+    if (mob.id != null) mobMap.set(mob.id, mob);
+  };
 
   return ctx;
 }
@@ -197,6 +212,7 @@ describe('handleSkillUse - Phase Shift', () => {
   it('should clear aggro from mobs targeting this player', () => {
     const ctx = createMockContext({ level: 5 });
     const mob = {
+      id: 10,
       target: ctx.id,
       clearTarget: vi.fn(),
       forgetPlayer: vi.fn(),
@@ -212,6 +228,7 @@ describe('handleSkillUse - Phase Shift', () => {
   it('should not clear target on mobs targeting someone else', () => {
     const ctx = createMockContext({ level: 5 });
     const mob = {
+      id: 11,
       target: 999, // Different player
       clearTarget: vi.fn(),
       forgetPlayer: vi.fn(),
@@ -220,14 +237,14 @@ describe('handleSkillUse - Phase Shift', () => {
 
     handleSkillUse(ctx, SkillId.PHASE_SHIFT);
 
+    // Mob targets someone else, so CombatTracker won't return its ID
     expect(mob.clearTarget).not.toHaveBeenCalled();
-    // forgetPlayer is always called to clean up hate lists
-    expect(mob.forgetPlayer).toHaveBeenCalledWith(ctx.id);
+    expect(mob.forgetPlayer).not.toHaveBeenCalled();
   });
 
   it('should handle mobs without clearTarget or forgetPlayer gracefully', () => {
     const ctx = createMockContext({ level: 5 });
-    const mob = { target: ctx.id }; // No clearTarget / forgetPlayer methods
+    const mob = { id: 12, target: ctx.id }; // No clearTarget / forgetPlayer methods
     (ctx as any)._addMob(mob);
 
     // Should not throw
@@ -322,8 +339,8 @@ describe('handleSkillUse - Whirlwind', () => {
     handleSkillUse(ctx, SkillId.WHIRLWIND);
 
     expect(mob.receiveDamage).toHaveBeenCalledTimes(1);
-    // Weapon avg = (10+20)/2 = 15, 75% = 11.25, floored to 11
-    expect(mob.receiveDamage).toHaveBeenCalledWith(11);
+    // Weapon avg = (10+20)/2 = 15, + weaponLevel(10) + level(20) = 45, 75% = 33.75, floored to 33
+    expect(mob.receiveDamage).toHaveBeenCalledWith(33, 1);
   });
 
   it('should send DAMAGE message per mob hit', () => {
@@ -343,7 +360,7 @@ describe('handleSkillUse - Whirlwind', () => {
     const damageCall = calls.find((c: any) => c[0][0] === Types.Messages.DAMAGE);
     expect(damageCall).toBeDefined();
     expect(damageCall![0][1]).toBe(mob.id);
-    expect(damageCall![0][2]).toBe(11);
+    expect(damageCall![0][2]).toBe(33);
   });
 
   it('should not damage mobs outside radius', () => {
@@ -387,7 +404,7 @@ describe('handleSkillUse - Whirlwind', () => {
     handleSkillUse(ctx, SkillId.WHIRLWIND);
 
     for (const mob of mobs) {
-      expect(mob.receiveDamage).toHaveBeenCalledWith(11);
+      expect(mob.receiveDamage).toHaveBeenCalledWith(33, 1);
     }
   });
 
@@ -404,8 +421,8 @@ describe('handleSkillUse - Whirlwind', () => {
 
     handleSkillUse(ctx, SkillId.WHIRLWIND);
 
-    // Weapon avg = (40+60)/2 = 50, 75% = 37.5, floored to 37
-    expect(mob.receiveDamage).toHaveBeenCalledWith(37);
+    // Weapon avg = (40+60)/2 = 50, + weaponLevel(10) + level(20) = 80, 75% = 60
+    expect(mob.receiveDamage).toHaveBeenCalledWith(60, 1);
   });
 });
 

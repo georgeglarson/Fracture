@@ -10,6 +10,7 @@ import { Messages } from '../message';
 import { Formulas } from '../formulas';
 import { EquipmentManager } from '../equipment/equipment-manager';
 import { EquipmentSlot } from '../../../shared/ts/equipment/equipment-types';
+import { ItemProperties } from '../../../shared/ts/items/index';
 import { createModuleLogger } from '../utils/logger.js';
 
 const log = createModuleLogger('Equipment');
@@ -19,6 +20,7 @@ const log = createModuleLogger('Equipment');
  */
 interface EquippableItem {
   kind: number;
+  properties?: ItemProperties | null;
 }
 
 /**
@@ -78,7 +80,7 @@ export function equipItem(ctx: EquipmentPlayerContext, item: EquippableItem | nu
 
   const equipment = ctx.getEquipment();
   // Pass item properties to equipment manager
-  const slot = equipment.equip(item.kind, (item as any).properties || null);
+  const slot = equipment.equip(item.kind, item.properties || null);
 
   if (slot && slot === 'armor') {
     updateHitPoints(ctx);

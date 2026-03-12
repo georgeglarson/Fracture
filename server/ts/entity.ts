@@ -51,12 +51,12 @@ export abstract class Entity {
   }
 
   getPositionNextTo(entity: Entity): { x: number; y: number } | null {
-    var pos: { x: number; y: number } | null = null;
+    let pos: { x: number; y: number } | null = null;
     if (entity) {
       pos = { x: entity.x, y: entity.y };
       // This is a quick & dirty way to give mobs a random position
       // close to another entity.
-      var r = Utils.random(4);
+      const r = Utils.random(4);
 
       if (r === 0)
         pos.y -= 1;
