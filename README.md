@@ -1,5 +1,7 @@
 # Fracture
 
+> Also on [Codeberg](https://codeberg.org/georgelarson/Fracture)
+
 **A multiplayer RPG built by modernizing a legacy HTML5 codebase. The same kind of work I've done for 25 years, applied to a game instead of enterprise software.**
 
 [Play it live](https://fracture.georgelarson.me) | [Architecture](./ARCHITECTURE_SRP.md) | [Systems analysis](./SYSTEMS_ANALYSIS.md) | [Roadmap](./ROADMAP.md)
