@@ -42,7 +42,7 @@ The server is organized into focused modules following SRP:
 | `inventory/` | Inventory management and serialization |
 | `zones/` | ZoneManager (boundaries, bonuses, level warnings) |
 
-See [ARCHITECTURE_SRP.md](../ARCHITECTURE_SRP.md) for the full decomposition story.
+See [ARCHITECTURE_SRP.md](../docs/ARCHITECTURE_SRP.md) for the full decomposition story.
 
 ## Tests
 

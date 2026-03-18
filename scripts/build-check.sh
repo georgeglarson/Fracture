@@ -1,5 +1,5 @@
 #!/bin/bash
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 echo "=== SERVER BUILD ==="
 npx tsc -p ./server 2>&1 || echo "Server build failed"
 echo ""

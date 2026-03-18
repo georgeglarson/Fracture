@@ -3,8 +3,8 @@
 ##
 ## Fracture server sends traces + logs via OTLP HTTP to localhost:4318
 ##
-## Start:  docker compose -f docker-compose.signoz.yml up -d
-## Stop:   docker compose -f docker-compose.signoz.yml down
+## Start:  docker compose -f deploy/docker-compose.signoz.yml up -d
+## Stop:   docker compose -f deploy/docker-compose.signoz.yml down
 ## UI:     http://localhost:3301 (SigNoz, proxied via nginx)
 ## Grafana: http://localhost:3302 (public dashboards, proxied via nginx)
 ##
@@ -41,7 +41,7 @@ services:
         tar -xvzf histogram-quantile.tar.gz
         mv histogram-quantile /var/lib/clickhouse/user_scripts/histogramQuantile
     volumes:
-      - ./deploy/common/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts/
+      - ./common/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts/
 
   zookeeper:
     <<: *common
@@ -87,11 +87,11 @@ services:
     environment:
       - CLICKHOUSE_SKIP_USER_SETUP=1
     volumes:
-      - ./deploy/common/clickhouse/config.xml:/etc/clickhouse-server/config.xml
-      - ./deploy/common/clickhouse/users.xml:/etc/clickhouse-server/users.xml
-      - ./deploy/common/clickhouse/custom-function.xml:/etc/clickhouse-server/custom-function.xml
-      - ./deploy/common/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts/
-      - ./deploy/common/clickhouse/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml
+      - ./common/clickhouse/config.xml:/etc/clickhouse-server/config.xml
+      - ./common/clickhouse/users.xml:/etc/clickhouse-server/users.xml
+      - ./common/clickhouse/custom-function.xml:/etc/clickhouse-server/custom-function.xml
+      - ./common/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts/
+      - ./common/clickhouse/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml
       - signoz-clickhouse:/var/lib/clickhouse/
     deploy:
       resources:
@@ -155,7 +155,7 @@ services:
         /signoz-otel-collector migrate sync check &&
         /signoz-otel-collector --config=/etc/otel-collector-config.yaml
     volumes:
-      - ./deploy/signoz/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - ./signoz/otel-collector-config.yaml:/etc/otel-collector-config.yaml
     environment:
       - OTEL_RESOURCE_ATTRIBUTES=host.name=signoz-host,os.type=linux
       - LOW_CARDINAL_EXCEPTION_GROUPING=false
@@ -177,8 +177,8 @@ services:
     ports:
       - "3302:3000"
     volumes:
-      - ./deploy/grafana/provisioning:/etc/grafana/provisioning
-      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
       - grafana-data:/var/lib/grafana
     environment:
       # Public anonymous read-only access

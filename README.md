@@ -4,7 +4,7 @@
 
 **A multiplayer RPG built by modernizing a legacy HTML5 codebase. The same kind of work I've done for 25 years, applied to a game instead of enterprise software.**
 
-[Play it live](https://fracture.georgelarson.me) | [Architecture](./ARCHITECTURE_SRP.md) | [Systems analysis](./SYSTEMS_ANALYSIS.md) | [Roadmap](./ROADMAP.md)
+[Play it live](https://fracture.georgelarson.me) | [Architecture](./docs/ARCHITECTURE_SRP.md) | [Systems analysis](./docs/SYSTEMS_ANALYSIS.md) | [Roadmap](./docs/ROADMAP.md)
 
 ---
 
@@ -204,7 +204,7 @@ Client connects to `localhost:8000` by default. Debug WebSocket runs on `localho
 
 ```bash
 # Start the full stack (ClickHouse, Zookeeper, OTel Collector, SigNoz, Grafana)
-docker compose -f docker-compose.signoz.yml up -d
+docker compose -f deploy/docker-compose.signoz.yml up -d
 
 # Start the server with OTel export enabled
 NODE_ENV=production OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
@@ -247,7 +247,10 @@ Fracture/
 │   ├── signoz/          # OTel Collector config
 │   ├── grafana/         # Public dashboard provisioning
 │   └── common/          # ClickHouse configs
-├── docker-compose.signoz.yml  # SigNoz + Grafana observability stack
+├── docs/                # Project documentation
+│   ├── ARCHITECTURE_SRP.md
+│   ├── ROADMAP.md
+│   └── ...
 └── specs/               # Feature specifications
 ```
 
