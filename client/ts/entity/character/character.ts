@@ -78,6 +78,7 @@ export class Character extends Entity {
       attacker.disengage();
       attacker.idle();
     });
+    this.stopHurting();
   }
 
   setMaxHitPoints(hp) {

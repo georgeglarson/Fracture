@@ -156,12 +156,9 @@ export const Messages = {
     }
 
     serialize(): unknown[] {
-      // Hacked this
-      // Made total prop optional
-      // Added condition to fallbac to world count
       return [Types.Messages.POPULATION,
         this.world,
-        this.total || this.world];
+        this.total ?? this.world];
     }
   },
 

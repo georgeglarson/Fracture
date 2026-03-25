@@ -400,10 +400,10 @@ describe('Messages.Population', () => {
     expect(msg.serialize()).toEqual([Types.Messages.POPULATION, 15, 15]);
   });
 
-  it('should fall back total to world count when total is 0 (falsy)', () => {
+  it('should use total=0 correctly instead of falling back', () => {
     const msg = new Messages.Population(5, 0);
-    // Because of `this.total || this.world`, total=0 is falsy, falls back to world
-    expect(msg.serialize()).toEqual([Types.Messages.POPULATION, 5, 5]);
+    // total=0 is a valid value (no players), should not fall back to world count
+    expect(msg.serialize()).toEqual([Types.Messages.POPULATION, 5, 0]);
   });
 
   it('should handle world count of 0', () => {

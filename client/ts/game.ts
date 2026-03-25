@@ -1323,10 +1323,16 @@ export class Game {
         }
       } else {
         if (character.hasTarget()
-          && character.isDiagonallyAdjacent(character.target)
-          && character.target instanceof Player
-          && !character.target.isMoving()) {
-          character.follow(character.target);
+          && character.isDiagonallyAdjacent(character.target)) {
+          if (character.target instanceof Player
+            && !character.target.isMoving()) {
+            // Mob is diagonally adjacent to player — move to cardinal position
+            character.follow(character.target);
+          } else if (character.id === this.playerId
+            && !character.isMoving()) {
+            // Player is diagonally adjacent to mob — move to cardinal position
+            character.follow(character.target);
+          }
         }
       }
     }

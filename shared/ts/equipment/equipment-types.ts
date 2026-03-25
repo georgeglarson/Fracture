@@ -37,10 +37,28 @@ export const SLOT_CONFIG: Record<EquipmentSlot, SlotConfig> = {
       Types.Entities.SWORD1,
       Types.Entities.SWORD2,
       Types.Entities.AXE,
+      Types.Entities.TEC9,
       Types.Entities.MORNINGSTAR,
+      Types.Entities.MP5,
+      Types.Entities.RAYGUN,
       Types.Entities.BLUESWORD,
+      Types.Entities.TENTACLE,
+      Types.Entities.LASERGUN,
       Types.Entities.REDSWORD,
-      Types.Entities.GOLDENSWORD
+      Types.Entities.CRYSTALSTAFF,
+      Types.Entities.VOIDBLADE,
+      Types.Entities.PLASMAHELIX,
+      Types.Entities.GOLDENSWORD,
+      // Set Weapons (high tier)
+      Types.Entities.BERSERKER_BLADE,
+      Types.Entities.GUARDIAN_HAMMER,
+      Types.Entities.SHADOW_DAGGER,
+      Types.Entities.DRAGON_SWORD,
+      // Legendary Weapons (boss-only drops, highest tier)
+      Types.Entities.GREEDS_EDGE,
+      Types.Entities.DRAGONBONE_CLEAVER,
+      Types.Entities.VOIDHEART_BLADE,
+      Types.Entities.SOUL_HARVESTER
     ],
     defaultItem: Types.Entities.SWORD1,
     affectsHP: false,
@@ -50,10 +68,23 @@ export const SLOT_CONFIG: Record<EquipmentSlot, SlotConfig> = {
     rankedItems: [
       Types.Entities.CLOTHARMOR,
       Types.Entities.LEATHERARMOR,
+      Types.Entities.HAZMATSUIT,
       Types.Entities.MAILARMOR,
+      Types.Entities.VOIDCLOAK,
       Types.Entities.PLATEARMOR,
+      Types.Entities.SHIELDBUBBLE,
       Types.Entities.REDARMOR,
-      Types.Entities.GOLDENARMOR
+      Types.Entities.CRYSTALSHELL,
+      Types.Entities.MECHARMOR,
+      Types.Entities.GOLDENARMOR,
+      // Set Armors (high tier)
+      Types.Entities.BERSERKER_MAIL,
+      Types.Entities.GUARDIAN_PLATE,
+      Types.Entities.SHADOW_CLOAK,
+      Types.Entities.DRAGON_SCALE,
+      // Legendary Armors (boss-only drops, highest tier)
+      Types.Entities.CROWN_UNDYING,
+      Types.Entities.HELLFIRE_MANTLE
     ],
     defaultItem: Types.Entities.CLOTHARMOR,
     affectsHP: true,

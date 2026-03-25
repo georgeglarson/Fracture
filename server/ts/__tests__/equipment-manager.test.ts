@@ -111,8 +111,8 @@ describe('EquipmentManager', () => {
 
     it('armorLevel should increase after equipping better armor', () => {
       mgr.equip(Types.Entities.PLATEARMOR);
-      // PLATEARMOR is index 3 in SLOT_CONFIG armor rankedItems => level 4
-      expect(mgr.armorLevel).toBe(4);
+      // PLATEARMOR is index 5 in SLOT_CONFIG armor rankedItems => level 6
+      expect(mgr.armorLevel).toBe(6);
     });
   });
 
@@ -169,8 +169,8 @@ describe('EquipmentManager', () => {
 
     it('should update the level when equipping a new item', () => {
       mgr.equip(Types.Entities.GOLDENSWORD);
-      // GOLDENSWORD is index 6 in SLOT_CONFIG weapon rankedItems => level 7
-      expect(mgr.getLevel('weapon')).toBe(7);
+      // GOLDENSWORD is index 14 in SLOT_CONFIG weapon rankedItems => level 15
+      expect(mgr.getLevel('weapon')).toBe(15);
     });
 
     it('should mark slot as non-default after equipping a non-default item', () => {

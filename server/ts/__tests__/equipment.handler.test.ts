@@ -184,8 +184,8 @@ describe('EquipmentHandler', () => {
 
     it('should update armor level after equipping', () => {
       equipArmor(ctx, Types.Entities.PLATEARMOR);
-      // PLATEARMOR is index 3 in rankedItems => level 4
-      expect(ctx.getEquipment().armorLevel).toBe(4);
+      // PLATEARMOR is index 5 in rankedItems => level 6
+      expect(ctx.getEquipment().armorLevel).toBe(6);
     });
 
     it('should not affect weapon slot', () => {
@@ -219,8 +219,8 @@ describe('EquipmentHandler', () => {
 
     it('should update weapon level after equipping', () => {
       equipWeapon(ctx, Types.Entities.GOLDENSWORD);
-      // GOLDENSWORD is index 6 in rankedItems => level 7
-      expect(ctx.getEquipment().weaponLevel).toBe(7);
+      // GOLDENSWORD is index 14 in rankedItems => level 15
+      expect(ctx.getEquipment().weaponLevel).toBe(15);
     });
 
     it('should not affect armor slot', () => {
@@ -535,8 +535,8 @@ describe('EquipmentHandler', () => {
 
     it('getArmorLevel should reflect equipped armor rank', () => {
       equipArmor(ctx, Types.Entities.REDARMOR);
-      // REDARMOR is index 4 => level 5
-      expect(getArmorLevel(ctx)).toBe(5);
+      // REDARMOR is index 7 => level 8
+      expect(getArmorLevel(ctx)).toBe(8);
     });
   });
 
