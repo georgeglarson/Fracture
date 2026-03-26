@@ -90,9 +90,14 @@ export class Camera {
     // Status bar height (60px + 3px border)
     var statusBarHeight = 63;
 
-    // How many tiles fit in the window? Subtract status bar from height
-    this.fullGridW = Math.ceil(window.innerWidth / (tilesize * scale));
-    this.fullGridH = Math.ceil((window.innerHeight - statusBarHeight) / (tilesize * scale));
+    // Use visualViewport when available (accurate on mobile, excludes browser chrome)
+    var vpW = (window as any).visualViewport?.width || window.innerWidth;
+    var vpH = (window as any).visualViewport?.height || window.innerHeight;
+
+    // How many tiles fit in the window? Subtract status bar from height.
+    // Use floor so the buffer never overflows the viewport (avoids clipping + distortion).
+    this.fullGridW = Math.floor(vpW / (tilesize * scale));
+    this.fullGridH = Math.floor((vpH - statusBarHeight) / (tilesize * scale));
 
     // Ensure minimum size
     this.fullGridW = Math.max(this.fullGridW, 15);

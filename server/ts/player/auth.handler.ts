@@ -22,6 +22,7 @@ export async function handleHello(player: Player, msg: any[], Utils: any, Formul
   const name = Utils.sanitize(msg[1]);
   const password = msg[5] || ''; // Password is now at index 5
   player.name = (name === '') ? 'lorem ipsum' : name.substr(0, 15);
+  player.getAuditLog().playerName = player.name;
   player.kind = Types.Entities.WARRIOR;
 
   const world = player.getWorld();

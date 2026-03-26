@@ -535,7 +535,7 @@ export class Character extends Entity {
   }
 
   canReachTarget() {
-    if (this.hasTarget() && this.isAdjacentNonDiagonal(this.target)) {
+    if (this.hasTarget() && this.isAdjacent(this.target)) {
       return true;
     }
     return false;

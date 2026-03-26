@@ -4,6 +4,8 @@
  */
 
 export interface CameraContext {
+  x: number;
+  y: number;
   gridX: number;
   gridY: number;
   gridW: number;
@@ -155,10 +157,12 @@ export class InputManager {
       my -= centerOffsetY;
     }
 
-    const offsetX = mx % (ts * s);
-    const offsetY = my % (ts * s);
-    const x = ((mx - offsetX) / (ts * s)) + c.gridX;
-    const y = ((my - offsetY) / (ts * s)) + c.gridY;
+    // Convert buffer pixel → world pixel → grid tile.
+    // camera.x/y are the exact pixel offset (sub-tile precision), so we use
+    // those instead of camera.gridX/gridY which are tile-snapped and cause
+    // up to 1-tile error on clicks.
+    const x = Math.floor((mx / s + c.x) / ts);
+    const y = Math.floor((my / s + c.y) / ts);
 
     return { x, y };
   }

@@ -124,7 +124,7 @@ var initApp = function () {
     });
 
     $('#nameinput').bind('keyup', function () {
-      app.toggleButton();
+      app.toggleCharacterPreview();
     });
 
     $('#notifications div').bind('transitioned', app.resetMessagesPosition.bind(app));
@@ -156,10 +156,18 @@ var initApp = function () {
     }
 
     $('.play div').click(function (event) {
-      var nameFromInput = $('#nameinput').val(),
+      var nameFromInput = $('#nameinput').val() as string || '',
         nameFromStorage = $('#playername').html(),
-        name = nameFromInput || nameFromStorage,
+        name = nameFromInput || nameFromStorage || '',
         password = ($('#passwordinput').val() as string) || '';
+
+      // No credentials provided? Play as guest
+      // Also catch returning guest names (no password saved in browser)
+      if (!name.trim() || (!nameFromInput && !password)) {
+        var tag = Math.random().toString(36).substring(2, 7);
+        name = 'Guest_' + tag;
+        password = Math.random().toString(36).substring(2, 10);
+      }
 
       app.tryStartingGame(name, password, null);
     });
@@ -170,6 +178,11 @@ var initApp = function () {
     $('#resize-check').bind('transitionend', app.resizeUi.bind(app));
     $('#resize-check').bind('webkitTransitionEnd', app.resizeUi.bind(app));
     $('#resize-check').bind('oTransitionEnd', app.resizeUi.bind(app));
+
+    // Mobile browsers resize the visual viewport when the URL bar shows/hides
+    if ((window as any).visualViewport) {
+      (window as any).visualViewport.addEventListener('resize', app.resizeUi.bind(app));
+    }
 
     console.info('App initialized.');
 
@@ -265,9 +278,16 @@ var initGame = function () {
   if (game.renderer.mobile || game.renderer.tablet) {
     $('#foreground').bind('touchstart', function (event) {
       app.center();
-      // app.setMouseCoordinates(event.originalEvent.touches[0]);
+      var touch = (event as any).originalEvent?.touches?.[0];
+      if (touch) {
+        app.setMouseCoordinates(touch);
+      }
       game.click();
       app.hideWindows();
+    });
+    // Prevent default touchmove to stop page scrolling/bouncing
+    $('#foreground').bind('touchmove', function (event) {
+      event.preventDefault();
     });
   } else {
     $('#foreground').click(function (event) {

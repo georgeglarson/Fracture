@@ -254,7 +254,6 @@ export class InteractionController {
     if (!this.deps.isStarted() ||
         !player ||
         this.deps.isZoning() ||
-        this.deps.isZoningTile(player.nextGridX, player.nextGridY) ||
         player.isDead ||
         this.deps.hoveringCollidingTile() ||
         this.deps.hoveringPlateauTile()) {
@@ -262,6 +261,18 @@ export class InteractionController {
     }
 
     const entity = this.deps.getEntityAt(pos.x, pos.y);
+
+    // Visible debug: show tap position and result on screen (remove after debugging)
+    const debugEl = document.getElementById('tap-debug') || (() => {
+      const el = document.createElement('div');
+      el.id = 'tap-debug';
+      el.style.cssText = 'position:fixed;top:5px;left:5px;background:rgba(0,0,0,0.8);color:#0f0;font:12px monospace;padding:4px 8px;z-index:99999;pointer-events:none;';
+      document.body.appendChild(el);
+      return el;
+    })();
+    const playerPos = player ? `P(${player.gridX},${player.gridY})` : 'P?';
+    debugEl.textContent = `tap(${pos.x},${pos.y}) ${playerPos} ${entity ? entity.constructor.name + '#' + entity.id : 'EMPTY'}`;
+
     console.log('[Click Debug] Position:', pos.x, pos.y,
       'Entity:', entity ? entity.kind : null,
       'isChest:', entity instanceof Chest,

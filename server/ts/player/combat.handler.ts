@@ -47,7 +47,9 @@ export function handleHit(player: Player, msg: any[]): void {
     const baseDmg = Formulas.dmg(player.weaponLevel, mob.armorLevel, player.level);
     const dmg = Math.floor(baseDmg * powerStrikeMultiplier);
     if (dmg > 0) {
+      const mobHpBefore = mob.hitPoints;
       mob.receiveDamage(dmg, player.id);
+      player.getAuditLog()?.record('combat', 'hit', { mobId: mob.id, mobHp: mobHpBefore }, { mobHp: mob.hitPoints, isDead: mob.isDead }, { dmg, weaponLevel: player.weaponLevel, mobArmorLevel: mob.armorLevel });
       player.getWorld().handleMobHate(mob.id, player.id, dmg);
       player.getWorld().handleHurtEntity(mob, player, dmg);
     }
@@ -78,11 +80,15 @@ export function handleHurt(player: Player, msg: any[]): void {
       world.broadcastAttacker(mob);
     }
 
-    player.hitPoints = Math.max(0, player.hitPoints - Formulas.dmg(mob.weaponLevel, player.armorLevel, mob.level ?? 1));
+    const hpBefore = player.hitPoints;
+    const dmg = Formulas.dmg(mob.weaponLevel, player.armorLevel, mob.level ?? 1);
+    player.hitPoints = Math.max(0, player.hitPoints - dmg);
+    player.getAuditLog()?.record('hp', 'hurt', { hp: hpBefore }, { hp: player.hitPoints }, { mobId: mob.id, dmg, mobWeaponLevel: mob.weaponLevel, armorLevel: player.armorLevel });
     world.handleHurtEntity(player);
 
     if (player.hitPoints <= 0) {
       player.isDead = true;
+      player.getAuditLog()?.flush('death');
       if (player.firepotionTimeout) {
         clearTimeout(player.firepotionTimeout);
       }

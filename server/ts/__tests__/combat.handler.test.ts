@@ -68,6 +68,7 @@ function createMockPlayer(overrides: Record<string, any> = {}): Player {
 
     send: vi.fn(),
     broadcast: vi.fn(),
+    getAuditLog: vi.fn(() => ({ record: vi.fn(), flush: vi.fn() })),
 
     ...overrides,
   } as unknown as Player;

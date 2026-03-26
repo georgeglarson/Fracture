@@ -115,6 +115,7 @@ function createMockPlayer(overrides: Record<string, any> = {}): Player {
     updatePosition: vi.fn(),
     loadFromStorage: vi.fn(() => true),
     initProgressionSystem: vi.fn(),
+    getAuditLog: vi.fn(() => ({ playerName: '', record: vi.fn(), flush: vi.fn() })),
 
     ...overrides,
   } as unknown as Player;

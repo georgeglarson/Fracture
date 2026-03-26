@@ -39,6 +39,7 @@ import * as ProgressionHandler from './player/progression.handler';
 import * as RiftHandler from './player/rift.handler';
 import { PlayerSkillState, createInitialSkillState } from '../../shared/ts/skills';
 import { createModuleLogger } from './utils/logger.js';
+import { StateAuditLog } from './utils/state-audit-log.js';
 
 const log = createModuleLogger('Player');
 
@@ -60,6 +61,9 @@ export class Player extends Character {
   formatChecker: FormatChecker;
   name!: string;
   firepotionTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // State audit log (ephemeral ring buffer, flushed on anomaly)
+  private auditLog: StateAuditLog;
 
   // Equipment management (unified handling of all equipment slots)
   private equipment: EquipmentManager = new EquipmentManager();
@@ -121,6 +125,11 @@ export class Player extends Character {
 
     this.formatChecker = new FormatChecker();
 
+    // Initialize audit log and wire into equipment/inventory
+    this.auditLog = new StateAuditLog(connection.id, 'pending');
+    this.equipment.setAuditLog(this.auditLog);
+    this.inventory.setAuditLog(this.auditLog);
+
     // Initialize progression service with callbacks
     this.progression = createProgressionService({
       send: (msg) => this.send(msg),
@@ -164,6 +173,7 @@ export class Player extends Character {
     });
 
     this.connection.onClose(() => {
+      this.auditLog.flush('disconnect');
       if (this.firepotionTimeout) {
         clearTimeout(this.firepotionTimeout);
       }
@@ -259,6 +269,10 @@ export class Player extends Character {
 
   getEquipment() {
     return this.equipment;
+  }
+
+  getAuditLog() {
+    return this.auditLog;
   }
 
   broadcast(message: MessagePayload, ignoreSelf?: boolean) {

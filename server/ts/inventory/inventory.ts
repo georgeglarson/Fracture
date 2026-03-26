@@ -15,12 +15,19 @@ import {
 } from '../../../shared/ts/inventory/inventory-types.js';
 import { ItemProperties } from '../../../shared/ts/items/item-types.js';
 import { Types } from '../../../shared/ts/gametypes.js';
+import type { StateAuditLog } from '../utils/state-audit-log';
+import { snapSlot } from '../utils/state-audit-log';
 
 export class Inventory {
   private slots: (InventorySlot | null)[];
+  private auditLog: StateAuditLog | null = null;
 
   constructor() {
     this.slots = createEmptyInventory();
+  }
+
+  setAuditLog(auditLog: StateAuditLog): void {
+    this.auditLog = auditLog;
   }
 
   /**
@@ -145,6 +152,7 @@ export class Inventory {
       count: isStackable(kind) ? Math.min(count, MAX_STACK_SIZE) : 1
     };
 
+    this.auditLog?.record('inventory', 'addItem', { slot: emptySlot, was: null }, { slot: emptySlot, now: snapSlot(this.slots[emptySlot]) }, { kind, count });
     return emptySlot;
   }
 
@@ -158,6 +166,7 @@ export class Inventory {
     const slot = this.slots[slotIndex];
     if (!slot) return null;
 
+    const before = snapSlot(slot);
     const removeCount = Math.min(count, slot.count);
     const result = {
       kind: slot.kind,
@@ -170,6 +179,7 @@ export class Inventory {
       this.slots[slotIndex] = null;
     }
 
+    this.auditLog?.record('inventory', 'removeItem', { slot: slotIndex, was: before }, { slot: slotIndex, now: snapSlot(this.slots[slotIndex]) }, { kind: result.kind, count: removeCount });
     return result;
   }
 
@@ -178,7 +188,9 @@ export class Inventory {
    */
   setSlot(index: number, slot: InventorySlot | null): void {
     if (index < 0 || index >= INVENTORY_SIZE) return;
+    const before = snapSlot(this.slots[index]);
     this.slots[index] = slot;
+    this.auditLog?.record('inventory', 'setSlot', { slot: index, was: before }, { slot: index, now: snapSlot(slot) });
   }
 
   /**
@@ -188,9 +200,12 @@ export class Inventory {
     if (fromIndex < 0 || fromIndex >= INVENTORY_SIZE) return false;
     if (toIndex < 0 || toIndex >= INVENTORY_SIZE) return false;
 
+    const beforeFrom = snapSlot(this.slots[fromIndex]);
+    const beforeTo = snapSlot(this.slots[toIndex]);
     const temp = this.slots[fromIndex];
     this.slots[fromIndex] = this.slots[toIndex];
     this.slots[toIndex] = temp;
+    this.auditLog?.record('inventory', 'swapSlots', { from: { slot: fromIndex, was: beforeFrom }, to: { slot: toIndex, was: beforeTo } }, { from: { slot: fromIndex, now: beforeTo }, to: { slot: toIndex, now: beforeFrom } });
     return true;
   }
 

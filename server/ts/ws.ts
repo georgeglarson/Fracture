@@ -63,8 +63,9 @@ export class Server {
     app.use(express.json());
 
     // Serve static client files from dist/client
+    // Short cache (5 min) so deploys propagate quickly but repeat loads are fast
     const clientPath = path.join(__dirname, '../../client');
-    app.use(express.static(clientPath));
+    app.use(express.static(clientPath, { maxAge: 300000, etag: true }));
 
     // Serve TTS cache files
     const ttsPath = path.join(__dirname, '../../data/tts-cache');

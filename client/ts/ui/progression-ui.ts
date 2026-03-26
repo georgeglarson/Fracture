@@ -254,10 +254,7 @@ export class ProgressionUI {
 
       @media (max-width: 768px) {
         #progression-panel {
-          top: auto;
-          bottom: 180px;
-          right: 10px;
-          width: 170px;
+          display: none !important;
         }
       }
     `;

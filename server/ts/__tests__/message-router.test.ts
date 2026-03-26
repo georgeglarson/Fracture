@@ -244,6 +244,7 @@ function createMockContext(
 
     isPhased: vi.fn(() => false),
     consumePowerStrike: vi.fn(() => 1),
+    getAuditLog: vi.fn(() => ({ playerName: '', record: vi.fn(), flush: vi.fn() })),
 
     ...overrides,
   } as unknown as Player;

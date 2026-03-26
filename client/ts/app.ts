@@ -27,7 +27,8 @@ export class App {
     this.isParchmentReady = true;
     this.ready = false;
     this.storage = new Storage();
-    this.watchNameInputInterval = setInterval(this.toggleButton.bind(this), 100);
+    // Character preview updates on name input (play button is always enabled for guest access)
+    this.watchNameInputInterval = setInterval(this.toggleCharacterPreview.bind(this), 100);
     this.$playButton = $('.play'),
       this.$playDiv = $('.play div');
     this.introSequence = new IntroSequence();
@@ -92,10 +93,10 @@ export class App {
       starting_callback();
     }
 
-    // Check for skipintro URL parameter (for testing)
+    // Check for skipintro URL parameter (for testing) or guest login
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('skipintro')) {
-      console.log('[App] Skipping intro (skipintro parameter)');
+    if (urlParams.has('skipintro') || (username && username.startsWith('Guest_'))) {
+      console.log('[App] Skipping intro');
       this.proceedToGame(username, password);
       return;
     }
@@ -235,14 +236,18 @@ export class App {
   }
 
   setMouseCoordinates(event) {
-    var gamePos = $('#container').offset(),
-      scale = this.game.renderer.getScaleFactor(),
+    // Use the foreground canvas's actual position on screen — accounts for
+    // centering offset, mobile browser chrome, and any CSS positioning.
+    var foreground = document.getElementById('foreground'),
+      rect = foreground ? foreground.getBoundingClientRect() : { left: 0, top: 0 },
       width = this.game.renderer.getWidth(),
       height = this.game.renderer.getHeight(),
       mouse = this.game.mouse;
 
-    mouse.x = event.pageX - gamePos.left - (this.isMobile ? 0 : 5 * scale);
-    mouse.y = event.pageY - gamePos.top - (this.isMobile ? 0 : 7 * scale);
+    // clientX/Y are relative to the viewport, rect.left/top are the canvas
+    // position in the viewport — difference gives buffer pixel coordinate.
+    mouse.x = (event.clientX || event.pageX) - rect.left;
+    mouse.y = (event.clientY || event.pageY) - rect.top;
 
     if (mouse.x <= 0) {
       mouse.x = 0;
@@ -322,15 +327,12 @@ export class App {
     $('#gold-display').text(savedGold + 'g');
   }
 
-  toggleButton() {
-    var name = $('#parchment input').val() as string,
-      $play = $('#createcharacter .play');
+  toggleCharacterPreview() {
+    var name = $('#nameinput').val() as string;
 
     if (name && name.length > 0) {
-      $play.removeClass('disabled');
       $('#character').removeClass('disabled');
     } else {
-      $play.addClass('disabled');
       $('#character').addClass('disabled');
     }
   }

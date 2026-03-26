@@ -17,6 +17,7 @@ import {
 import { Types } from '../../../shared/ts/gametypes';
 import { ItemProperties } from '../../../shared/ts/items/item-types';
 import { SetId, SetBonus, calculateSetBonuses } from '../../../shared/ts/equipment/set-data';
+import type { StateAuditLog } from '../utils/state-audit-log';
 
 export interface EquipmentCallbacks {
   onHPUpdate?: () => void;
@@ -27,6 +28,7 @@ export class EquipmentManager {
   private properties: Map<EquipmentSlot, ItemProperties | null> = new Map();
   private levels: Map<EquipmentSlot, number> = new Map();
   private callbacks: EquipmentCallbacks = {};
+  private auditLog: StateAuditLog | null = null;
 
   // Set bonus tracking
   private activeSets: Map<SetId, number> = new Map();
@@ -49,6 +51,10 @@ export class EquipmentManager {
    */
   setCallbacks(callbacks: EquipmentCallbacks): void {
     this.callbacks = callbacks;
+  }
+
+  setAuditLog(auditLog: StateAuditLog): void {
+    this.auditLog = auditLog;
   }
 
   /**
@@ -93,12 +99,15 @@ export class EquipmentManager {
     const slot = getSlotForKind(kind);
     if (!slot) return null;
 
+    const oldKind = this.equipped.get(slot);
     this.equipped.set(slot, kind);
     this.properties.set(slot, properties || null);
     this.levels.set(slot, getLevel(slot, kind));
 
     // Update set bonuses
     this.updateSetBonuses();
+
+    this.auditLog?.record('equipment', 'equip', { slot, kind: oldKind }, { slot, kind }, { level: getLevel(slot, kind) });
 
     if (slotAffectsHP(slot) && this.callbacks.onHPUpdate) {
       this.callbacks.onHPUpdate();
@@ -111,12 +120,15 @@ export class EquipmentManager {
    * Equip an item to a specific slot
    */
   equipToSlot(slot: EquipmentSlot, kind: number, properties?: ItemProperties | null): void {
+    const oldKind = this.equipped.get(slot);
     this.equipped.set(slot, kind);
     this.properties.set(slot, properties || null);
     this.levels.set(slot, getLevel(slot, kind));
 
     // Update set bonuses
     this.updateSetBonuses();
+
+    this.auditLog?.record('equipment', 'equipToSlot', { slot, kind: oldKind }, { slot, kind }, { level: getLevel(slot, kind) });
 
     if (slotAffectsHP(slot) && this.callbacks.onHPUpdate) {
       this.callbacks.onHPUpdate();
@@ -147,6 +159,8 @@ export class EquipmentManager {
 
     // Update set bonuses
     this.updateSetBonuses();
+
+    this.auditLog?.record('equipment', 'drop', { slot, kind: droppedKind }, { slot, kind: defaultItem });
 
     if (slotAffectsHP(slot) && this.callbacks.onHPUpdate) {
       this.callbacks.onHPUpdate();

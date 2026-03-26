@@ -84,8 +84,9 @@ export class Renderer {
   }
 
   getScaleFactor() {
-    var w = window.innerWidth,
-      h = window.innerHeight,
+    var vp = (window as any).visualViewport;
+    var w = vp?.width || window.innerWidth,
+      h = vp?.height || window.innerHeight,
       scale;
 
     this.mobile = false;
@@ -142,19 +143,29 @@ export class Renderer {
     this.forecanvas.height = this.canvas.height;
     console.debug('#foreground set to ' + this.forecanvas.width + ' x ' + this.forecanvas.height);
 
-    // Set CSS display size to fill viewport
-    var canvasStyle = 'width:100vw;height:100vh;position:fixed;top:0;left:0;';
+    // CSS must match buffer dimensions exactly (no stretch = no distortion,
+    // and touch coordinates map 1:1 to buffer pixels). Center in viewport.
+    var bufW = this.canvas.width;
+    var bufH = this.canvas.height;
+    var vp = (window as any).visualViewport;
+    var vpW = vp?.width || window.innerWidth;
+    var vpH = vp?.height || window.innerHeight;
+    var offsetX = Math.max(0, Math.floor((vpW - bufW) / 2));
+    var offsetY = Math.max(0, Math.floor((vpH - bufH) / 2));
+    var canvasStyle = 'width:' + bufW + 'px;height:' + bufH + 'px;position:fixed;top:' + offsetY + 'px;left:' + offsetX + 'px;';
+
     this.canvas.style.cssText = canvasStyle;
     this.backcanvas.style.cssText = canvasStyle;
     this.forecanvas.style.cssText = canvasStyle;
 
-    // Set containers for fullscreen
+    // Containers fill viewport (black bars behind canvas)
+    var fullStyle = 'width:' + vpW + 'px;height:' + vpH + 'px;position:fixed;top:0;left:0;';
     var container = document.getElementById('container');
     var canvasDiv = document.getElementById('canvas');
     var canvasborder = document.getElementById('canvasborder');
-    if (container) container.style.cssText = 'width:100vw;height:100vh;position:fixed;top:0;left:0;margin:0;padding:0;';
-    if (canvasDiv) canvasDiv.style.cssText = 'width:100vw;height:100vh;position:fixed;top:0;left:0;';
-    if (canvasborder) canvasborder.style.cssText = 'width:100vw;height:100vh;position:fixed;top:0;left:0;padding:0;background:none;';
+    if (container) container.style.cssText = fullStyle + 'margin:0;padding:0;background:#000;';
+    if (canvasDiv) canvasDiv.style.cssText = fullStyle;
+    if (canvasborder) canvasborder.style.cssText = fullStyle + 'padding:0;background:#000;';
 
     // Hide intro elements during gameplay
     var instructions = document.getElementById('instructions');
