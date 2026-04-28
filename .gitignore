@@ -17,3 +17,4 @@ server/data/*.db-wal
 # pnpm build approvals
 .pnpm-build-approvals.json
 coverage/
+package-lock.json
