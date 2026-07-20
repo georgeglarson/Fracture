@@ -502,11 +502,15 @@ var initGame = function () {
         return false;
       }
       if (key === 73) { // I - Toggle inventory
-        game.toggleInventory();
+        if (game.ready && game.started) {
+          game.toggleInventory();
+        }
         return false;
       }
       if (key === 74) { // J - Toggle achievements
-        game.toggleAchievements();
+        if (game.ready && game.started) {
+          game.toggleAchievements();
+        }
         return false;
       }
       if (key === 77) { // M - Toggle minimap
