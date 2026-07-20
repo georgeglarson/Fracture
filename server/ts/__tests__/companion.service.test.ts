@@ -102,20 +102,22 @@ describe('CompanionService', () => {
       expect(prompt).toContain('1 deaths');
     });
 
-    it('should fall back to first static hint when API returns null', async () => {
+    it('should fall back to a random static hint when API returns null', async () => {
       randomSpy.mockReturnValue(0.8);
       client.call.mockResolvedValue(null);
       const result = await service.getCompanionHint('p1', 'lowHealth');
 
-      expect(result).toBe('Heal up!');
+      // random 0.8 -> index 2 of 3 hints
+      expect(result).toBe('Run away!');
     });
 
-    it('should fall back to first static hint when API throws', async () => {
+    it('should fall back to a random static hint when API throws', async () => {
       randomSpy.mockReturnValue(0.8);
       client.call.mockRejectedValue(new Error('API failure'));
       const result = await service.getCompanionHint('p1', 'death');
 
-      expect(result).toBe('Rise again!');
+      // random 0.8 -> index 1 of 2 hints
+      expect(result).toBe('Come back stronger.');
     });
 
     it('should describe newArea situation correctly', async () => {
@@ -181,6 +183,28 @@ describe('CompanionService', () => {
       randomSpy.mockReturnValue(0.99);
       const result = service.getStaticHint('lowHealth');
       expect(result).toBe('Run away!');
+    });
+  });
+
+  // ── no-AI mode (null client) ───────────────────────────────────
+
+  describe('no-AI mode (null client)', () => {
+    it('should return a random static hint without any API call', async () => {
+      const noAi = new CompanionService(null, new ProfileService());
+      // random 0.8 would take the AI path if a client existed
+      randomSpy.mockReturnValue(0.8);
+
+      const result = await noAi.getCompanionHint('p1', 'lowHealth');
+
+      expect(result).toBe('Run away!');
+    });
+
+    it('should return null for an unknown trigger without a client', async () => {
+      const noAi = new CompanionService(null, new ProfileService());
+
+      const result = await noAi.getCompanionHint('p1', 'unknownTrigger');
+
+      expect(result).toBeNull();
     });
   });
 });

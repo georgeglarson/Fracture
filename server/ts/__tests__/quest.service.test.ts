@@ -436,4 +436,36 @@ describe('QuestService', () => {
       expect(() => service.cleanup('nonexistent')).not.toThrow();
     });
   });
+
+  // ── no-AI mode (null client) ────────────────────────────────────
+
+  describe('no-AI mode (null client)', () => {
+    it('should generate a template quest without any API call', async () => {
+      const noAiService = new QuestService(null, new ProfileService());
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+
+      const quest = await noAiService.generateQuest('player1', 'guard');
+
+      // Deterministic with random=0: first kill template (rat, count 3)
+      expect(quest.type).toBe('kill');
+      expect(quest.target).toBe('rat');
+      expect(quest.count).toBe(3);
+      expect(quest.description).toBe('Defeat 3 rat!');
+      expect(quest.giver).toBe('guard');
+    });
+
+    it('should still track quest progress in no-AI mode', async () => {
+      const profiles = new ProfileService();
+      const noAiService = new QuestService(null, profiles);
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      await noAiService.generateQuest('player1', 'guard');
+
+      expect(noAiService.checkQuestProgress('player1', 'kill', 'rat')).toBeNull();
+      expect(noAiService.checkQuestProgress('player1', 'kill', 'rat')).toBeNull();
+      const result = noAiService.checkQuestProgress('player1', 'kill', 'rat');
+
+      expect(result?.completed).toBe(true);
+      expect(result?.reward).toBe('burger');
+    });
+  });
 });

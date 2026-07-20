@@ -46,17 +46,20 @@ interface AIThoughtPool {
 }
 
 export class ThoughtService {
-  private client: VeniceClient;
+  // Null client = no-AI mode: static mad-libs templates only, no pool refresh
+  private client: VeniceClient | null;
   private aiThoughtPools: Map<string, AIThoughtPool> = new Map();
   private refreshInterval = 5 * 60 * 1000; // Refresh AI thoughts every 5 minutes
   private poolSize = 10; // Number of AI thoughts per entity type
   private aiChance = 0.25; // 25% chance to use AI thought
   private isRefreshing = false;
 
-  constructor(client: VeniceClient) {
+  constructor(client: VeniceClient | null) {
     this.client = client;
-    // Start background refresh after a short delay
-    setTimeout(() => this.startBackgroundRefresh(), 10000);
+    // Start background refresh after a short delay (AI pool needs an API client)
+    if (this.client) {
+      setTimeout(() => this.startBackgroundRefresh(), 10000);
+    }
   }
 
   /**
@@ -220,8 +223,8 @@ Output exactly 5 thoughts, one per line. No numbering or punctuation at start:`;
   ): Promise<string | null> {
     const baseThought = this.getEntityThought(entityType, state as ThoughtState);
 
-    // Only 20% of thoughts get AI enhancement
-    if (Math.random() > 0.2) {
+    // No AI client (no-AI mode) or outside the 20% enhancement window: static thought
+    if (!this.client || Math.random() > 0.2) {
       return baseThought.thought;
     }
 

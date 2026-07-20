@@ -1105,6 +1105,38 @@ describe('World', () => {
   });
 
   // ────────────────────────────────────────────
+  // 18b. Thought tick (no-AI mode)
+  // ────────────────────────────────────────────
+
+  describe('Thought tick without Venice (no-AI mode)', () => {
+    it('broadcasts static template thought bubbles when Venice is absent', () => {
+      // getVeniceService() is mocked to return null in this file — the tick
+      // must still serve static mad-libs thoughts via the fallback service.
+      const world = createAndRunWorld();
+      mockSpatialInstance.groups = {
+        g1: {
+          players: [100],
+          entities: {
+            50: makeMockMob({ id: 50, target: null }),
+          },
+        },
+      };
+
+      world.thoughtCallback!();
+
+      expect(mockBroadcasterInstance.pushToAdjacentGroups).toHaveBeenCalled();
+      const [groupId, message] = mockBroadcasterInstance.pushToAdjacentGroups.mock.calls[0];
+      expect(groupId).toBe('g1');
+      const serialized = message.serialize();
+      expect(serialized[0]).toBe('thought');
+      expect(serialized[1]).toBe(50);
+      // Static template thought: a non-empty string, never the dead '...' guard
+      expect(typeof serialized[2]).toBe('string');
+      expect(serialized[2].length).toBeGreaterThan(0);
+    });
+  });
+
+  // ────────────────────────────────────────────
   // 19. Iteration and queue processing
   // ────────────────────────────────────────────
 

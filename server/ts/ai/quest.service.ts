@@ -12,13 +12,14 @@ import { createModuleLogger } from '../utils/logger.js';
 const log = createModuleLogger('QuestService');
 
 export class QuestService {
-  private client: VeniceClient;
+  // Null client = no-AI mode: quests come from templates, no API calls
+  private client: VeniceClient | null;
   private profiles: ProfileService;
 
   // Active quests: { playerId: quest }
   private activeQuests: Map<string, Quest> = new Map();
 
-  constructor(client: VeniceClient, profiles: ProfileService) {
+  constructor(client: VeniceClient | null, profiles: ProfileService) {
     this.client = client;
     this.profiles = profiles;
   }
@@ -70,7 +71,7 @@ Write a SHORT quest description (under 100 chars). Sound urgent but friendly:`;
 
     let description: string;
     try {
-      description = await this.client.call(prompt) ||
+      description = (this.client ? await this.client.call(prompt) : null) ||
         `Defeat ${template.count || 1} ${template.target || template.area}!`;
     } catch (err) {
       log.debug({ err }, 'Quest description generation failed');

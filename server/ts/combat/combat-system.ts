@@ -7,6 +7,7 @@ import { Messages } from '../message.js';
 import { Types } from '../../../shared/ts/gametypes.js';
 import { Formulas } from '../formulas.js';
 import { getVeniceService } from '../ai/venice.service.js';
+import { getStaticServices } from '../ai/static-services.js';
 import { getServerEventBus } from '../../../shared/ts/events/index.js';
 import { PartyService } from '../party/index.js';
 import { getKillStreakService } from './kill-streak.service.js';
@@ -270,11 +271,11 @@ export class CombatSystem {
         attacker.checkKillAchievements(mob.kind);
       }
 
-      // Record world event for Town Crier
-      const venice = getVeniceService();
-      if (venice && mobType) {
+      // Record world event for Town Crier (static news service in no-AI mode)
+      const newsSink = getVeniceService() ?? getStaticServices().news;
+      if (mobType) {
         const isBoss = mob.kind === Types.Entities.BOSS;
-        venice.recordWorldEvent(isBoss ? 'bossKill' : 'kill', attacker.name, {
+        newsSink.recordWorldEvent(isBoss ? 'bossKill' : 'kill', attacker.name, {
           mobType,
           bossType: isBoss ? mobType : undefined
         });
@@ -310,14 +311,12 @@ export class CombatSystem {
    * Handle player death
    */
   private handlePlayerDeath(player: Entity, attacker?: Entity): void {
-    // Record world event for Town Crier
-    const venice = getVeniceService();
-    if (venice) {
-      const killerType = attacker ? Types.getKindAsString(attacker.kind) : 'unknown';
-      venice.recordWorldEvent('death', player.name, {
-        killer: killerType
-      });
-    }
+    // Record world event for Town Crier (static news service in no-AI mode)
+    const newsSink = getVeniceService() ?? getStaticServices().news;
+    const killerType = attacker ? Types.getKindAsString(attacker.kind) : 'unknown';
+    newsSink.recordWorldEvent('death', player.name, {
+      killer: killerType
+    });
 
     // Emit player:died event
     const eventBus = getServerEventBus();

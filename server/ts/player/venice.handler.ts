@@ -8,6 +8,7 @@
 import { Types } from '../../../shared/ts/gametypes';
 import { Messages } from '../message';
 import { getVeniceService, getFishAudioService } from '../ai';
+import { getStaticServices } from '../ai/static-services';
 import { isMerchant, getShopInventory } from '../shop/shop.service';
 import { shopService } from '../shop/shop.service';
 import { createModuleLogger } from '../utils/logger.js';
@@ -101,7 +102,14 @@ export async function handleRequestQuest(ctx: VenicePlayerContext, npcKind: numb
   const venice = getVeniceService();
   const npcType = Types.getKindAsString(npcKind);
 
-  if (!venice || !npcType) {
+  if (!npcType) {
+    return;
+  }
+
+  // No-AI mode: offer a template quest through the same quest service
+  if (!venice) {
+    const quest = await getStaticServices().quests.generateQuest(ctx.id.toString(), npcType);
+    ctx.send(new Messages.QuestOffer(quest).serialize());
     return;
   }
 
@@ -242,7 +250,9 @@ export async function handleNewsRequest(ctx: VenicePlayerContext): Promise<void>
   log.debug({ player: ctx.name }, 'handleNewsRequest');
   const venice = getVeniceService();
   if (!venice) {
-    ctx.send(new Messages.NewsResponse([]).serialize());
+    // No-AI mode: stat-based headlines from recorded world events (no AI headline)
+    const newspaper = await getStaticServices().news.generateNewspaper();
+    ctx.send(new Messages.NewsResponse(newspaper.headlines).serialize());
     return;
   }
 
