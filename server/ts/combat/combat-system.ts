@@ -330,7 +330,7 @@ export class CombatSystem {
   private handlePlayerDeath(player: Entity, attacker?: Entity): void {
     // Record world event for Town Crier (static news service in no-AI mode)
     const newsSink = getVeniceService() ?? getStaticServices().news;
-    const killerType = attacker ? Types.getKindAsString(attacker.kind) : 'unknown';
+    const killerType = attacker ? (Types.getKindAsString(attacker.kind) ?? 'unknown') : 'unknown';
     newsSink.recordWorldEvent('death', player.name, {
       killer: killerType
     });

@@ -220,7 +220,11 @@ export class World {
         this.decrementPlayerCount();
 
         // Clear per-player AI/static-service state (profiles, active quests)
-        player.cleanupVenice();
+        try {
+          player.cleanupVenice();
+        } catch (e) {
+          log.error({ err: e, playerName: player.name }, 'Failed to clean up AI state on exit');
+        }
 
         if (this.removedCallback) {
           this.removedCallback();

@@ -86,6 +86,7 @@ vi.mock('../party/index.js', () => ({
 
 import { CombatSystem, Entity, WorldContext } from '../combat/combat-system.js';
 import { Formulas } from '../formulas.js';
+import { Types } from '../../../shared/ts/gametypes.js';
 
 // ---------------------------------------------------------------------------
 // Factory helpers
@@ -724,11 +725,13 @@ describe('CombatSystem — Bug Fix & Security Tests', () => {
       const handleDeath = vi.fn().mockResolvedValue(undefined);
       const player = createMockPlayer({ hitPoints: 0, handleDeath });
       const mob = createMockEntity({ id: 2 });
+      // Distinguish the argument path from the shared mock's default
+      vi.mocked(Types.getKindAsString).mockReturnValueOnce('skeleton');
 
       combatSystem.handleHurtEntity(player, mob, 50);
 
       expect(handleDeath).toHaveBeenCalledTimes(1);
-      expect(handleDeath).toHaveBeenCalledWith('rat'); // mocked getKindAsString
+      expect(handleDeath).toHaveBeenCalledWith('skeleton');
     });
 
     it('fires handleLowHealth once per crossing below 30%', () => {
