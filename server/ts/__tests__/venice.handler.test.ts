@@ -35,11 +35,18 @@ vi.mock('../shop/shop.service', () => ({
 }));
 
 import { Types } from '../../../shared/ts/gametypes';
-import { handleRequestQuest, handleNewsRequest } from '../player/venice.handler';
+import {
+  handleRequestQuest,
+  handleNewsRequest,
+  handleKill,
+  handleAreaChange,
+  handleLowHealth,
+  handleDeath,
+} from '../player/venice.handler';
 import { getStaticServices } from '../ai/static-services';
 
-function createCtx() {
-  return { id: 42, name: 'Hero', send: vi.fn() };
+function createCtx(id = 42) {
+  return { id, name: 'Hero', send: vi.fn() };
 }
 
 describe('VeniceHandler no-AI mode', () => {
@@ -142,6 +149,76 @@ describe('VeniceHandler no-AI mode', () => {
       const msg = ctx.send.mock.calls[0][0];
       expect(msg[0]).toBe(Types.Messages.NEWS_RESPONSE);
       expect(msg.slice(1)).toEqual(['AI headline of the day']);
+    });
+  });
+
+  // ── quest completion loop (no-AI mode) ─────────────────────────
+
+  describe('quest completion loop (no-AI mode)', () => {
+    it('completes a template kill quest through kill progress', async () => {
+      const ctx = createCtx(777);
+
+      // Offer: fresh player gets the rat kill quest (count 3)
+      await handleRequestQuest(ctx, Types.Entities.GUARD);
+      expect(ctx.send).toHaveBeenCalledTimes(1);
+      const offer = ctx.send.mock.calls[0][0];
+      expect(offer[0]).toBe(Types.Messages.QUEST_OFFER);
+      expect(offer[1]).toBe('kill');
+      expect(offer[2]).toBe('rat');
+      expect(offer[3]).toBe(3);
+
+      const triggerNarration = vi.fn();
+      handleKill(ctx, 'rat', triggerNarration);
+      handleKill(ctx, 'rat', triggerNarration);
+      expect(ctx.send).toHaveBeenCalledTimes(1); // 2/3 — not complete yet
+
+      handleKill(ctx, 'rat', triggerNarration);
+      expect(ctx.send).toHaveBeenCalledTimes(2);
+      // [QUEST_COMPLETE, reward, xp, description]
+      const complete = ctx.send.mock.calls[1][0];
+      expect(complete[0]).toBe(Types.Messages.QUEST_COMPLETE);
+      expect(complete[1]).toBe('burger');
+      expect(complete[2]).toBe(10);
+
+      expect(triggerNarration).not.toHaveBeenCalled(); // narration is Venice-only
+    });
+  });
+
+  // ── companion hints (no-AI mode) ───────────────────────────────
+
+  describe('companion hints (no-AI mode)', () => {
+    it('sends a static hint on low health without Venice', async () => {
+      const ctx = createCtx(42);
+
+      await handleLowHealth(ctx, 0.25);
+
+      expect(ctx.send).toHaveBeenCalledTimes(1);
+      const msg = ctx.send.mock.calls[0][0];
+      expect(msg[0]).toBe(Types.Messages.COMPANION_HINT);
+      expect(typeof msg[1]).toBe('string');
+      expect(msg[1].length).toBeGreaterThan(0);
+    });
+
+    it('sends a static hint on area change without Venice', async () => {
+      const ctx = createCtx(43);
+      const triggerNarration = vi.fn();
+
+      await handleAreaChange(ctx, 'forest', triggerNarration);
+
+      const msgs = ctx.send.mock.calls.map((c) => c[0]);
+      expect(msgs.some((m) => m[0] === Types.Messages.COMPANION_HINT)).toBe(true);
+      expect(triggerNarration).not.toHaveBeenCalled();
+    });
+
+    it('sends a static hint on death without Venice', async () => {
+      const ctx = createCtx(44);
+      const triggerNarration = vi.fn();
+
+      await handleDeath(ctx, 'skeleton', triggerNarration);
+
+      const msgs = ctx.send.mock.calls.map((c) => c[0]);
+      expect(msgs.some((m) => m[0] === Types.Messages.COMPANION_HINT)).toBe(true);
+      expect(triggerNarration).not.toHaveBeenCalled();
     });
   });
 });

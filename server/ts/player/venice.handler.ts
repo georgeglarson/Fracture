@@ -126,7 +126,18 @@ export async function handleRequestQuest(ctx: VenicePlayerContext, npcKind: numb
  */
 export function handleKill(ctx: VenicePlayerContext, mobType: string, triggerNarration: (event: string, details?: Record<string, any>) => Promise<void>): void {
   const venice = getVeniceService();
-  if (!venice) return;
+
+  // No-AI mode: feed kill progress to the static quest service so template
+  // quests can complete; narration remains Venice-only.
+  if (!venice) {
+    const { quests, profiles } = getStaticServices();
+    profiles.recordKill(ctx.id.toString(), mobType);
+    const result = quests.checkQuestProgress(ctx.id.toString(), 'kill', mobType);
+    if (result && result.completed) {
+      ctx.send(new Messages.QuestComplete(result).serialize());
+    }
+    return;
+  }
 
   const profile = venice.getProfile(ctx.id.toString());
   const prevKills = profile.totalKills;
@@ -157,7 +168,24 @@ export function handleKill(ctx: VenicePlayerContext, mobType: string, triggerNar
  */
 export async function handleAreaChange(ctx: VenicePlayerContext, area: string, triggerNarration: (event: string, details?: Record<string, any>) => Promise<void>): Promise<void> {
   const venice = getVeniceService();
-  if (!venice) return;
+
+  // No-AI mode: static quest progress + static companion hint;
+  // narration remains Venice-only.
+  if (!venice) {
+    const { quests, profiles, companion } = getStaticServices();
+    const isNewArea = profiles.recordArea(ctx.id.toString(), area);
+    const result = isNewArea
+      ? quests.checkQuestProgress(ctx.id.toString(), 'explore', area)
+      : null;
+    if (result && result.completed) {
+      ctx.send(new Messages.QuestComplete(result).serialize());
+    }
+    const hint = await companion.getCompanionHint(ctx.id.toString(), 'newArea', { area });
+    if (hint) {
+      ctx.send(new Messages.CompanionHint(hint).serialize());
+    }
+    return;
+  }
 
   const profile = venice.getProfile(ctx.id.toString());
   const isNewArea = !profile.areas.includes(area);
@@ -198,10 +226,10 @@ export async function handleItemPickup(ctx: VenicePlayerContext, itemKind: numbe
  * Handle low health - for companion hints
  */
 export async function handleLowHealth(ctx: VenicePlayerContext, healthPercent: number): Promise<void> {
-  const venice = getVeniceService();
-  if (!venice) return;
+  // Static companion service in no-AI mode (serves static hints only)
+  const hintSource = getVeniceService() ?? getStaticServices().companion;
 
-  const hint = await venice.getCompanionHint(
+  const hint = await hintSource.getCompanionHint(
     ctx.id.toString(),
     'lowHealth',
     { percent: Math.round(healthPercent * 100) }
@@ -216,7 +244,22 @@ export async function handleLowHealth(ctx: VenicePlayerContext, healthPercent: n
  */
 export async function handleDeath(ctx: VenicePlayerContext, killerType: string, triggerNarration: (event: string, details?: Record<string, any>) => Promise<void>): Promise<void> {
   const venice = getVeniceService();
-  if (!venice) return;
+
+  // No-AI mode: record the death in the static profile and serve a static
+  // companion hint; narration remains Venice-only.
+  if (!venice) {
+    const { profiles, companion } = getStaticServices();
+    profiles.recordDeath(ctx.id.toString());
+    const hint = await companion.getCompanionHint(
+      ctx.id.toString(),
+      'death',
+      { killer: killerType }
+    );
+    if (hint) {
+      ctx.send(new Messages.CompanionHint(hint).serialize());
+    }
+    return;
+  }
 
   venice.recordDeath(ctx.id.toString());
 

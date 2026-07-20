@@ -124,7 +124,7 @@ function main(config: ServerConfig): void {
             log.info('IntroService initialized');
         }
     } else {
-        log.warn({ envVarSet: !!process.env.VENICE_API_KEY }, 'Venice API key not found — set VENICE_API_KEY in .env');
+        log.info('AI features disabled — running on static fallbacks (set VENICE_API_KEY to enable)');
     }
 
     // Initialize Fish Audio TTS service if API key is configured
