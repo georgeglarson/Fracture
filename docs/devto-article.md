@@ -1,7 +1,7 @@
 ---
-title: I Took a 2012 Mozilla Demo and Turned It Into a Production MMO With AI
+title: I Took a 2012 Mozilla Demo and Turned It Into a Production MMO With AI (Then the AI Went Away)
 published: false
-description: How a legacy modernization veteran used Claude as a development partner to transform BrowserQuest into Fracture — a real-time multiplayer RPG with AI-powered NPCs, distributed tracing, and 3,161 tests.
+description: How a legacy modernization veteran used Claude as a development partner to transform BrowserQuest into Fracture, a real-time multiplayer RPG with AI NPCs, distributed tracing, and 3,167 tests.
 tags: ai, gamedev, typescript, legacy
 cover_image:
 ---
@@ -19,7 +19,7 @@ The answer is [Fracture](https://github.com/georgeglarson/Fracture). You can [pl
      with at least one mob thought bubble visible and an NPC nearby.
      Ideal if the HUD shows level, HP, inventory — proof this is a real game, not a demo.
      Upload to dev.to and replace this comment with:
-     ![Fracture gameplay — AI-powered thought bubbles and real-time combat](IMAGE_URL)
+     ![Fracture gameplay: mob thought bubbles and real-time combat](IMAGE_URL)
 -->
 
 ## Why this project
@@ -87,7 +87,7 @@ This is the same pattern you'd use in a microservice architecture, applied at th
 
 ### 4. Test everything
 
-The codebase has **3,161 tests across 65 test files** with zero failures. Coverage by module:
+The codebase has **3,167 tests across 66 test files** with zero failures. Coverage by module:
 
 - Party, Shop, Zones, Events: **100%**
 - Rifts: **98%**
@@ -114,17 +114,15 @@ const span = tracer.startSpan('storage.saveCharacter');
 const span = tracer.startSpan('ai.venice');
 ```
 
-Logs and traces are correlated — every log line carries a `trace_id` and `span_id`. The whole stack ships to a self-hosted SigNoz instance backed by ClickHouse, with public Grafana dashboards for portfolio visitors.
+Logs and traces were correlated: every log line carried a `trace_id` and `span_id`. The whole stack shipped to a self-hosted SigNoz instance backed by ClickHouse, with public Grafana dashboards for portfolio visitors.
 
-This is the same OTel + Pino + SigNoz stack used in production microservices. I just applied it to a game server.
+It ran in production until May 2026. The stack did its job, but the ops cost didn't justify a demo site's traffic, so it was retired and the deploy configs no longer ship with the repo. The instrumentation is still in the code. Point `OTEL_EXPORTER_OTLP_ENDPOINT` at a collector and the pipeline comes back.
 
-<!-- SCREENSHOT: grafana
-     Capture: The Grafana dashboard at localhost:3302 (or fracture-grafana.georgelarson.me)
-     showing server operation metrics — traces collected, request latency, etc.
-     This is the "enterprise credibility" shot. Shows this isn't a toy.
-     Upload to dev.to and replace this comment with:
-     ![Fracture Grafana dashboard — production observability on a game server](IMAGE_URL)
--->
+The OTel + Pino wiring is the same pattern used in production microservices. I just applied it to a game server.
+
+<!-- The Grafana dashboards went away with the observability stack in May 2026;
+     fracture-grafana.georgelarson.me is retired. If the stack is ever
+     reactivated, this is where the dashboard screenshot goes. -->
 
 ## Where AI changed the game
 
@@ -132,21 +130,24 @@ Claude was my development partner throughout this project. Here's what that actu
 
 **AI as force multiplier, not replacement.** I made every architectural decision. I chose SRP decomposition. I chose event-driven communication. I chose OpenTelemetry over custom metrics. AI didn't make those calls — 25 years of legacy modernization did. But AI let me *execute* those decisions at a pace that would've required a team.
 
-**AI for the tedious but important work.** Migrating 316 console.log calls to structured logging with proper context? Writing 3,161 tests? Extracting 13 handler modules from a monolithic class? This is work that matters but takes forever when you're doing it alone. AI compressed weeks into days.
+**AI for the tedious but important work.** Migrating 316 console.log calls to structured logging with proper context? Writing 3,167 tests? Extracting 13 handler modules from a monolithic class? This is work that matters but takes forever when you're doing it alone. AI compressed weeks into days.
 
-**AI-powered game features.** The AI integration isn't just in the development process — it's in the game itself:
+**AI-powered game features.** The AI integration wasn't just in the development process. It ran in the game itself:
 
-- **NPC dialogue** — Every NPC generates contextual responses via Venice AI (llama-3.3-70b). The village priest talks about "the time before the sky broke." The guard asks where you came from. Conversations have memory.
-- **Entity thoughts** — Mobs display visible AI-generated thought bubbles. Rats think about cheese. Skeletons scheme about revenge. 25% AI-generated, 75% template-based, refreshed on a 5-minute cycle.
-- **Narrator system** — Zone-specific narrative voices describe events with unique vocabularies. Deaths are mourned. Achievements are celebrated. Voice synthesis via Fish Audio TTS.
-- **Graceful degradation** — If Venice goes down, the game keeps running with static fallbacks. AI enhances the experience; it never blocks it. Circuit breaker opens after 5 failures, recovers automatically.
+- **NPC dialogue**: every NPC generated contextual responses via Venice AI (llama-3.3-70b). The village priest talked about "the time before the sky broke." The guard asked where you came from. Conversations had memory.
+- **Entity thoughts**: mobs displayed visible AI-generated thought bubbles. Rats thought about cheese. Skeletons schemed about revenge. 25% AI-generated, 75% template-based, refreshed on a 5-minute cycle.
+- **Narrator system**: zone-specific narrative voices described events with unique vocabularies. Deaths were mourned. Achievements were celebrated. Voice synthesis via Fish Audio TTS.
+- **Graceful degradation**: if Venice went down, the game kept running on static fallbacks. Circuit breaker opened after 5 failures, recovered automatically. AI enhanced the experience; it never blocked it.
+
+That last bullet stopped being a design claim in June 2026, when the Venice account was cancelled. The game never noticed. It runs today on its static fallback content (template quests, mad-libs thought bubbles, stat-based newspaper headlines) and stays fully playable. Re-enabling AI takes one env var and any OpenAI-compatible provider. There is no plan to do it.
 
 <!-- SCREENSHOT: npc-dialogue
-     Capture: A conversation with an NPC — the village priest or the guard work well.
-     Show the dialogue box with AI-generated text. Bonus if you can get a thought
-     bubble from a nearby mob in the same frame.
+     Capture: A conversation with an NPC; the village priest or the guard work well.
+     Note: dialogue now comes from the static fallback templates (Venice retired
+     June 2026). Caption it as fallback dialogue or reactivate AI first. Don't
+     caption template text as AI-generated.
      Upload to dev.to and replace this comment with:
-     ![NPC dialogue generated by Venice AI — every conversation is unique](IMAGE_URL)
+     ![NPC conversation in Fracture](IMAGE_URL)
 -->
 
 ## The stack
@@ -156,12 +157,12 @@ Claude was my development partner throughout this project. Here's what that actu
 | Client | HTML5 Canvas, TypeScript 5.8, Webpack 5 |
 | Server | Node.js, TypeScript 5.8, Socket.IO 4 |
 | Database | SQLite (better-sqlite3) |
-| AI | Venice AI (llama-3.3-70b), Fish Audio TTS |
-| Observability | OpenTelemetry, Pino, SigNoz, Grafana, ClickHouse |
+| AI | Venice AI (llama-3.3-70b), Fish Audio TTS (retired June 2026; static fallbacks) |
+| Observability | OpenTelemetry + Pino in code; SigNoz/Grafana/ClickHouse retired May 2026 |
 | Testing | Vitest 4, v8 coverage, CI on Node 20 + 22 |
-| Production | nginx, Let's Encrypt SSL, Docker Compose |
+| Production | nginx, Let's Encrypt SSL, systemd |
 
-~215 TypeScript source files. 280 including tests. 105 WebSocket message types. 50 levels, 7 zones, 6 roaming bosses, a nemesis system where mobs track grudges and power up against players who've killed them before.
+~217 TypeScript source files. 283 including tests. 105 WebSocket message types. 50 levels, 7 zones, 6 roaming bosses, a nemesis system where mobs track grudges and power up against players who've killed them before.
 
 ## What I'd tell someone doing this at work
 
@@ -186,7 +187,7 @@ Legacy modernization with AI follows the same rules as legacy modernization with
 **Play:** [fracture.georgelarson.me](https://fracture.georgelarson.me)
 **Code:** [github.com/georgeglarson/Fracture](https://github.com/georgeglarson/Fracture)
 
-The game runs 24/7 on a real server with real observability. Walk around, fight mobs, read their thoughts, talk to NPCs. Everything you see — the combat, the AI dialogue, the persistence, the spatial partitioning — is the result of applying boring enterprise modernization patterns to a fun problem.
+The game runs 24/7 on a real server. Walk around, fight mobs, read their thoughts, talk to NPCs. Everything you see (the combat, the dialogue, the persistence, the spatial partitioning) is the result of applying boring enterprise modernization patterns to a fun problem.
 
 That's the whole point. The skills transfer. The methodology scales. AI just makes it possible to do it alone.
 

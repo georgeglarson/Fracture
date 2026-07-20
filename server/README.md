@@ -11,7 +11,7 @@ Node.js game server for Fracture. Handles all authoritative game state: combat, 
 
 - **Socket.IO 4** — WebSocket transport (105 message types)
 - **better-sqlite3** — Player persistence (characters, inventory, achievements, progression)
-- **Venice AI SDK** — NPC dialogue generation (llama-3.3-70b)
+- **Venice AI SDK** — NPC dialogue generation (llama-3.3-70b). Optional and currently dormant: the Venice account was cancelled in June 2026, and the server runs fully on its static fallback content (template quests, mad-libs thought bubbles, static narration). Re-enabling takes any OpenAI-compatible provider plus one env var.
 - **Fish Audio** — TTS voice synthesis for narration
 - **pino** — Structured logging
 
@@ -47,7 +47,7 @@ See [ARCHITECTURE_SRP.md](../docs/ARCHITECTURE_SRP.md) for the full decompositio
 ## Tests
 
 ```bash
-pnpm test                 # 42 test files, 2,229 tests
+pnpm test                 # 66 test files, 3,167 tests
 pnpm test:coverage        # v8 coverage report
 ```
 

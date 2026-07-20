@@ -22,6 +22,7 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 - Narrator system for event storytelling
 - Town Crier newspaper aggregating world events
 - Entity thought bubbles with AI thought pool (25% AI-generated, 75% templates)
+- *(2026-06: the Venice account was cancelled. The AI systems above now serve their static fallback content; see "P0: Venice AI Fix" below.)*
 - **SQLite storage layer** - Character/inventory/achievement persistence (016 ✅)
 - Typed EventBus for decoupled systems
 - **Item System** with rarity, properties, tooltips (001 ✅)
@@ -62,9 +63,11 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 
 ---
 
-### P0: Venice AI Fix ✅
+### P0: Venice AI Fix ✅ (superseded)
 **Status:** Complete - API key updated
 **Impact:** All AI features working (NPC dialogue, quests, narrator, news)
+
+**Superseded 2026-06:** the Venice account was cancelled. The game now runs permanently on its static fallback content (template quests, mad-libs thought bubbles, stat-based newspaper headlines) and is fully playable. The AI code and circuit breaker remain; re-enabling takes any OpenAI-compatible provider plus one env var. No re-enable is planned.
 
 ### P1: Zone Bosses ✅
 **Status:** Complete
@@ -400,4 +403,4 @@ Solves "nothing to do at max level." Leaderboard creates competition.
 ---
 
 *This roadmap is not a timeline. It's a direction.*
-*Last updated: 2025-12-19*
+*Last updated: 2025-12-19 (Venice supersession noted 2026-07-20)*
