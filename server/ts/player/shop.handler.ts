@@ -45,6 +45,16 @@ export interface ShopPlayerContext {
 export function handleShopBuy(ctx: ShopPlayerContext, npcKind: number, itemKind: number): void {
   log.info({ player: ctx.name, itemKind, npcKind }, 'Attempting to buy item');
 
+  // Everything sold goes to inventory (equipment + expendables). Check room
+  // BEFORE processPurchase so limited stock isn't decremented for a
+  // purchase we then abort (stock leak).
+  const goesToInventory = Types.isWeapon(itemKind) || Types.isArmor(itemKind) || Types.isExpendableItem(itemKind);
+  if (goesToInventory && !ctx.getInventory().hasRoom(itemKind)) {
+    log.info({ player: ctx.name, itemKind }, 'Inventory is full');
+    ctx.send(new Messages.ShopBuyResult(false, itemKind, ctx.gold, 'Inventory is full').serialize());
+    return;
+  }
+
   const economyService = getEconomyService();
   const result = economyService.processPurchase(npcKind, itemKind, ctx.gold);
 

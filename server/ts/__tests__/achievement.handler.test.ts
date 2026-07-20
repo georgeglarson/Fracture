@@ -150,6 +150,56 @@ describe('AchievementHandler', () => {
 
       expect(ctx.setTitle).toHaveBeenCalledWith(null);
     });
+
+    // Login load order: persistence.handler initPlayer()s the saved state,
+    // then auth.handler runs initAchievements with NO saved data — the
+    // service init must be idempotent and keep the just-loaded state
+    // (previously the second init wiped it with a blank state).
+    it('should keep state loaded by the persistence layer when init runs without saved data', () => {
+      const saved: PlayerAchievements = {
+        unlocked: ['first_steps'],
+        progress: { total_kills: 37 },
+        selectedTitle: null,
+      };
+      mockService.initPlayer(ctx.id.toString(), saved);
+
+      initAchievements(ctx);
+
+      const state = mockService.getPlayerAchievements(ctx.id.toString());
+      expect(state.unlocked).toContain('first_steps');
+      expect(state.progress['total_kills']).toBe(37);
+
+      // The client receives the loaded state, not a blank one
+      const sendFn = ctx.send as ReturnType<typeof vi.fn>;
+      const initCall = sendFn.mock.calls
+        .map((c: unknown[]) => c[0])
+        .find((m: unknown): m is unknown[] => Array.isArray(m) && m[0] === Types.Messages.ACHIEVEMENT_INIT);
+      expect(initCall).toBeDefined();
+      expect(initCall![1]).toContain('first_steps');
+      expect(JSON.parse(initCall![2] as string)).toEqual({ total_kills: 37 });
+    });
+
+    it('should not re-grant first_steps rewards after a persistence-layer load', () => {
+      const saved: PlayerAchievements = {
+        unlocked: ['first_steps'],
+        progress: {},
+        selectedTitle: null,
+      };
+      mockService.initPlayer(ctx.id.toString(), saved);
+
+      initAchievements(ctx);
+
+      expect(ctx.grantGold).not.toHaveBeenCalled();
+      expect(ctx.grantXP).not.toHaveBeenCalled();
+    });
+
+    it('should still create fresh state for a brand-new player (no prior load)', () => {
+      initAchievements(ctx);
+
+      const state = mockService.getPlayerAchievements(ctx.id.toString());
+      // first_steps is unlocked during init for new players
+      expect(state.unlocked).toContain('first_steps');
+    });
   });
 
   // =========================================================================

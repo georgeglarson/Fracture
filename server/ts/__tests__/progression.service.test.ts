@@ -23,6 +23,7 @@ function makeCallbacks(): ProgressionCallbacks {
     checkLevelAchievements: vi.fn(),
     checkGoldAchievements: vi.fn(),
     getName: vi.fn().mockReturnValue('TestPlayer'),
+    checkSkillUnlocks: vi.fn(),
   };
 }
 
@@ -163,6 +164,28 @@ describe('ProgressionService', () => {
       service.grantXP(Formulas.xpToNextLevel(1));
 
       expect(callbacks.checkLevelAchievements).toHaveBeenCalledWith(2);
+    });
+
+    it('should invoke checkSkillUnlocks with old and new level on level up', () => {
+      service.grantXP(Formulas.xpToNextLevel(1));
+
+      expect(callbacks.checkSkillUnlocks).toHaveBeenCalledWith(1, 2);
+    });
+
+    it('should invoke checkSkillUnlocks once per level when leveling multiple times', () => {
+      const xpFor1 = Formulas.xpToNextLevel(1);
+      const xpFor2 = Formulas.xpToNextLevel(2);
+      service.grantXP(xpFor1 + xpFor2);
+
+      expect(callbacks.checkSkillUnlocks).toHaveBeenCalledTimes(2);
+      expect(callbacks.checkSkillUnlocks).toHaveBeenNthCalledWith(1, 1, 2);
+      expect(callbacks.checkSkillUnlocks).toHaveBeenNthCalledWith(2, 2, 3);
+    });
+
+    it('should not invoke checkSkillUnlocks without a level up', () => {
+      service.grantXP(1);
+
+      expect(callbacks.checkSkillUnlocks).not.toHaveBeenCalled();
     });
 
     it('should send LevelUp and HitPoints messages on level up', () => {

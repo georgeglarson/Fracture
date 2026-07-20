@@ -5,11 +5,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Types } from '../../../shared/ts/gametypes';
+import { serializeProperties, ItemProperties, Rarity } from '../../../shared/ts/items/item-types';
 import {
   handleUnequipToInventory,
   handleInventoryPickup,
   handleInventoryUse,
   handleInventoryEquip,
+  handleInventoryDrop,
   InventoryPlayerContext
 } from '../player/inventory.handler';
 
@@ -116,6 +118,75 @@ describe('InventoryHandler', () => {
       handleUnequipToInventory(mockCtx, 'invalid');
 
       expect(mockInventory.hasRoom).not.toHaveBeenCalled();
+    });
+
+    it('should preserve equipment properties when unequipping (fix: props were dropped)', () => {
+      const props: ItemProperties = { rarity: Rarity.RARE, level: 3, category: 'weapon' };
+      const getProperties = vi.fn(() => props);
+      mockCtx.getEquipment = () => ({
+        getEquipped: vi.fn(() => Types.Entities.SWORD2),
+        getProperties,
+      });
+
+      handleUnequipToInventory(mockCtx, 'weapon');
+
+      expect(getProperties).toHaveBeenCalledWith('weapon');
+      expect(mockInventory.addItem).toHaveBeenCalledWith(Types.Entities.SWORD2, props, 1);
+
+      // INVENTORY_ADD carries the serialized properties, not null
+      const invAdd = (mockCtx.send as ReturnType<typeof vi.fn>).mock.calls
+        .map((c: unknown[]) => c[0])
+        .find((m: unknown): m is unknown[] => Array.isArray(m) && m[0] === Types.Messages.INVENTORY_ADD);
+      expect(invAdd).toBeDefined();
+      expect(invAdd![3]).toEqual(serializeProperties(props));
+    });
+
+    it('should notify the owner about the gear change, not just broadcast (fix: self-notify)', () => {
+      mockCtx.equip = vi.fn(() => ({ serialize: () => ['EQUIP_SELF'] }));
+
+      handleUnequipToInventory(mockCtx, 'weapon');
+
+      expect(mockCtx.broadcast).toHaveBeenCalled();
+      expect(mockCtx.send).toHaveBeenCalledWith(['EQUIP_SELF']);
+    });
+  });
+
+  describe('handleInventoryDrop - stackables (fix: partial-stack drop desync)', () => {
+    it('should send INVENTORY_UPDATE with the remaining count when the slot survives', () => {
+      mockInventory.getSlot
+        .mockReturnValueOnce({ kind: Types.Entities.FLASK, properties: null, count: 3 }) // initial read
+        .mockReturnValueOnce({ kind: Types.Entities.FLASK, properties: null, count: 2 }); // after remove
+
+      handleInventoryDrop(mockCtx, 0);
+
+      expect(mockInventory.removeItem).toHaveBeenCalledWith(0, 1);
+      expect(mockCtx.send).toHaveBeenCalledWith([Types.Messages.INVENTORY_UPDATE, 0, 2]);
+
+      const removes = (mockCtx.send as ReturnType<typeof vi.fn>).mock.calls
+        .map((c: unknown[]) => c[0])
+        .filter((m: unknown) => Array.isArray(m) && m[0] === Types.Messages.INVENTORY_REMOVE);
+      expect(removes).toHaveLength(0);
+    });
+
+    it('should send INVENTORY_REMOVE when the last item of the slot is dropped', () => {
+      mockInventory.getSlot
+        .mockReturnValueOnce({ kind: Types.Entities.FLASK, properties: null, count: 1 })
+        .mockReturnValueOnce(null);
+
+      handleInventoryDrop(mockCtx, 0);
+
+      expect(mockCtx.send).toHaveBeenCalledWith([Types.Messages.INVENTORY_REMOVE, 0]);
+    });
+
+    it('should still drop the item entity in the world for partial stacks', () => {
+      mockInventory.getSlot
+        .mockReturnValueOnce({ kind: Types.Entities.FLASK, properties: null, count: 3 })
+        .mockReturnValueOnce({ kind: Types.Entities.FLASK, properties: null, count: 2 });
+
+      handleInventoryDrop(mockCtx, 0);
+
+      expect(mockWorld.createItemWithProperties).toHaveBeenCalledWith(Types.Entities.FLASK, mockCtx.x, mockCtx.y, null);
+      expect(mockWorld.addItem).toHaveBeenCalled();
     });
   });
 

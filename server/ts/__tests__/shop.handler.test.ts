@@ -6,10 +6,28 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Types } from '../../../shared/ts/gametypes';
 
-// Mock economy service
+// Mock economy service — shared hoisted mock so tests can assert whether
+// processPurchase was called at all (stock-leak pre-check).
+const mockEconomy = vi.hoisted(() => ({
+  processPurchase: vi.fn(),
+  processSell: vi.fn(),
+}));
+
 vi.mock('../player/economy.service.js', () => ({
-  getEconomyService: () => ({
-    processPurchase: vi.fn((npcKind, itemKind, gold) => {
+  getEconomyService: () => mockEconomy,
+}));
+
+import { handleShopBuy, handleShopSell, ShopPlayerContext } from '../player/shop.handler';
+
+describe('ShopHandler', () => {
+  let mockCtx: ShopPlayerContext;
+  let mockInventory: any;
+
+  beforeEach(() => {
+    mockEconomy.processPurchase.mockReset();
+    mockEconomy.processSell.mockReset();
+
+    mockEconomy.processPurchase.mockImplementation((npcKind, itemKind, gold) => {
       // Simple mock - assume 100g items
       if (gold >= 100) {
         return {
@@ -33,23 +51,14 @@ vi.mock('../player/economy.service.js', () => ({
         isConsumable: false,
         healAmount: 0,
       };
-    }),
-    processSell: vi.fn(() => ({
+    });
+    mockEconomy.processSell.mockImplementation(() => ({
       success: true,
       newGold: 150,
       sellPrice: 50,
       message: 'Sold',
-    })),
-  }),
-}));
+    }));
 
-import { handleShopBuy, handleShopSell, ShopPlayerContext } from '../player/shop.handler';
-
-describe('ShopHandler', () => {
-  let mockCtx: ShopPlayerContext;
-  let mockInventory: any;
-
-  beforeEach(() => {
     mockInventory = {
       hasRoom: vi.fn(() => true),
       addItem: vi.fn(() => 0), // Returns slot index
@@ -131,6 +140,55 @@ describe('ShopHandler', () => {
       handleShopBuy(mockCtx, Types.Entities.GUARD, Types.Entities.SWORD2);
 
       expect(mockInventory.addItem).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleShopBuy - Stock leak pre-check (fix: stock decremented on abort)', () => {
+    it('should not call processPurchase for equipment when inventory is full', () => {
+      mockInventory.hasRoom.mockReturnValue(false);
+
+      handleShopBuy(mockCtx, Types.Entities.GUARD, Types.Entities.SWORD2);
+
+      // Stock must not be decremented for a purchase we abort
+      expect(mockEconomy.processPurchase).not.toHaveBeenCalled();
+      expect(mockCtx.setGold).not.toHaveBeenCalled();
+    });
+
+    it('should not call processPurchase for consumables when inventory is full', () => {
+      mockInventory.hasRoom.mockReturnValue(false);
+
+      handleShopBuy(mockCtx, Types.Entities.VILLAGEGIRL, Types.Entities.FIREPOTION);
+
+      expect(mockEconomy.processPurchase).not.toHaveBeenCalled();
+      expect(mockCtx.setGold).not.toHaveBeenCalled();
+    });
+
+    it('should still check gold/stock via processPurchase when inventory has room', () => {
+      const goldBefore = mockCtx.gold;
+
+      handleShopBuy(mockCtx, Types.Entities.GUARD, Types.Entities.SWORD2);
+
+      expect(mockEconomy.processPurchase).toHaveBeenCalledWith(
+        Types.Entities.GUARD,
+        Types.Entities.SWORD2,
+        goldBefore,
+      );
+    });
+  });
+
+  describe('handleShopBuy - Expendables (fix: cake/firepotion phantom purchase)', () => {
+    it('should add CAKE to inventory and deduct gold', () => {
+      handleShopBuy(mockCtx, Types.Entities.VILLAGEGIRL, Types.Entities.CAKE);
+
+      expect(mockInventory.addItem).toHaveBeenCalledWith(Types.Entities.CAKE, null, 1);
+      expect(mockCtx.setGold).toHaveBeenCalledWith(400); // 500 - 100 (mock price)
+    });
+
+    it('should add FIREPOTION to inventory and deduct gold', () => {
+      handleShopBuy(mockCtx, Types.Entities.VILLAGEGIRL, Types.Entities.FIREPOTION);
+
+      expect(mockInventory.addItem).toHaveBeenCalledWith(Types.Entities.FIREPOTION, null, 1);
+      expect(mockCtx.setGold).toHaveBeenCalledWith(400);
     });
   });
 

@@ -393,6 +393,42 @@ describe('AIPlayer', () => {
   });
 
   // =========================================================================
+  // die / respawn - world re-registration (fix: respawned as ghost)
+  // =========================================================================
+  describe('die / respawn', () => {
+    it('die() removes the bot from the entity registry', () => {
+      const ai = createAIPlayer(world);
+
+      ai.die();
+      if (ai.respawnTimer) {
+        clearTimeout(ai.respawnTimer);
+        ai.respawnTimer = null;
+      }
+
+      expect(ai.isDead).toBe(true);
+      expect(world.removeEntity).toHaveBeenCalledWith(ai);
+    });
+
+    it('respawn() re-registers the bot with the world', () => {
+      const ai = createAIPlayer(world);
+      ai.die();
+      if (ai.respawnTimer) {
+        clearTimeout(ai.respawnTimer);
+        ai.respawnTimer = null;
+      }
+      world.addEntity.mockClear();
+
+      ai.respawn();
+
+      expect(ai.isDead).toBe(false);
+      // Mirrors AIPlayerManager.spawnAIPlayer: entity registry + players map
+      expect(world.addEntity).toHaveBeenCalledWith(ai);
+      expect(world.players[ai.id]).toBe(ai);
+      expect(world.handleEntityGroupMembership).toHaveBeenCalledWith(ai);
+    });
+  });
+
+  // =========================================================================
   // destroy
   // =========================================================================
   describe('destroy', () => {
