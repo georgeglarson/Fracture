@@ -606,13 +606,6 @@ function setupAIHandlers(game: Game, client: GameClient): void {
     }
   });
 
-  client.on(ClientEvents.QUEST_OFFER, function (quest) {
-    if (quest && game.notification_callback) {
-      game.notification_callback('Quest: ' + quest.description);
-      game.currentQuest = quest;
-    }
-  });
-
   client.on(ClientEvents.QUEST_COMPLETE, function (result) {
     if (result && game.notification_callback) {
       game.notification_callback('Quest Complete! Reward: ' + result.reward);
