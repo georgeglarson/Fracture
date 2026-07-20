@@ -1274,17 +1274,6 @@ export class Game {
     if (character.isAttacking() && !character.previousTarget) {
       var isMoving = this.tryMovingToADifferentTile(character); // Don't let multiple mobs stack on the same tile when attacking a player.
 
-      // Combat debug overlay (read-only — do NOT call canAttack here, it consumes the cooldown)
-      if (character.id === this.playerId && character.target) {
-        const dbg = document.getElementById('tap-debug');
-        if (dbg) {
-          const dist = character.getDistanceToEntity(character.target);
-          const cd = character.attackCooldown;
-          const elapsed = cd ? Math.floor(time - cd.lastTime) : -1;
-          dbg.textContent = `t#${character.target.id} d=${dist} el=${elapsed}/${cd?.duration} mv=${character.isMoving()} reach=${character.canReachTarget()}`;
-        }
-      }
-
       if (character.canAttack(time)) {
         if (!isMoving) { // don't hit target if moving to a different tile.
           if (character.id === this.playerId) {
