@@ -86,6 +86,12 @@ var initApp = function () {
       $(this).removeClass('blink');
     });
 
+    $('#riftbutton').click(function () {
+      if (game && game.ready && game.started) {
+        game.toggleRiftMenu();
+      }
+    });
+
     $('#instructions').click(function () {
       app.hideWindows();
     });
@@ -439,7 +445,18 @@ var initGame = function () {
         return false;
       }
       if (key === 27) { // ESC
+        // Only exit an active rift when ESC closed nothing: if any window or
+        // rift panel was open, ESC's job was to close it, not end the run
+        const hadOpenUi = !!(game.achievementUI?.isVisible?.()) ||
+          $('#instructions').hasClass('active') ||
+          $('body').hasClass('credits') ||
+          !!(game.riftUI?.hasOpenPanel?.());
         app.hideWindows();
+        if (game.riftUI?.hasOpenPanel?.()) {
+          game.riftUI.closePanels();
+        } else if (!hadOpenUi && game.riftUI?.isActive()) {
+          game.exitRift();
+        }
         Object.values(game.player.attackers).forEach(function (attacker: any) {
           attacker.stop();
         });
@@ -454,6 +471,18 @@ var initGame = function () {
       if (key === 88) { // X - Drop current weapon (changed from D for WASD)
         if (game.ready && game.started) {
           game.dropCurrentWeapon();
+        }
+        return false;
+      }
+      if (key === 76) { // L - Boss kill leaderboard
+        if (game.ready && game.started) {
+          game.requestBossLeaderboard();
+        }
+        return false;
+      }
+      if (key === 82) { // R - Fracture Rift menu
+        if (game.ready && game.started) {
+          game.toggleRiftMenu();
         }
         return false;
       }
@@ -496,11 +525,15 @@ var initGame = function () {
         return false;
       }
       if (key === 73) { // I - Toggle inventory
-        game.toggleInventory();
+        if (game.ready && game.started) {
+          game.toggleInventory();
+        }
         return false;
       }
       if (key === 74) { // J - Toggle achievements
-        game.toggleAchievements();
+        if (game.ready && game.started) {
+          game.toggleAchievements();
+        }
         return false;
       }
       if (key === 77) { // M - Toggle minimap

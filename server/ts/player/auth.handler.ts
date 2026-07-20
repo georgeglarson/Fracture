@@ -19,13 +19,61 @@ const log = createModuleLogger('AuthHandler');
  * HELLO - Initial handshake: authenticate, create/load character, enter game
  */
 export async function handleHello(player: Player, msg: any[], Utils: any, Formulas: any): Promise<void> {
+  const world = player.getWorld();
+
+  // Respawn path: a second HELLO on the same connection is only accepted
+  // for an already-authenticated dead player (enforced by Player's message
+  // listener). Skip the storage reload — it would overwrite up to 60s of
+  // in-memory progress with the last autosave. Keep in-memory state,
+  // restore HP to full, and respawn at the last checkpoint via the
+  // existing onRequestPosition logic.
+  if (player.hasEnteredGame && player.isDead) {
+    player.orientation = Utils.randomOrientation();
+    player.updateHitPoints(); // resetHitPoints → full HP
+    player.updatePosition();  // last checkpoint, or start position if none
+
+    player.isDead = false;
+    player.spawnProtectionUntil = Date.now() + 10000; // same aggro immunity as first spawn
+
+    // Re-register with the world (death removed the entity) and push the
+    // entity list — the client rebuilt its entity grid on respawn.
+    // (No enterCallback: callbacks persist from first login, and a respawn
+    // is not a fresh 'join' world event.)
+    world.addPlayer(player);
+    world.pushRelevantEntityListTo(player);
+
+    // Same WELCOME shape as first login, from live in-memory state
+    // [WELCOME, id, name, x, y, hp, maxHp, level, xp, xpToNext, gold]
+    player.send([
+      Types.Messages.WELCOME,
+      player.id,
+      player.name,
+      player.x,
+      player.y,
+      player.hitPoints,
+      player.maxHitPoints,
+      player.level || 1,
+      player.xp || 0,
+      Formulas.xpToNextLevel(player.level || 1),
+      player.gold || 0
+    ]);
+
+    // The client rebuilt its player entity — resend gear so sprites render
+    if (player.weapon) {
+      player.send([Types.Messages.EQUIP, player.id, player.weapon]);
+    }
+    if (player.armor) {
+      player.send([Types.Messages.EQUIP, player.id, player.armor]);
+    }
+    return;
+  }
+
   const name = Utils.sanitize(msg[1]);
   const password = msg[5] || ''; // Password is now at index 5
   player.name = (name === '') ? 'lorem ipsum' : name.substr(0, 15);
   player.getAuditLog().playerName = player.name;
   player.kind = Types.Entities.WARRIOR;
 
-  const world = player.getWorld();
   const storage = world.getStorageService();
   const characterExists = storage.characterExists(player.name);
 

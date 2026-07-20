@@ -197,7 +197,14 @@ export class Map {
       gx = Math.floor((x - 1) / w),
       gy = Math.floor((y - 1) / h);
 
-    return gx + '-' + gy;
+    // Clamp into the valid group range. groupWidth/groupHeight are floor()'d,
+    // so map-edge tiles past the last full zone (e.g. x 169-171 on a 172-wide
+    // map) would otherwise resolve to nonexistent groups — entities there were
+    // skipped by addToGroup and went invisible.
+    const clampedGx = Math.max(0, Math.min(gx, this.groupWidth - 1)),
+      clampedGy = Math.max(0, Math.min(gy, this.groupHeight - 1));
+
+    return clampedGx + '-' + clampedGy;
   }
 
   getAdjacentGroupPositions(id: string) {

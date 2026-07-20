@@ -17,6 +17,7 @@ import { InteractionController } from '../player/interaction-controller';
 import { QuestController } from '../quest/quest-controller';
 import { QuestUI, initQuestUI } from '../ui/quest-ui';
 import { Pathfinder } from '../utils/pathfinder';
+import type { Character } from '../entity/character/character';
 
 /**
  * Context passed to bootstrap containing game references
@@ -95,7 +96,7 @@ export interface BootstrapContext {
   hoveringCollidingTile: boolean;
   hoveringPlateauTile: boolean;
   previousClickPosition: { x: number; y: number };
-  currentNpcTalk: any;
+  pendingNpcTalks: { [npcKind: number]: Character };
 }
 
 /**
@@ -264,13 +265,15 @@ export function initializeManagers(ctx: BootstrapContext): BootstrapResult {
     tryUnlockingAchievement: ctx.tryUnlockingAchievement,
     getPreviousClickPosition: () => ctx.previousClickPosition,
     setPreviousClickPosition: (pos) => { ctx.previousClickPosition = pos; },
-    setCurrentNpcTalk: (npc) => { ctx.currentNpcTalk = npc; },
-    getCurrentNpcTalk: () => ctx.currentNpcTalk
+    setPendingNpcTalk: (npc) => { ctx.pendingNpcTalks[npc.kind] = npc; },
+    getPendingNpcTalk: (npcKind) => ctx.pendingNpcTalks[npcKind],
+    clearPendingNpcTalk: (npcKind) => { delete ctx.pendingNpcTalks[npcKind]; }
   });
 
   // Initialize quest controller
   const questController = new QuestController({
     sendRequestQuest: (npcKind: number) => ctx.client?.sendRequestQuest(npcKind),
+    sendQuestAbandon: () => ctx.client?.sendQuestAbandon(),
     showNotification: ctx.showNotification,
     showNarratorText: (text: string, style: string) => uiManager?.showNarratorText(text, style as any),
     playSound: (soundName: string) => ctx.audioManager?.playSound(soundName)

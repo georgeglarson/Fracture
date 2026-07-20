@@ -1202,4 +1202,132 @@ describe('World', () => {
       expect(Messages.Population).toHaveBeenCalledWith(3, 10);
     });
   });
+
+  // ────────────────────────────────────────────
+  // 21. Regen tick — party HP updates
+  //     (fix: party HP bars froze because regen healed without a damage event)
+  // ────────────────────────────────────────────
+
+  describe('Regen tick — party HP updates', () => {
+    function makeRegenCharacter(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 100,
+        type: 'player',
+        hitPoints: 50,
+        maxHitPoints: 100,
+        hasFullHealth: vi.fn().mockReturnValue(false),
+        regenHealthBy: vi.fn(),
+        regen: vi.fn().mockReturnValue({ serialize: () => ['regen', 100] }),
+        ...overrides,
+      };
+    }
+
+    it('calls updatePartyHp on healed players', () => {
+      const world = createAndRunWorld();
+      const playerChar = makeRegenCharacter({ updatePartyHp: vi.fn() });
+      mockEntityManagerInstance.forEachCharacter.mockImplementation((cb: (c: Record<string, unknown>) => void) => {
+        cb(playerChar);
+      });
+
+      world.regenCallback!();
+
+      expect(playerChar.regenHealthBy).toHaveBeenCalled();
+      expect(playerChar.updatePartyHp).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not throw for player-type entities without party methods (AIPlayers)', () => {
+      const world = createAndRunWorld();
+      const aiChar = makeRegenCharacter(); // no updatePartyHp — AIPlayer shape
+      mockEntityManagerInstance.forEachCharacter.mockImplementation((cb: (c: Record<string, unknown>) => void) => {
+        cb(aiChar);
+      });
+
+      expect(() => world.regenCallback!()).not.toThrow();
+    });
+
+    it('skips characters already at full health', () => {
+      const world = createAndRunWorld();
+      const fullChar = makeRegenCharacter({
+        hitPoints: 100,
+        hasFullHealth: vi.fn().mockReturnValue(true),
+        updatePartyHp: vi.fn(),
+      });
+      mockEntityManagerInstance.forEachCharacter.mockImplementation((cb: (c: Record<string, unknown>) => void) => {
+        cb(fullChar);
+      });
+
+      world.regenCallback!();
+
+      expect(fullChar.regenHealthBy).not.toHaveBeenCalled();
+      expect(fullChar.updatePartyHp).not.toHaveBeenCalled();
+    });
+  });
+
+  // ────────────────────────────────────────────
+  // 22. Aggro tick — roaming-boss leash exemption
+  //     (fix: roaming bosses rubber-banded to spawn mid-fight)
+  // ────────────────────────────────────────────
+
+  describe('Aggro tick — roaming-boss leash exemption', () => {
+    function makeAggroMob(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 50,
+        type: 'mob',
+        kind: 1,
+        x: 500,
+        y: 500,
+        group: 'g1',
+        aggroRange: 5,
+        isDead: false,
+        target: 100,
+        hasTarget: vi.fn().mockReturnValue(true),
+        isStunned: vi.fn().mockReturnValue(false),
+        distanceToSpawningPoint: vi.fn().mockReturnValue(100), // way beyond leash (10)
+        clearTarget: vi.fn(),
+        forgetEveryone: vi.fn(),
+        resetPosition: vi.fn(),
+        attack: vi.fn().mockReturnValue({ serialize: () => ['attack', 50] }),
+        ...overrides,
+      };
+    }
+
+    beforeEach(() => {
+      // Live target for the mob
+      mockEntityManagerInstance.getEntityById.mockReturnValue({
+        id: 100,
+        isDead: false,
+        removeAttacker: vi.fn(),
+      });
+    });
+
+    it('force-resets a normal mob that aggros beyond leash range', () => {
+      const world = createAndRunWorld();
+      const mob = makeAggroMob(); // no config — plain mob
+      mockEntityManagerInstance.forEachMob.mockImplementation((cb: (m: Record<string, unknown>) => void) => {
+        cb(mob);
+      });
+
+      world.aggroCallback!();
+
+      expect(mob.clearTarget).toHaveBeenCalled();
+      expect(mob.forgetEveryone).toHaveBeenCalled();
+      expect(mob.resetPosition).toHaveBeenCalled();
+    });
+
+    it('does not leash-reset a RoamingBoss (config present)', () => {
+      const world = createAndRunWorld();
+      const boss = makeAggroMob({ config: { id: 'boss-1' } }); // RoamingBoss marker
+      mockEntityManagerInstance.forEachMob.mockImplementation((cb: (m: Record<string, unknown>) => void) => {
+        cb(boss);
+      });
+
+      world.aggroCallback!();
+
+      expect(boss.clearTarget).not.toHaveBeenCalled();
+      expect(boss.forgetEveryone).not.toHaveBeenCalled();
+      expect(boss.resetPosition).not.toHaveBeenCalled();
+      // Boss keeps fighting: attack is re-broadcast to stay in sync
+      expect(mockBroadcasterInstance.pushToAdjacentGroups).toHaveBeenCalled();
+    });
+  });
 });

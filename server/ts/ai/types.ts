@@ -55,6 +55,8 @@ export interface QuestResult {
   reward: string;
   xp: number;
   description: string;
+  /** The completed quest's final state (for a last QuestStatus sync to the client) */
+  quest?: Quest;
 }
 
 export interface ItemContext {

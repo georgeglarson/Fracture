@@ -23,6 +23,7 @@ import {getLegendariesForBoss} from '../../shared/ts/items/legendary-data';
 import {Rarity} from '../../shared/ts/items/item-types';
 import {IStorageService} from './storage/storage.interface';
 import {getStorageService} from './storage/sqlite.service';
+import {riftManager} from './rifts/rift-manager';
 import {Server} from './ws';
 import {Entity} from './entity';
 import {Character} from './character';
@@ -35,6 +36,15 @@ import { createModuleLogger } from './utils/logger.js';
 import { trace } from '@opentelemetry/api';
 
 const log = createModuleLogger('World');
+
+/**
+ * RoamingBoss instances (identified by their ZoneBossConfig) roam far from
+ * their spawn point by design — exempt them from leash resets or they
+ * rubber-band back to spawn mid-fight.
+ */
+function isRoamingBoss(mob: Mob): boolean {
+  return (mob as Mob & { config?: unknown }).config !== undefined;
+}
 
 // Message type for push methods - can be an object with serialize() or a raw array
 type MessagePayload = { serialize(): unknown[] } | unknown[];
@@ -113,6 +123,10 @@ export class World {
   // Periodic save interval (60-second auto-save for all connected players)
   private periodicSaveInterval: ReturnType<typeof setInterval> | null = null;
 
+  // Fracture Rift mob spawn tick (1-second; manager owns per-run cadence)
+  private riftSpawnInterval: ReturnType<typeof setInterval> | null = null;
+  private riftMobCounter = 0;
+
   // Storage service for player persistence
   private storageService: IStorageService | null = null;
 
@@ -161,7 +175,7 @@ export class World {
             const pos = this.findPositionNextTo(mob, target);
             // Leash: mob gives up if next position is too far from spawn
             const leashDist = getLeashDistance(mob.aggroRange);
-            if (mob.distanceToSpawningPoint(pos.x, pos.y) > leashDist) {
+            if (!isRoamingBoss(mob) && mob.distanceToSpawningPoint(pos.x, pos.y) > leashDist) {
               mob.clearTarget();
               mob.forgetEveryone();
               player.removeAttacker(mob);
@@ -205,6 +219,14 @@ export class World {
 
       player.onExit(() => {
         log.info({ playerName: player.name }, 'Player left the game');
+
+        // End any active rift run FIRST — it restores the player's entry
+        // position, and the save below must persist that, not the arena spot
+        try {
+          player.handleRiftDisconnect?.();
+        } catch (e) {
+          log.error({ err: e, playerName: player.name }, 'Failed to clean up rift state on exit');
+        }
 
         // Save player data to database before removing
         if (this.storageService && player.characterId) {
@@ -253,6 +275,11 @@ export class World {
 
           if (character.type === 'player') {
             this.pushToPlayer(character as Player, character.regen());
+
+            // Party HP bars: regen changes HP without a damage event, so
+            // push the update here (AIPlayers have type 'player' but no
+            // party methods — hence the optional call)
+            (character as unknown as { updatePartyHp?: () => void }).updatePartyHp?.();
 
             // Regen heals without a damage event — re-arm the low-health
             // crossing detector once they're back above the threshold
@@ -356,7 +383,7 @@ export class World {
           }
           // Leash based on mob's own position (consistent with move_callback leash)
           const mobDist = mob.distanceToSpawningPoint(mob.x, mob.y);
-          if (mobDist > leashDistance) {
+          if (!isRoamingBoss(mob) && mobDist > leashDistance) {
             // Remove mob from target's attacker list before leashing
             (target as Character).removeAttacker(mob);
             mob.clearTarget();
@@ -557,6 +584,39 @@ export class World {
           log.info({ event: 'periodic_save', playerCount: savedCount, failures: failCount }, 'Periodic save completed');
         }
       }, 60_000);
+
+      // Fracture Rift: mob spawn tick — tops up each active run's arena mobs.
+      // The manager owns cadence (SPAWN_INTERVAL), mob selection and difficulty
+      // scaling; the world spawns through the normal addMob path so rift mobs
+      // aggro, move, drop loot and broadcast like any other mob.
+      this.riftSpawnInterval = setInterval(() => {
+        try {
+          this.forEachPlayer((player: Player) => {
+            const spawn = riftManager.getMobToSpawn(player.id);
+            if (!spawn) return;
+
+            // Rift mob ids: '6' prefix (unused: players '5', static mobs '7',
+            // npcs '8', items '9') + zero-padded session counter. Ids are
+            // parsed with parseInt in entity.ts, so they must stay purely
+            // numeric — and the kind lives on mob.kind, not in the id.
+            const mob = new Mob('6' + String(this.riftMobCounter++).padStart(6, '0'), spawn.mobKind, spawn.x, spawn.y);
+
+            // Apply rift difficulty scaling at spawn (tier + FORTIFIED/EMPOWERED modifiers)
+            mob.maxHitPoints = Math.max(1, Math.floor(mob.maxHitPoints * spawn.hpMultiplier));
+            mob.hitPoints = mob.maxHitPoints;
+            mob.weaponLevel = Math.max(1, Math.round(mob.weaponLevel * spawn.damageMultiplier));
+
+            mob.onMove(this.onMobMoveCallback.bind(this));
+            this.addMob(mob);
+            riftManager.registerSpawnedMob(player.id, mob.id as number);
+          });
+        } catch (e) {
+          log.error({ err: e }, 'Rift spawn tick failed');
+        }
+      }, 1000);
+
+      // Rift mobs only spawn on walkable tiles
+      riftManager.setPositionValidator((x, y) => this.isValidPosition(x, y));
     });
 
     log.info({ worldId: this.id, capacity: this.maxPlayers }, 'World created');
@@ -980,6 +1040,12 @@ export class World {
     if (this.periodicSaveInterval) {
       clearInterval(this.periodicSaveInterval);
       this.periodicSaveInterval = null;
+    }
+
+    // Clear rift spawn interval
+    if (this.riftSpawnInterval) {
+      clearInterval(this.riftSpawnInterval);
+      this.riftSpawnInterval = null;
     }
 
     // Stop game loop

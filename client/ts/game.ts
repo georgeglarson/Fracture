@@ -53,6 +53,7 @@ import * as PartyHandler from './handlers/party.handler';
 import * as InventoryHandler from './handlers/inventory.handler';
 import * as GameEventHandler from './handlers/game-event.handler';
 import * as NetworkConnectionHandler from './handlers/network-connection.handler';
+import * as RiftUIHandler from './handlers/rift-ui.handler';
 import { PlayerController } from './player/player-controller';
 import { InteractionController } from './player/interaction-controller';
 import { QuestController } from './quest/quest-controller';
@@ -568,8 +569,7 @@ export class Game {
       get hoveringPlateauTile() { return self.hoveringPlateauTile; },
       get previousClickPosition() { return self.previousClickPosition; },
       set previousClickPosition(val) { self.previousClickPosition = val; },
-      get currentNpcTalk() { return self.currentNpcTalk; },
-      set currentNpcTalk(val) { self.currentNpcTalk = val; }
+      get pendingNpcTalks() { return self.pendingNpcTalks; }
     };
   }
 
@@ -650,6 +650,9 @@ export class Game {
 
         // Initialize achievements panel UI
         self.initAchievementsUI();
+
+        // Initialize Fracture Rift UI (menu, HUD, leaderboard)
+        self.initRiftUI();
 
         // Set camera map bounds to prevent rendering outside the map
         self.camera.setMapSize(self.map.width, self.map.height);
@@ -808,9 +811,12 @@ export class Game {
         self.showFirstTimeHints();
         // Auto-show minimap for new players
         self.initMinimap();
+        self.minimapUI?.show();
       } else {
         self.showNotification('Welcome back to Fracture!');
         self.storage.setPlayerName(name);
+        // Returning players get the minimap too (it defaults hidden)
+        self.minimapUI?.show();
       }
 
       // Update UI with server progression
@@ -944,8 +950,9 @@ export class Game {
     this.questController?.requestQuest(npcKind);
   }
 
-  // Current NPC being talked to (for Venice AI response handling)
-  currentNpcTalk = null;
+  // Pending NPC talks keyed by NPC kind (for response handling — the server
+  // echoes the NPC kind in NPCTALK_RESPONSE)
+  pendingNpcTalks: { [npcKind: number]: Character } = {};
 
   // Current quest (for tracking)
   currentQuest = null;
@@ -1273,17 +1280,6 @@ export class Game {
 
     if (character.isAttacking() && !character.previousTarget) {
       var isMoving = this.tryMovingToADifferentTile(character); // Don't let multiple mobs stack on the same tile when attacking a player.
-
-      // Combat debug overlay (read-only — do NOT call canAttack here, it consumes the cooldown)
-      if (character.id === this.playerId && character.target) {
-        const dbg = document.getElementById('tap-debug');
-        if (dbg) {
-          const dist = character.getDistanceToEntity(character.target);
-          const cd = character.attackCooldown;
-          const elapsed = cd ? Math.floor(time - cd.lastTime) : -1;
-          dbg.textContent = `t#${character.target.id} d=${dist} el=${elapsed}/${cd?.duration} mv=${character.isMoving()} reach=${character.canReachTarget()}`;
-        }
-      }
 
       if (character.canAttack(time)) {
         if (!isMoving) { // don't hit target if moving to a different tile.
@@ -1646,6 +1642,10 @@ export class Game {
     this.uiManager?.toggleNewspaper();
   }
 
+  requestBossLeaderboard() {
+    this.client.sendLeaderboardRequest();
+  }
+
   dropCurrentWeapon() {
     console.log('[Drop] dropCurrentWeapon called, player:', this.player ? this.player.getWeaponName() : 'no player');
     if (this.player && this.player.getWeaponName() !== 'sword1') {
@@ -1887,5 +1887,30 @@ export class Game {
       this.initAchievementsUI();
     }
     this.achievementUI?.toggle();
+  }
+
+  // Fracture Rift UI (menu, HUD, leaderboard)
+  initRiftUI() {
+    if (this.riftUI) return;
+
+    this.riftUI = new RiftUI();
+    this.riftUI.setCallbacks({
+      onEnter: () => RiftUIHandler.enterRift(this),
+      onExit: () => RiftUIHandler.exitRift(this),
+      onLeaderboard: () => RiftUIHandler.requestRiftLeaderboard(this)
+    });
+
+    console.info('[Rift] UI initialized');
+  }
+
+  toggleRiftMenu() {
+    if (!this.riftUI) {
+      this.initRiftUI();
+    }
+    this.riftUI?.toggleMenu();
+  }
+
+  exitRift() {
+    RiftUIHandler.exitRift(this);
   }
 }

@@ -38,8 +38,19 @@ export class AchievementService {
 
   /**
    * Initialize achievements for a player (called on connect)
+   *
+   * Idempotent: when no savedData is given but state already exists for the
+   * player (e.g. the persistence layer just loaded it during login), keep
+   * the existing entry instead of wiping it with a blank state.
    */
   initPlayer(playerId: string, savedData?: PlayerAchievements): PlayerAchievements {
+    if (!savedData) {
+      const existing = this.playerAchievements.get(playerId);
+      if (existing) {
+        return existing;
+      }
+    }
+
     const achievements = savedData || createEmptyPlayerAchievements();
     this.playerAchievements.set(playerId, achievements);
 

@@ -67,6 +67,15 @@ export class FormatChecker {
 
     // Progression system
     this.formats[Types.Messages.ASCEND_REQUEST] = []; // no params
+
+    // Boss leaderboard + quest abandon
+    this.formats[Types.Messages.LEADERBOARD_REQUEST] = []; // no params
+    this.formats[Types.Messages.QUEST_ABANDON] = []; // no params
+
+    // Fracture Rift
+    this.formats[Types.Messages.RIFT_ENTER] = []; // no params
+    this.formats[Types.Messages.RIFT_EXIT] = []; // no params
+    this.formats[Types.Messages.RIFT_LEADERBOARD_REQ] = []; // no params
   }
 
   check(msg: unknown[]): boolean {

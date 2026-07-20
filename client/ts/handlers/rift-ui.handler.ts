@@ -88,6 +88,9 @@ export function handleRiftEnd(
     }
     ctx.showNotification(msg);
     ctx.audioManager?.playSound('quest');
+  } else if (data.reason) {
+    // Failed entry and other non-death failures must say WHY (was silent)
+    ctx.showNotification(data.reason);
   }
 }
 

@@ -121,6 +121,8 @@ export interface MessageTypes {
   readonly RIFT_EXIT: 102;
   readonly RIFT_LEADERBOARD: 103;
   readonly RIFT_LEADERBOARD_REQ: 104;
+
+  readonly QUEST_ABANDON: 105;
 }
 
 /** All valid message type values */

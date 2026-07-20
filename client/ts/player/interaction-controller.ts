@@ -46,8 +46,11 @@ export interface InteractionControllerDeps {
   // State management
   getPreviousClickPosition: () => { x: number; y: number };
   setPreviousClickPosition: (pos: { x: number; y: number }) => void;
-  setCurrentNpcTalk: (npc: any) => void;
-  getCurrentNpcTalk: () => any;
+  // Pending NPC talks, keyed by NPC kind (the server echoes the kind in
+  // NPCTALK_RESPONSE, so responses can be attributed to the right NPC)
+  setPendingNpcTalk: (npc: any) => void;
+  getPendingNpcTalk: (npcKind: number) => any;
+  clearPendingNpcTalk: (npcKind: number) => void;
 }
 
 /**
@@ -213,8 +216,8 @@ export class InteractionController {
       this.deps.tryUnlockingAchievement('RICKROLLD');
     }
 
-    // Store current NPC for response handling
-    this.deps.setCurrentNpcTalk(npc);
+    // Register pending talk (keyed by NPC kind) for response handling
+    this.deps.setPendingNpcTalk(npc);
 
     // Show thinking indicator
     this.deps.showBubbleFor(npc, '...');
@@ -225,8 +228,8 @@ export class InteractionController {
     // Fallback: if no response in 5 seconds, use static dialogue
     const currentNpc = npc;
     setTimeout(() => {
-      if (this.deps.getCurrentNpcTalk() === currentNpc) {
-        this.deps.setCurrentNpcTalk(null);
+      if (this.deps.getPendingNpcTalk(currentNpc.kind) === currentNpc) {
+        this.deps.clearPendingNpcTalk(currentNpc.kind);
         const msg = currentNpc.talk();
         if (msg) {
           this.deps.showBubbleFor(currentNpc, msg);
@@ -261,17 +264,6 @@ export class InteractionController {
     }
 
     const entity = this.deps.getEntityAt(pos.x, pos.y);
-
-    // Visible debug: show tap position and result on screen (remove after debugging)
-    const debugEl = document.getElementById('tap-debug') || (() => {
-      const el = document.createElement('div');
-      el.id = 'tap-debug';
-      el.style.cssText = 'position:fixed;top:5px;left:5px;background:rgba(0,0,0,0.8);color:#0f0;font:12px monospace;padding:4px 8px;z-index:99999;pointer-events:none;';
-      document.body.appendChild(el);
-      return el;
-    })();
-    const playerPos = player ? `P(${player.gridX},${player.gridY})` : 'P?';
-    debugEl.textContent = `tap(${pos.x},${pos.y}) ${playerPos} ${entity ? entity.constructor.name + '#' + entity.id : 'EMPTY'}`;
 
     console.log('[Click Debug] Position:', pos.x, pos.y,
       'Entity:', entity ? entity.kind : null,

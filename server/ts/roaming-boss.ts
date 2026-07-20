@@ -10,6 +10,7 @@
  */
 
 import { Mob } from './mob';
+import { Messages } from './message';
 import { Utils } from './utils';
 import { getServerEventBus } from '../../shared/ts/events/index';
 import {
@@ -32,6 +33,7 @@ interface BossWorld {
   addMob(mob: Mob): void;
   handleMobHate(mobId: number, playerId: number, hate: number): void;
   pushToPlayer(player: PlayerLike, message: unknown): void;
+  onMobMoveCallback(mob: Mob): void;
 }
 
 // Minimal Player interface for proximity detection
@@ -47,6 +49,9 @@ interface PlayerLike {
 export class RoamingBoss extends Mob {
   // Config reference
   config: ZoneBossConfig;
+
+  // Boss identifier for legendary drop gating (world.getDroppedItem checks mob.bossId)
+  bossId: string;
 
   // Behavior intervals
   roamInterval: NodeJS.Timeout | null = null;
@@ -69,6 +74,9 @@ export class RoamingBoss extends Mob {
 
     this.config = config;
 
+    // Expose the config id as bossId so legendary drops can gate on it
+    this.bossId = config.id;
+
     // Load zone boundaries
     const zone = ZONE_DATA[config.zoneId];
     if (zone) {
@@ -79,6 +87,12 @@ export class RoamingBoss extends Mob {
     this.maxHitPoints = config.hp;
     this.hitPoints = config.hp;
     this.baseMaxHp = config.hp;
+
+    // Fight and pay as the boss, not the base sprite kind: combat and
+    // reward paths read weaponLevel/armorLevel/level off the mob.
+    this.weaponLevel = config.damage;
+    this.armorLevel = config.armor;
+    this.level = zone?.maxLevel ?? this.level;
 
     // Override aggro range from config
     this.aggroRange = config.aggroRange;
@@ -419,6 +433,9 @@ export class ZoneBossManager {
     const boss = new RoamingBoss(bossId, config, pos.x, pos.y);
 
     boss.setWorld(this.world);
+    // Broadcast movement to clients (same wiring as MobArea/SpawnManager) —
+    // without this the server roams the boss but clients see it frozen.
+    boss.onMove(this.world.onMobMoveCallback.bind(this.world));
     boss.startBehavior();
 
     // Register with world
@@ -530,7 +547,6 @@ export class ZoneBossManager {
    * Announce boss spawn to all players
    */
   private announceSpawn(boss: RoamingBoss) {
-    const { Messages } = require('./message');
     const message = new Messages.WorldEvent(
       boss.config.spawnTitle,
       boss.config.spawnMessage,
@@ -547,7 +563,6 @@ export class ZoneBossManager {
    * Announce boss kill to all players
    */
   private announceBossKill(bossName: string, killerName: string) {
-    const { Messages } = require('./message');
     const message = new Messages.BossKill(bossName, killerName);
 
     // Broadcast to all players

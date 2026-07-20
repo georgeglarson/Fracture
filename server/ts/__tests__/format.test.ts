@@ -90,6 +90,12 @@ describe('FormatChecker', () => {
     it('should define formats for progression system', () => {
       expect(checker.formats[Types.Messages.ASCEND_REQUEST]).toEqual([]);
     });
+
+    it('should define formats for fracture rift system', () => {
+      expect(checker.formats[Types.Messages.RIFT_ENTER]).toEqual([]);
+      expect(checker.formats[Types.Messages.RIFT_EXIT]).toEqual([]);
+      expect(checker.formats[Types.Messages.RIFT_LEADERBOARD_REQ]).toEqual([]);
+    });
   });
 
   describe('check - valid messages', () => {
@@ -209,6 +215,12 @@ describe('FormatChecker', () => {
     it('should accept a valid ASCEND_REQUEST message (no params)', () => {
       expect(checker.check([Types.Messages.ASCEND_REQUEST])).toBe(true);
     });
+
+    it('should accept valid rift messages (no params)', () => {
+      expect(checker.check([Types.Messages.RIFT_ENTER])).toBe(true);
+      expect(checker.check([Types.Messages.RIFT_EXIT])).toBe(true);
+      expect(checker.check([Types.Messages.RIFT_LEADERBOARD_REQ])).toBe(true);
+    });
   });
 
   describe('check - invalid parameter counts', () => {
@@ -266,6 +278,12 @@ describe('FormatChecker', () => {
 
     it('should reject ASCEND_REQUEST with unexpected params', () => {
       expect(checker.check([Types.Messages.ASCEND_REQUEST, 1])).toBe(false);
+    });
+
+    it('should reject rift messages with unexpected params', () => {
+      expect(checker.check([Types.Messages.RIFT_ENTER, 1])).toBe(false);
+      expect(checker.check([Types.Messages.RIFT_EXIT, 'x'])).toBe(false);
+      expect(checker.check([Types.Messages.RIFT_LEADERBOARD_REQ, 10])).toBe(false);
     });
   });
 

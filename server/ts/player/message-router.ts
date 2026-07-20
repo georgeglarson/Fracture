@@ -121,6 +121,8 @@ export function createMessageHandlers(
           player.broadcast(new Messages.Move(player));
           player.moveCallback(player.x, player.y);
           player.checkZoneChange(x, y);
+          // Keep party state (shared-XP range checks, party UI) on live positions
+          player.updatePartyPosition();
         }
       }
     }
@@ -232,6 +234,14 @@ export function createMessageHandlers(
     requiresAlive: true,
     handler: async (player, msg) => {
       await VeniceHandler.handleRequestQuest(player, msg[1]);
+    }
+  });
+
+  // QUEST_ABANDON - Abandon the active quest
+  handlers.set(Types.Messages.QUEST_ABANDON, {
+    requiresAlive: true,
+    handler: (player) => {
+      VeniceHandler.handleAbandonQuest(player);
     }
   });
 

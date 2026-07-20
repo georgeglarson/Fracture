@@ -715,6 +715,12 @@ export class AIPlayer extends Character {
     this.attackers = {};
     this.lastDamageFromAttacker.clear();
 
+    // Re-register with the world — die() removed the bot from the entity
+    // registry, and without this it respawns as an invisible ghost that
+    // players cannot see or target (mirrors AIPlayerManager.spawnAIPlayer).
+    this.world.addEntity(this);
+    this.world.players[this.id] = this;
+
     // Re-add to world
     this.world.handleEntityGroupMembership(this);
 

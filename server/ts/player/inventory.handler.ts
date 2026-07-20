@@ -289,8 +289,14 @@ export function handleInventoryDrop(ctx: InventoryPlayerContext, slotIndex: numb
     log.debug({ player: ctx.name, itemKind: Types.getKindAsString(kind), x: ctx.x, y: ctx.y }, 'Dropped item');
   }
 
-  // Send inventory remove
-  ctx.send([Types.Messages.INVENTORY_REMOVE, slotIndex]);
+  // Stackable with a remainder keeps the slot — send the new count instead
+  // of removing the slot client-side (mirrors handleInventoryUse)
+  const updatedSlot = inventory.getSlot(slotIndex);
+  if (updatedSlot) {
+    ctx.send([Types.Messages.INVENTORY_UPDATE, slotIndex, updatedSlot.count]);
+  } else {
+    ctx.send([Types.Messages.INVENTORY_REMOVE, slotIndex]);
+  }
 }
 
 /**
@@ -346,8 +352,10 @@ export function handleUnequipToInventory(ctx: InventoryPlayerContext, slot: stri
     return;
   }
 
-  // Add to inventory
-  const slotIndex = inventory.addItem(currentKind, null, 1);
+  // Add to inventory — WITH the equipped item's properties (enchantments,
+  // rarity) so unequipping doesn't silently strip them
+  const currentProperties = ctx.getEquipment().getProperties(slot);
+  const slotIndex = inventory.addItem(currentKind, currentProperties, 1);
   if (slotIndex === -1) {
     log.debug({ player: ctx.name, slot }, 'Failed to add to inventory (race condition?)');
     ctx.send([Types.Messages.CHAT, 'Inventory full! Drop or sell items first.']);
@@ -365,13 +373,15 @@ export function handleUnequipToInventory(ctx: InventoryPlayerContext, slot: stri
 
   // Broadcast equipment change
   ctx.broadcast(ctx.equip(defaultKind));
+  // Also send directly to self (broadcast may not reach self reliably)
+  ctx.send(ctx.equip(defaultKind).serialize());
 
   // Send inventory add message
   ctx.send([
     Types.Messages.INVENTORY_ADD,
     slotIndex,
     currentKind,
-    null,
+    currentProperties ? serializeProperties(currentProperties) : null,
     1
   ]);
 

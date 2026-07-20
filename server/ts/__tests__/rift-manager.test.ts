@@ -735,4 +735,22 @@ describe('RiftManager', () => {
       expect(a).toBe(b);
     });
   });
+
+  describe('freeSpawnSlotForMob', () => {
+    it('removes the mob from the owning run without progress credit', () => {
+      mgr.startRun(PLAYER_ID, PLAYER_NAME, 10);
+      mgr.registerSpawnedMob(PLAYER_ID, 6000001);
+      expect(mgr.isRiftMob(PLAYER_ID, 6000001)).toBe(true);
+
+      expect(mgr.freeSpawnSlotForMob(6000001)).toBe(true);
+
+      expect(mgr.isRiftMob(PLAYER_ID, 6000001)).toBe(false);
+      expect(mgr.getActiveRun(PLAYER_ID)?.killCount).toBe(0); // no credit
+    });
+
+    it('returns false for mobs no run owns', () => {
+      mgr.startRun(PLAYER_ID, PLAYER_NAME, 10);
+      expect(mgr.freeSpawnSlotForMob(999999)).toBe(false);
+    });
+  });
 });

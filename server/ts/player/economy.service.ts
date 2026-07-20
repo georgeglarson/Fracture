@@ -60,7 +60,10 @@ export class EconomyService {
 
     const isWeapon = Types.isWeapon(itemKind);
     const isArmor = Types.isArmor(itemKind);
-    const isConsumable = Types.isHealingItem(itemKind);
+    // Expendables (flask, burger, cake, firepotion) all go to inventory like
+    // other consumables — isHealingItem alone misses CAKE and FIREPOTION,
+    // which then fell through with no item granted for the gold spent.
+    const isConsumable = Types.isExpendableItem(itemKind);
     const healAmount = isConsumable ? this.getConsumableHealAmount(itemKind) : 0;
 
     if (shopResult.success) {

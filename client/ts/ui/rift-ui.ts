@@ -9,6 +9,20 @@
 
 import { RiftModifier } from '../../../shared/ts/rifts/rift-data';
 
+/**
+ * Escape user/server-supplied strings before innerHTML interpolation.
+ * Leaderboard player names are user-controlled; modifier text comes from the
+ * static MODIFIERS table but gets the same treatment (Sourcery XSS finding).
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 interface ModifierInfo {
   id: string;
   name: string;
@@ -37,6 +51,12 @@ export class RiftUI {
   private container: HTMLDivElement | null = null;
   private hudElement: HTMLDivElement | null = null;
   private leaderboardElement: HTMLDivElement | null = null;
+  private menuElement: HTMLDivElement | null = null;
+  private callbacks: {
+    onEnter?: () => void;
+    onExit?: () => void;
+    onLeaderboard?: () => void;
+  } = {};
   private state: RiftState = {
     active: false,
     runId: '',
@@ -101,7 +121,133 @@ export class RiftUI {
     `;
     this.container.appendChild(this.leaderboardElement);
 
+    // Create menu panel (entry point — opened via the status bar rift button)
+    this.menuElement = document.createElement('div');
+    this.menuElement.id = 'rift-menu';
+    this.menuElement.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(20,0,40,0.95) 100%);
+      border: 2px solid #a020f0;
+      border-radius: 8px;
+      padding: 20px;
+      color: #fff;
+      font-family: 'GraphicPixel', monospace;
+      font-size: 12px;
+      z-index: 600;
+      display: none;
+      min-width: 320px;
+      text-align: center;
+      box-shadow: 0 0 30px rgba(160, 32, 240, 0.6);
+    `;
+    this.container.appendChild(this.menuElement);
+
     document.body.appendChild(this.container);
+  }
+
+  /**
+   * Wire the menu buttons to game actions (enter/exit/leaderboard)
+   */
+  setCallbacks(callbacks: { onEnter?: () => void; onExit?: () => void; onLeaderboard?: () => void }): void {
+    this.callbacks = callbacks;
+  }
+
+  /**
+   * Toggle the rift menu panel
+   */
+  toggleMenu(): void {
+    if (this.menuElement && this.menuElement.style.display === 'block') {
+      this.hideMenu();
+    } else {
+      this.showMenu();
+    }
+  }
+
+  /**
+   * Show the rift menu
+   */
+  showMenu(): void {
+    if (!this.menuElement) return;
+
+    const buttonStyle = `
+      display: block;
+      width: 100%;
+      margin-top: 10px;
+      background: #a020f0;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 24px;
+      color: #fff;
+      font-family: 'GraphicPixel', monospace;
+      cursor: pointer;
+    `;
+
+    let html = `
+      <div style="margin-bottom: 8px;">
+        <span style="color: #a020f0; font-size: 18px; font-weight: bold;">
+          FRACTURE RIFT
+        </span>
+      </div>
+      <div style="color: #888; margin-bottom: 8px;">
+        Endless escalating depths. How deep can you go?
+      </div>
+    `;
+
+    if (this.state.active) {
+      html += `<button id="rift-menu-exit" style="${buttonStyle}">Exit Rift (Depth ${this.state.depth})</button>`;
+    } else {
+      html += `<button id="rift-menu-enter" style="${buttonStyle}">Enter the Rift</button>`;
+    }
+
+    html += `<button id="rift-menu-leaderboard" style="${buttonStyle}">Leaderboard</button>`;
+    html += `<button id="rift-menu-close" style="${buttonStyle} background: #444;">Close</button>`;
+
+    this.menuElement.innerHTML = html;
+    this.menuElement.style.display = 'block';
+
+    const enterBtn = document.getElementById('rift-menu-enter');
+    if (enterBtn) {
+      enterBtn.onclick = () => {
+        this.hideMenu();
+        this.callbacks.onEnter?.();
+      };
+    }
+    const exitBtn = document.getElementById('rift-menu-exit');
+    if (exitBtn) {
+      exitBtn.onclick = () => {
+        this.hideMenu();
+        this.callbacks.onExit?.();
+      };
+    }
+    const leaderboardBtn = document.getElementById('rift-menu-leaderboard');
+    if (leaderboardBtn) {
+      leaderboardBtn.onclick = () => {
+        this.hideMenu();
+        this.callbacks.onLeaderboard?.();
+      };
+    }
+    const closeBtn = document.getElementById('rift-menu-close');
+    if (closeBtn) {
+      closeBtn.onclick = () => this.hideMenu();
+    }
+  }
+
+  /**
+   * Hide the rift menu
+   */
+  hideMenu(): void {
+    if (this.menuElement) {
+      this.menuElement.style.display = 'none';
+    }
+  }
+
+  /**
+   * Check if the rift menu is open
+   */
+  isMenuOpen(): boolean {
+    return this.menuElement?.style.display === 'block';
   }
 
   /**
@@ -208,7 +354,7 @@ export class RiftUI {
               margin: 2px;
               font-size: 10px;
               color: ${m.color};
-            " title="${m.description}">${m.name}</span>
+            " title="${escapeHtml(m.description)}">${escapeHtml(m.name)}</span>
           `).join('')}
         </div>
       `;
@@ -317,7 +463,7 @@ export class RiftUI {
       html += `
         <tr style="border-bottom: 1px solid #333;">
           <td style="padding: 8px; color: ${rankColor};">#${entry.rank}</td>
-          <td style="padding: 8px;">${entry.playerName}</td>
+          <td style="padding: 8px;">${escapeHtml(entry.playerName)}</td>
           <td style="padding: 8px; text-align: right; color: #ff8800;">${entry.maxDepth}</td>
           <td style="padding: 8px; text-align: right; color: #44ff44;">${entry.totalKills}</td>
         </tr>
@@ -368,6 +514,24 @@ export class RiftUI {
     if (this.leaderboardElement) {
       this.leaderboardElement.style.display = 'none';
     }
+  }
+
+  /**
+   * Any closable rift panel open (menu or leaderboard)? ESC closes panels
+   * before it exits the run — a player closing an overlay must not
+   * accidentally end their run (panel review finding).
+   */
+  hasOpenPanel(): boolean {
+    return this.isMenuOpen() ||
+      (this.leaderboardElement?.style.display === 'block');
+  }
+
+  /**
+   * Close every closable rift panel
+   */
+  closePanels(): void {
+    this.hideMenu();
+    this.hideLeaderboard();
   }
 
   /**

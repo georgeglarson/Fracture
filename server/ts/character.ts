@@ -1,6 +1,7 @@
 import {Entity} from './entity';
 import {Utils, normalizeId} from './utils';
 import {Messages} from './message';
+import {getAscensionHpMultiplier} from './player/progression.handler.js';
 import { createModuleLogger } from './utils/logger.js';
 
 const log = createModuleLogger('Character');
@@ -43,6 +44,12 @@ export abstract class Character extends Entity {
   }
 
   resetHitPoints(maxHitPoints: number): void {
+    // Ascension HP bonus (+5% per ascension, advertised via PROGRESSION_INIT).
+    // Only players carry ascensionCount; mobs leave it undefined and are unaffected.
+    const ascensionCount = (this as { ascensionCount?: number }).ascensionCount;
+    if (ascensionCount) {
+      maxHitPoints = Math.floor(maxHitPoints * getAscensionHpMultiplier(ascensionCount));
+    }
     this.maxHitPoints = maxHitPoints;
     this.hitPoints = this.maxHitPoints;
   }

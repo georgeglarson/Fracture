@@ -221,6 +221,8 @@ function createMockContext(
 
     checkZoneChange: vi.fn(),
     updatePosition: vi.fn(),
+    updatePartyPosition: vi.fn(),
+    updatePartyHp: vi.fn(),
 
     initProgressionSystem: vi.fn(),
     handleAscendRequest: vi.fn(),
@@ -570,6 +572,54 @@ describe('MessageRouter', () => {
       // Move within MAX_MOVE_DISTANCE (3 tiles) of player position (50,50)
       await router.route(ctx, [Msg.MOVE, 51, 52]);
       expect(ctx.checkZoneChange).toHaveBeenCalledWith(51, 52);
+    });
+
+    it('should update party position after a successful move', async () => {
+      await router.route(ctx, [Msg.MOVE, 51, 52]);
+
+      expect(ctx.updatePartyPosition).toHaveBeenCalled();
+    });
+
+    it('should not update party position when the move is rejected', async () => {
+      mockWorld.isValidPosition = vi.fn(() => false);
+
+      await router.route(ctx, [Msg.MOVE, -1, -1]);
+
+      expect(ctx.updatePartyPosition).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
+  // QUEST_ABANDON handler
+  // =========================================================================
+
+  describe('QUEST_ABANDON handler', () => {
+    const QUEST_ABANDON = 105; // Types.Messages.QUEST_ABANDON
+    const QUEST_STATUS = 31;   // Types.Messages.QUEST_STATUS
+
+    it('has a handler registered for QUEST_ABANDON', () => {
+      expect(router.hasHandler(QUEST_ABANDON)).toBe(true);
+    });
+
+    it('clears the active quest server-side and confirms with QUEST_STATUS(null)', async () => {
+      // Give the player an active quest through the static quest service
+      const { getStaticServices } = await import('../ai/static-services');
+      const quests = getStaticServices().quests;
+      await quests.generateQuest(ctx.id.toString(), 'guard');
+      expect(quests.hasActiveQuest(ctx.id.toString())).toBe(true);
+
+      const result = await router.route(ctx, [QUEST_ABANDON]);
+
+      expect(result).toBe(true);
+      expect(quests.hasActiveQuest(ctx.id.toString())).toBe(false);
+      expect(ctx.send).toHaveBeenCalledWith([QUEST_STATUS, null]);
+    });
+
+    it('confirms with QUEST_STATUS(null) even with no active quest', async () => {
+      const result = await router.route(ctx, [QUEST_ABANDON]);
+
+      expect(result).toBe(true);
+      expect(ctx.send).toHaveBeenCalledWith([QUEST_STATUS, null]);
     });
   });
 

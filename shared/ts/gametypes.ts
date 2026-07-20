@@ -133,7 +133,9 @@ const Messages = {
   RIFT_END: 101,           // Server -> Client: Run ended (death/exit/complete)
   RIFT_EXIT: 102,          // Client -> Server: Leave rift early
   RIFT_LEADERBOARD: 103,   // Server -> Client: Leaderboard data
-  RIFT_LEADERBOARD_REQ: 104 // Client -> Server: Request leaderboard
+  RIFT_LEADERBOARD_REQ: 104, // Client -> Server: Request leaderboard
+
+  QUEST_ABANDON: 105        // Client -> Server: Abandon the active quest
 } as const;
 
 // ============================================================================

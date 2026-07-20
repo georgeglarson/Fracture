@@ -12,6 +12,9 @@ import { getServerEventBus } from '../../../shared/ts/events/index.js';
 import { PartyService } from '../party/index.js';
 import { getKillStreakService } from './kill-streak.service.js';
 import { getCombatTracker } from './combat-tracker.js';
+import { nemesisService } from './nemesis.service.js';
+import { getZoneManager } from '../zones/zone-manager.js';
+import { riftManager } from '../rifts/rift-manager.js';
 import { LOW_HEALTH_THRESHOLD } from './combat-constants.js';
 import { createModuleLogger } from '../utils/logger.js';
 
@@ -55,7 +58,11 @@ export interface Entity {
   grantXP?(amount: number): void;  // For progression system
   grantGold?(amount: number): void;  // For economy system
   checkKillAchievements?(mobKind: number): void;  // For achievement system
+  handleRiftKill?(mobId: number): void;  // Fracture Rift progress (Player only)
+  handleRiftDeath?(): void;  // Fracture Rift run end on death (Player only)
   isPhased?(): boolean;  // Phase shift immunity check
+  updatePartyHp?(): void;  // Party HP bar sync (Player only)
+  getLootMultipliers?(): { xp: number; gold: number; dropBonus: number };  // RoamingBoss loot scaling
 }
 
 export interface Message {
@@ -205,6 +212,9 @@ export class CombatSystem {
         this.world.pushToPlayer(entity, entity.health());
       }
 
+      // Keep party HP bars in sync when a member takes damage
+      entity.updatePartyHp?.();
+
       // Low-health companion hook — fires once per crossing below the
       // threshold (skipped on the killing blow — the death hook covers that)
       const healthPct = entity.maxHitPoints ? entity.hitPoints / entity.maxHitPoints : 1;
@@ -288,6 +298,12 @@ export class CombatSystem {
         attacker.checkKillAchievements(mob.kind);
       }
 
+      // Fracture Rift: counts only if the mob belongs to the attacker's run
+      attacker.handleRiftKill?.(mob.id as number);
+      // Killed by a non-owner (party member / another player): no progress
+      // credit, but free the owning run's spawn slot so it can't stall
+      riftManager.freeSpawnSlotForMob(mob.id as number);
+
       // Record world event for Town Crier (static news service in no-AI mode)
       const newsSink = getVeniceService() ?? getStaticServices().news;
       if (mobType) {
@@ -339,6 +355,9 @@ export class CombatSystem {
     player.handleDeath?.(killerType).catch((err) => {
       log.error({ err, playerName: player.name }, 'handleDeath hook failed');
     });
+
+    // Fracture Rift: dying ends the run (partial rewards, leaderboard entry)
+    player.handleRiftDeath?.();
 
     // Emit player:died event
     const eventBus = getServerEventBus();
@@ -398,6 +417,14 @@ export class CombatSystem {
    * Party members within 15 tiles get a share of XP with a bonus per member
    * @param xpMultiplier - Streak bonus multiplier for XP (default 1.0)
    * @param goldMultiplier - Streak bonus multiplier for gold (default 1.0)
+   *
+   * On top of the streak multipliers this applies:
+   * - Nemesis revenge multipliers when the mob was the attacker's nemesis
+   * - RoamingBoss loot multipliers (bosses pay as their config, not sprite)
+   * - Zone XP/gold bonuses from the mob's position (advertised via ZONE_INFO)
+   *
+   * XP is scaled per recipient: each party member's share uses their OWN
+   * level for the gray-mob modifier (Formulas.xpLevelModifier).
    */
   private distributePartyRewards(attacker: Entity, mob: Entity, xpMultiplier: number = 1.0, goldMultiplier: number = 1.0): void {
     const partyService = PartyService.getInstance();
@@ -405,9 +432,31 @@ export class CombatSystem {
     const attackerX = attacker.x ?? 0;
     const attackerY = attacker.y ?? 0;
 
-    // Apply streak multipliers to base rewards
-    const baseXp = Math.floor(Formulas.xpFromMob(mob.level!) * xpMultiplier);
-    const baseGold = Math.floor(Formulas.goldFromMob(mob.armorLevel!) * goldMultiplier);
+    // Nemesis revenge bonus: extra XP/gold for killing YOUR nemesis
+    const revenge = nemesisService.getRevengeMultipliers(attackerId, mob.id as number);
+
+    // Zone-boss loot multipliers (RoamingBoss instances only)
+    const loot = mob.getLootMultipliers?.();
+
+    // Zone XP/gold bonuses from the mob's position
+    const zoneManager = getZoneManager();
+    const zone = zoneManager.getZoneAt(mob.x ?? 0, mob.y ?? 0);
+
+    const totalXpMultiplier = xpMultiplier * revenge.xp * (loot?.xp ?? 1);
+    const totalGoldMultiplier = goldMultiplier * revenge.gold * (loot?.gold ?? 1);
+
+    // Apply multipliers to base rewards, then the zone bonus
+    const baseGold = zoneManager.applyGoldBonus(
+      Math.floor(Formulas.goldFromMob(mob.armorLevel!) * totalGoldMultiplier),
+      zone
+    );
+
+    // Per-player XP: each recipient's own level drives the gray-mob modifier
+    const xpForLevel = (playerLevel: number): number =>
+      zoneManager.applyXpBonus(
+        Math.floor(Formulas.xpFromMob(mob.level!, playerLevel) * totalXpMultiplier),
+        zone
+      );
 
     // Check if attacker is in a party
     if (partyService.isInParty(attackerId)) {
@@ -422,16 +471,15 @@ export class CombatSystem {
       if (participants.length > 1) {
         // Calculate party bonus based on participants only
         const xpBonus = partyService.calculatePartyXpBonus(participants.length);
-        const totalXp = Math.floor(baseXp * xpBonus);
-        const xpPerMember = Math.floor(totalXp / participants.length);
 
-        log.info({ memberCount: participants.length, totalXp, baseXp, xpBonus: xpBonus.toFixed(2), xpPerMember }, 'Party XP sharing');
+        log.info({ memberCount: participants.length, xpBonus: xpBonus.toFixed(2), zoneId: zone?.id }, 'Party XP sharing');
 
-        // Distribute XP to participating party members
+        // Distribute XP to participating party members (each scaled by their own level)
         for (const memberId of participants) {
           const member = this.world.getEntityById(memberId);
           if (member && member.grantXP) {
-            member.grantXP(xpPerMember);
+            const memberXp = Math.floor((xpForLevel(member.level ?? 1) * xpBonus) / participants.length);
+            member.grantXP(memberXp);
           }
         }
 
@@ -445,7 +493,7 @@ export class CombatSystem {
 
     // No party or solo - give full rewards to attacker
     if (attacker.grantXP) {
-      attacker.grantXP(baseXp);
+      attacker.grantXP(xpForLevel(attacker.level ?? 1));
     }
     if (attacker.grantGold) {
       attacker.grantGold(baseGold);

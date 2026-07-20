@@ -34,6 +34,7 @@ describe('QuestController', () => {
   beforeEach(() => {
     mockDeps = {
       sendRequestQuest: vi.fn(),
+      sendQuestAbandon: vi.fn(),
       showNotification: vi.fn(),
       showNarratorText: vi.fn(),
       playSound: vi.fn(),
@@ -111,6 +112,7 @@ describe('QuestController', () => {
       // Create completely isolated test setup
       const testDeps = {
         sendRequestQuest: vi.fn(),
+        sendQuestAbandon: vi.fn(),
         showNotification: vi.fn(),
         showNarratorText: vi.fn(),
         playSound: vi.fn(),
@@ -139,6 +141,16 @@ describe('QuestController', () => {
       controller.handleQuestStatus(null);
 
       expect(controller.hasActiveQuest()).toBe(false);
+    });
+
+    it('should keep the quest active and update progress across repeated status updates', () => {
+      controller.handleQuestStatus({ progress: 1 });
+      controller.handleQuestStatus({ progress: 2 });
+      controller.handleQuestStatus({ progress: 4 });
+
+      expect(controller.hasActiveQuest()).toBe(true);
+      expect(controller.getActiveQuest()?.progress).toBe(4);
+      expect(controller.getObjectiveText()).toBe('rat: 4/5');
     });
   });
 
@@ -201,6 +213,35 @@ describe('QuestController', () => {
       controller.abandonQuest();
 
       expect(mockDeps.showNotification).toHaveBeenCalledWith('Quest abandoned');
+    });
+
+    it('should send abandon to the server', () => {
+      controller.abandonQuest();
+
+      expect(mockDeps.sendQuestAbandon).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not send abandon when there is no active quest', () => {
+      controller.abandonQuest(); // clears the quest from beforeEach
+      mockDeps.sendQuestAbandon.mockClear();
+
+      controller.abandonQuest();
+
+      expect(mockDeps.sendQuestAbandon).not.toHaveBeenCalled();
+    });
+
+    it('should tolerate the server QUEST_STATUS null reply after a local abandon', () => {
+      const listener = vi.fn();
+      controller.on(QuestEvents.QUEST_UPDATED, listener);
+
+      controller.abandonQuest();
+      controller.handleQuestStatus(null); // server reply to QUEST_ABANDON
+
+      expect(controller.hasActiveQuest()).toBe(false);
+      // One QUEST_UPDATED (from the server reply), one notification (the local one)
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(null);
+      expect(mockDeps.showNotification).toHaveBeenCalledTimes(1);
     });
 
     it('should do nothing if no active quest', () => {
