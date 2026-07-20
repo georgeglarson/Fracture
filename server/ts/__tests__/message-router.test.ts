@@ -574,6 +574,40 @@ describe('MessageRouter', () => {
   });
 
   // =========================================================================
+  // QUEST_ABANDON handler
+  // =========================================================================
+
+  describe('QUEST_ABANDON handler', () => {
+    const QUEST_ABANDON = 105; // Types.Messages.QUEST_ABANDON
+    const QUEST_STATUS = 31;   // Types.Messages.QUEST_STATUS
+
+    it('has a handler registered for QUEST_ABANDON', () => {
+      expect(router.hasHandler(QUEST_ABANDON)).toBe(true);
+    });
+
+    it('clears the active quest server-side and confirms with QUEST_STATUS(null)', async () => {
+      // Give the player an active quest through the static quest service
+      const { getStaticServices } = await import('../ai/static-services');
+      const quests = getStaticServices().quests;
+      await quests.generateQuest(ctx.id.toString(), 'guard');
+      expect(quests.hasActiveQuest(ctx.id.toString())).toBe(true);
+
+      const result = await router.route(ctx, [QUEST_ABANDON]);
+
+      expect(result).toBe(true);
+      expect(quests.hasActiveQuest(ctx.id.toString())).toBe(false);
+      expect(ctx.send).toHaveBeenCalledWith([QUEST_STATUS, null]);
+    });
+
+    it('confirms with QUEST_STATUS(null) even with no active quest', async () => {
+      const result = await router.route(ctx, [QUEST_ABANDON]);
+
+      expect(result).toBe(true);
+      expect(ctx.send).toHaveBeenCalledWith([QUEST_STATUS, null]);
+    });
+  });
+
+  // =========================================================================
   // CHAT handler
   // =========================================================================
 

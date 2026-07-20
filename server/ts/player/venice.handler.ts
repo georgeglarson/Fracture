@@ -11,17 +11,104 @@ import { getVeniceService, getFishAudioService } from '../ai';
 import { getStaticServices } from '../ai/static-services';
 import { isMerchant, getShopInventory } from '../shop/shop.service';
 import { shopService } from '../shop/shop.service';
+import type { Quest, QuestResult } from '../ai/types';
 import { createModuleLogger } from '../utils/logger.js';
 
 const log = createModuleLogger('Venice');
 
 /**
+ * Minimal shape of a world item entity (what Messages.Spawn needs).
+ */
+interface SpawnableItem {
+  getState(): unknown[];
+}
+
+/**
  * Player interface for Venice handler
+ *
+ * The optional gameplay surface is present when ctx is a full Player
+ * (handleKill/handleAreaChange pass the Player itself); lean test mocks
+ * only implement id/name/send.
  */
 export interface VenicePlayerContext {
   id: number;
   name: string;
   send: (message: any) => void;
+
+  // Optional gameplay surface (quest rewards, reward drop on full inventory)
+  x?: number;
+  y?: number;
+  broadcast?: (message: { serialize(): unknown[] }, ignoreSelf?: boolean) => void;
+  grantXP?: (amount: number) => void;
+  getInventory?: () => {
+    hasRoom: (kind: number) => boolean;
+    addItem: (kind: number, properties: unknown, count: number) => number;
+    getSlot: (slotIndex: number) => { count: number } | null;
+  };
+  getWorld?: () => {
+    createItemWithProperties: (kind: number, x: number, y: number, properties?: unknown) => SpawnableItem | null | undefined;
+    addItem: (item: SpawnableItem) => void;
+  };
+}
+
+/**
+ * Minimal quest-service surface needed here (static QuestService and the
+ * VeniceService facade both satisfy it).
+ */
+interface QuestServiceLike {
+  getQuestStatus: (playerId: string) => Quest | null;
+}
+
+/**
+ * Send the quest's current progress to the client so its tracker stays in
+ * sync. Only sends when the event actually applies to the active quest
+ * (checkQuestProgress returns null until completion, so progress must be
+ * read back from the service).
+ */
+function sendQuestProgress(ctx: VenicePlayerContext, quests: QuestServiceLike, type: string, target: string): void {
+  const quest = quests.getQuestStatus(ctx.id.toString());
+  if (quest && quest.type === type && quest.target.toLowerCase() === target.toLowerCase()) {
+    ctx.send(new Messages.QuestStatus(quest).serialize());
+  }
+}
+
+/**
+ * Grant quest completion rewards: XP plus the reward item.
+ * Reward strings are entity-kind names (e.g. 'burger', 'goldenarmor').
+ * The item goes to the inventory; when that is full it drops at the
+ * player's feet (mirrors the drop pattern in handleInventoryDrop).
+ */
+function grantQuestRewards(ctx: VenicePlayerContext, result: QuestResult): void {
+  if (result.xp > 0 && ctx.grantXP) {
+    ctx.grantXP(result.xp); // sends XP_GAIN (and LEVEL_UP) itself
+  }
+
+  const kind = Types.getKindFromString(result.reward);
+  if (kind === undefined) {
+    log.warn({ reward: result.reward }, 'Quest reward is not a known entity kind');
+    return;
+  }
+
+  const inventory = ctx.getInventory?.();
+  if (inventory && inventory.hasRoom(kind)) {
+    const slotIndex = inventory.addItem(kind, null, 1);
+    if (slotIndex >= 0) {
+      const slot = inventory.getSlot(slotIndex);
+      ctx.send([Types.Messages.INVENTORY_ADD, slotIndex, kind, null, slot?.count || 1]);
+      return;
+    }
+  }
+
+  // No inventory surface or inventory full — drop at the player's feet
+  const world = ctx.getWorld?.();
+  if (world && ctx.x !== undefined && ctx.y !== undefined) {
+    const item = world.createItemWithProperties(kind, ctx.x, ctx.y, null);
+    if (item) {
+      world.addItem(item);
+      ctx.broadcast?.(new Messages.Spawn(item), false);
+      log.info({ player: ctx.name, itemKind: Types.getKindAsString(kind) }, 'Quest reward dropped at player feet (inventory full)');
+    }
+  }
 }
 
 /**
@@ -110,15 +197,35 @@ export async function handleRequestQuest(ctx: VenicePlayerContext, npcKind: numb
   if (!venice) {
     const quest = await getStaticServices().quests.generateQuest(ctx.id.toString(), npcType);
     ctx.send(new Messages.QuestOffer(quest).serialize());
+    // Initialize the client tracker from the server (progress 0)
+    ctx.send(new Messages.QuestStatus(quest).serialize());
     return;
   }
 
   try {
     const quest = await venice.generateQuest(ctx.id.toString(), npcType);
     ctx.send(new Messages.QuestOffer(quest).serialize());
+    // Initialize the client tracker from the server (progress 0)
+    ctx.send(new Messages.QuestStatus(quest).serialize());
   } catch (error) {
     log.error({ err: error }, 'Venice quest generation error');
   }
+}
+
+/**
+ * Handle quest abandon request (QUEST_ABANDON)
+ *
+ * Drops the active quest server-side, then confirms with QuestStatus(null)
+ * so the client clears its tracker from the server-authoritative state.
+ */
+export function handleAbandonQuest(ctx: VenicePlayerContext): void {
+  const venice = getVeniceService();
+  // VeniceService doesn't expose abandonQuest on its facade — reach the
+  // quest sub-service (same class the static singleton uses).
+  const quests = venice ? venice.getServices().quests : getStaticServices().quests;
+  const abandoned = quests.abandonQuest(ctx.id.toString());
+  log.debug({ player: ctx.name, abandoned }, 'Quest abandon requested');
+  ctx.send(new Messages.QuestStatus(null).serialize());
 }
 
 /**
@@ -135,6 +242,9 @@ export function handleKill(ctx: VenicePlayerContext, mobType: string, triggerNar
     const result = quests.checkQuestProgress(ctx.id.toString(), 'kill', mobType);
     if (result && result.completed) {
       ctx.send(new Messages.QuestComplete(result).serialize());
+      grantQuestRewards(ctx, result);
+    } else {
+      sendQuestProgress(ctx, quests, 'kill', mobType);
     }
     return;
   }
@@ -145,6 +255,9 @@ export function handleKill(ctx: VenicePlayerContext, mobType: string, triggerNar
   const result = venice.recordKill(ctx.id.toString(), mobType);
   if (result && result.completed) {
     ctx.send(new Messages.QuestComplete(result).serialize());
+    grantQuestRewards(ctx, result);
+  } else {
+    sendQuestProgress(ctx, venice, 'kill', mobType);
   }
 
   const newKills = profile.totalKills;
@@ -179,6 +292,9 @@ export async function handleAreaChange(ctx: VenicePlayerContext, area: string, t
       : null;
     if (result && result.completed) {
       ctx.send(new Messages.QuestComplete(result).serialize());
+      grantQuestRewards(ctx, result);
+    } else {
+      sendQuestProgress(ctx, quests, 'explore', area);
     }
     const hint = await companion.getCompanionHint(ctx.id.toString(), 'newArea', { area });
     if (hint) {
@@ -193,6 +309,9 @@ export async function handleAreaChange(ctx: VenicePlayerContext, area: string, t
   const result = venice.recordArea(ctx.id.toString(), area);
   if (result && result.completed) {
     ctx.send(new Messages.QuestComplete(result).serialize());
+    grantQuestRewards(ctx, result);
+  } else {
+    sendQuestProgress(ctx, venice, 'explore', area);
   }
 
   // AI Narrator: Announce new area discovery

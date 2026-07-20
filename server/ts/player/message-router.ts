@@ -235,6 +235,14 @@ export function createMessageHandlers(
     }
   });
 
+  // QUEST_ABANDON - Abandon the active quest
+  handlers.set(Types.Messages.QUEST_ABANDON, {
+    requiresAlive: true,
+    handler: (player) => {
+      VeniceHandler.handleAbandonQuest(player);
+    }
+  });
+
   // NEWS_REQUEST - Newspaper request
   handlers.set(Types.Messages.NEWS_REQUEST, {
     handler: async (player) => {
