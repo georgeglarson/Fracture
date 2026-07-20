@@ -42,8 +42,9 @@ import {
   handleAreaChange,
   handleLowHealth,
   handleDeath,
+  cleanupVenice,
 } from '../player/venice.handler';
-import { getStaticServices } from '../ai/static-services';
+import { getStaticServices, resetStaticServices } from '../ai/static-services';
 
 function createCtx(id = 42) {
   return { id, name: 'Hero', send: vi.fn() };
@@ -53,6 +54,7 @@ describe('VeniceHandler no-AI mode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetVeniceService.mockReturnValue(null);
+    resetStaticServices();
   });
 
   // ── handleRequestQuest ─────────────────────────────────────────
@@ -219,6 +221,24 @@ describe('VeniceHandler no-AI mode', () => {
       const msgs = ctx.send.mock.calls.map((c) => c[0]);
       expect(msgs.some((m) => m[0] === Types.Messages.COMPANION_HINT)).toBe(true);
       expect(triggerNarration).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── disconnect cleanup (no-AI mode) ─────────────────────────────
+
+  describe('cleanupVenice (no-AI mode)', () => {
+    it('clears static per-player state on disconnect', async () => {
+      const ctx = createCtx(45);
+
+      await handleRequestQuest(ctx, Types.Entities.GUARD);
+      const statics = getStaticServices();
+      expect(statics.quests.hasActiveQuest(ctx.id.toString())).toBe(true);
+      expect(statics.profiles.getAllProfiles().has(ctx.id.toString())).toBe(true);
+
+      cleanupVenice(ctx.id.toString());
+
+      expect(statics.quests.hasActiveQuest(ctx.id.toString())).toBe(false);
+      expect(statics.profiles.getAllProfiles().has(ctx.id.toString())).toBe(false);
     });
   });
 });

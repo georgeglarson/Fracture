@@ -277,13 +277,20 @@ export async function handleDeath(ctx: VenicePlayerContext, killerType: string, 
 }
 
 /**
- * Cleanup Venice data when player disconnects
+ * Cleanup per-player AI state on disconnect.
+ * Venice mode: the VeniceService cleans its own sub-services.
+ * No-AI mode: the static singletons hold per-player state too (profiles,
+ * active quests) and must be cleaned or they grow for the process lifetime.
  */
 export function cleanupVenice(playerId: string): void {
   const venice = getVeniceService();
   if (venice) {
     venice.cleanupPlayer(playerId);
+    return;
   }
+  const statics = getStaticServices();
+  statics.profiles.cleanup(playerId);
+  statics.quests.cleanup(playerId);
 }
 
 /**

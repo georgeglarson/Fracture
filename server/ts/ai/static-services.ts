@@ -38,3 +38,8 @@ export function getStaticServices(): StaticServices {
   }
   return staticServices;
 }
+
+/** Test-only: drop the singletons so each test gets fresh static services. */
+export function resetStaticServices(): void {
+  staticServices = null;
+}
