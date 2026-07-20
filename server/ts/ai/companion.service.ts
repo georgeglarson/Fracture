@@ -17,10 +17,11 @@ export interface CompanionData {
 }
 
 export class CompanionService {
-  private client: VeniceClient;
+  // Null client = no-AI mode: static hints only, no API calls
+  private client: VeniceClient | null;
   private profiles: ProfileService;
 
-  constructor(client: VeniceClient, profiles: ProfileService) {
+  constructor(client: VeniceClient | null, profiles: ProfileService) {
     this.client = client;
     this.profiles = profiles;
   }
@@ -41,10 +42,17 @@ export class CompanionService {
     }
 
     const staticHints = triggerConfig.hints;
+    const randomStaticHint = () =>
+      staticHints[Math.floor(Math.random() * staticHints.length)];
 
-    // 70% chance to use static hint (faster, cheaper)
-    if (staticHints && Math.random() < 0.7) {
-      return staticHints[Math.floor(Math.random() * staticHints.length)];
+    // 70% chance to use a static hint (faster, cheaper); always static in no-AI mode
+    if (staticHints?.length && (Math.random() < 0.7 || !this.client)) {
+      return randomStaticHint();
+    }
+
+    // No AI client and no static hints — nothing to offer
+    if (!this.client) {
+      return null;
     }
 
     // Generate dynamic hint with context
@@ -57,9 +65,9 @@ Give a SHORT helpful hint (under 60 chars). Be encouraging but practical:`;
 
     try {
       const response = await this.client.call(prompt);
-      return response || staticHints[0];
+      return response || (staticHints?.length ? randomStaticHint() : null);
     } catch (error) {
-      return staticHints[0];
+      return staticHints?.length ? randomStaticHint() : null;
     }
   }
 

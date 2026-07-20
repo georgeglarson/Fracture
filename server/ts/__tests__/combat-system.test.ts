@@ -86,6 +86,7 @@ vi.mock('../party/index.js', () => ({
 
 import { CombatSystem, Entity, WorldContext } from '../combat/combat-system.js';
 import { Formulas } from '../formulas.js';
+import { Types } from '../../../shared/ts/gametypes.js';
 
 // ---------------------------------------------------------------------------
 // Factory helpers
@@ -704,6 +705,60 @@ describe('CombatSystem — Bug Fix & Security Tests', () => {
 
       // Should be called with 2 (participants: 1 + 2), not 3 (all nearby)
       expect(mockCalculatePartyXpBonus).toHaveBeenCalledWith(2);
+    });
+  });
+
+  // ==========================================================================
+  // AI/companion wiring: death + low-health hooks
+  // ==========================================================================
+
+  describe('player AI hooks', () => {
+    let combatSystem: CombatSystem;
+    let world: WorldContext;
+
+    beforeEach(() => {
+      world = createMockWorld();
+      combatSystem = new CombatSystem(world);
+    });
+
+    it('calls handleDeath with the killer type when a player dies', () => {
+      const handleDeath = vi.fn().mockResolvedValue(undefined);
+      const player = createMockPlayer({ hitPoints: 0, handleDeath });
+      const mob = createMockEntity({ id: 2 });
+      // Distinguish the argument path from the shared mock's default
+      vi.mocked(Types.getKindAsString).mockReturnValueOnce('skeleton');
+
+      combatSystem.handleHurtEntity(player, mob, 50);
+
+      expect(handleDeath).toHaveBeenCalledTimes(1);
+      expect(handleDeath).toHaveBeenCalledWith('skeleton');
+    });
+
+    it('fires handleLowHealth once per crossing below 30%', () => {
+      const handleLowHealth = vi.fn().mockResolvedValue(undefined);
+      const player = createMockPlayer({ hitPoints: 25, maxHitPoints: 100, handleLowHealth });
+      const mob = createMockEntity({ id: 2 });
+
+      combatSystem.handleHurtEntity(player, mob, 5);
+      expect(handleLowHealth).toHaveBeenCalledTimes(1);
+      expect(handleLowHealth).toHaveBeenCalledWith(0.25);
+
+      combatSystem.handleHurtEntity(player, mob, 5); // still below 30%
+      expect(handleLowHealth).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-arms the low-health hook after recovering above 30%', () => {
+      const handleLowHealth = vi.fn().mockResolvedValue(undefined);
+      const player = createMockPlayer({ hitPoints: 25, maxHitPoints: 100, handleLowHealth });
+      const mob = createMockEntity({ id: 2 });
+
+      combatSystem.handleHurtEntity(player, mob, 5); // fires at 25%
+      player.hitPoints = 80;
+      combatSystem.handleHurtEntity(player, mob, 5); // 75% — clears the flag
+      player.hitPoints = 20;
+      combatSystem.handleHurtEntity(player, mob, 5); // 15% — fires again
+
+      expect(handleLowHealth).toHaveBeenCalledTimes(2);
     });
   });
 });

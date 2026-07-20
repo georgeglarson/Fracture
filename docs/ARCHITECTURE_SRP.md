@@ -167,12 +167,8 @@
 | AIPlayer | server/ai/aiplayer.ts | Autonomous NPCs (Westworld) |
 | AIPlayerManager | server/ai/aiplayer.ts | AI player lifecycle |
 
-### Domain 12: Metrics/Monitoring
-**Responsibility:** Server metrics, population tracking
-
-| Component | Location | Current Responsibilities |
-|-----------|----------|-------------------------|
-| Metrics | server/metrics.ts | Memcached, player counts |
+### Domain 12: Metrics/Monitoring (removed)
+**Status:** Removed in the TypeScript rewrite. `server/metrics.ts` (Memcached-backed) was never ported; the file does not exist in the current codebase. Server metrics now come from the debug tooling (`tools/debug-cli.js`, via the port 8001 debug WebSocket) and, while the observability stack ran, from the OTel/SigNoz instrumentation (retired May 2026).
 
 ---
 

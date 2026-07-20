@@ -6,7 +6,6 @@ After=network.target
 Type=simple
 WorkingDirectory=%h/Fracture
 Environment=NODE_ENV=production
-Environment=OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 ExecStart=/usr/bin/node dist/server/ts/main.js
 Restart=on-failure
 RestartSec=5

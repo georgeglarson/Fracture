@@ -104,8 +104,8 @@ function main(config: ServerConfig): void {
     log.info('Starting Fracture game server');
 
     // Initialize Venice AI service if API key is configured
-    // Priority: environment variable > config file
-    const veniceApiKey = process.env.VENICE_API_KEY || config.venice_api_key;
+    // Priority: environment variable (even empty = force off) > config file
+    const veniceApiKey = process.env.VENICE_API_KEY ?? config.venice_api_key;
     if (veniceApiKey) {
         // Log key status (masked for security)
         const maskedKey = veniceApiKey.substring(0, 4) + '...' + veniceApiKey.substring(veniceApiKey.length - 4);
@@ -124,11 +124,11 @@ function main(config: ServerConfig): void {
             log.info('IntroService initialized');
         }
     } else {
-        log.warn({ envVarSet: !!process.env.VENICE_API_KEY }, 'Venice API key not found — set VENICE_API_KEY in .env');
+        log.info('AI features disabled — running on static fallbacks (set VENICE_API_KEY to enable)');
     }
 
-    // Initialize Fish Audio TTS service if API key is configured
-    const fishAudioApiKey = process.env.FISH_AUDIO_API_KEY || config.fish_audio_api_key;
+    // Initialize Fish Audio TTS service if API key is configured (independent of Venice)
+    const fishAudioApiKey = process.env.FISH_AUDIO_API_KEY ?? config.fish_audio_api_key;
     if (fishAudioApiKey) {
         const maskedKey = fishAudioApiKey.substring(0, 4) + '...' + fishAudioApiKey.substring(fishAudioApiKey.length - 4);
         log.info({ maskedKey }, 'FishAudio API key found');

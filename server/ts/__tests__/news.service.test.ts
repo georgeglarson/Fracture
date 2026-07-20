@@ -425,4 +425,28 @@ describe('NewsService', () => {
       expect(recent).toHaveLength(2);
     });
   });
+
+  // ─── no-AI mode (null client) ──────────────────────────────
+
+  describe('no-AI mode (null client)', () => {
+    it('should generate stat-based headlines without any API call', async () => {
+      const noAiService = new NewsService(null);
+      addKillEvents(noAiService, 'Alice', 5);
+
+      const paper = await noAiService.generateNewspaper();
+
+      expect(paper.headlines.length).toBeGreaterThan(0);
+      expect(paper.headlines).toContain('🗡️ Alice leads the kill count with 5 slain!');
+      expect(paper.headlines).toContain('📊 Total monsters slain today: 5');
+    });
+
+    it('should serve the quiet-realm fallback when no events exist', async () => {
+      const noAiService = new NewsService(null);
+
+      const paper = await noAiService.generateNewspaper();
+
+      expect(paper.headlines.length).toBeGreaterThan(0);
+      expect(paper.headlines[0]).toContain('quiet');
+    });
+  });
 });

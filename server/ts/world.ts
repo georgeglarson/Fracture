@@ -7,6 +7,7 @@ import {Mob} from './mob';
 import {Utils, isMob} from './utils';
 import {Map} from './map';
 import {getVeniceService} from './ai/venice.service';
+import {getStaticServices} from './ai/static-services';
 import {AIPlayerManager} from './ai/aiplayer';
 import {MessageBroadcaster} from './messaging/message-broadcaster';
 import {CombatSystem} from './combat/combat-system';
@@ -28,7 +29,7 @@ import {Character} from './character';
 import {MobArea} from './mobarea';
 import {ChestArea} from './chestarea';
 import {evaluateAggro} from './combat/aggro-policy';
-import {getLeashDistance} from './combat/combat-constants';
+import {getLeashDistance, LOW_HEALTH_THRESHOLD} from './combat/combat-constants';
 import type {Player} from './player'; // Type-only import to avoid circular dep
 import { createModuleLogger } from './utils/logger.js';
 import { trace } from '@opentelemetry/api';
@@ -139,11 +140,9 @@ export class World {
         this.incrementPlayerCount();
       }
 
-      // Record world event for Town Crier
-      const venice = getVeniceService();
-      if (venice) {
-        venice.recordWorldEvent('join', player.name, {});
-      }
+      // Record world event for Town Crier (static news service in no-AI mode)
+      const newsSink = getVeniceService() ?? getStaticServices().news;
+      newsSink.recordWorldEvent('join', player.name, {});
 
       // Number of players in this world
       this.pushToPlayer(player, new Messages.Population(this.playerCount));
@@ -220,6 +219,13 @@ export class World {
         this.removePlayer(player);
         this.decrementPlayerCount();
 
+        // Clear per-player AI/static-service state (profiles, active quests)
+        try {
+          player.cleanupVenice();
+        } catch (e) {
+          log.error({ err: e, playerName: player.name }, 'Failed to clean up AI state on exit');
+        }
+
         if (this.removedCallback) {
           this.removedCallback();
         }
@@ -247,6 +253,13 @@ export class World {
 
           if (character.type === 'player') {
             this.pushToPlayer(character as Player, character.regen());
+
+            // Regen heals without a damage event — re-arm the low-health
+            // crossing detector once they're back above the threshold
+            const p = character as Player & { wasLowHealth?: boolean };
+            if (p.wasLowHealth && character.hitPoints / character.maxHitPoints >= LOW_HEALTH_THRESHOLD) {
+              p.wasLowHealth = false;
+            }
           }
         }
       });
@@ -255,11 +268,9 @@ export class World {
     // AI Thought Bubbles - The "Ant Farm" Feature
     this.onThoughtTick(() => {
       log.trace('Thoughts tick fired');
-      const venice = getVeniceService();
-      if (!venice) {
-        log.trace('Thoughts tick: no venice service');
-        return;
-      }
+      // Static mad-libs templates need no API — run with or without Venice.
+      // (Without a Venice client the AI thought pool simply stays empty.)
+      const thoughtSource = getVeniceService() ?? getStaticServices().thoughts;
 
       let groupsWithPlayers = 0;
       let totalEntities = 0;
@@ -298,7 +309,7 @@ export class World {
           if (!typeName) return;
 
           // Generate thought
-          const thoughtResult = venice.getEntityThought(typeName, state);
+          const thoughtResult = thoughtSource.getEntityThought(typeName, state);
           log.debug({ entityType: typeName, entityId: entity.id, thought: thoughtResult.thought }, 'Entity thought');
 
           // Broadcast to all players in adjacent groups

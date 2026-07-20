@@ -235,7 +235,8 @@ function buildSnapshot(world: any): DebugSnapshot {
 }
 
 export function startDebugServer(world: any, port = 8001): WebSocketServer {
-  wss = new WebSocketServer({ port });
+  // Localhost only — the debug TUI is a local tool; never expose on the network
+  wss = new WebSocketServer({ port, host: '127.0.0.1' });
 
   let snapshotInterval: ReturnType<typeof setInterval> | null = null;
 

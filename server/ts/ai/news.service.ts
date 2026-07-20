@@ -37,7 +37,8 @@ export interface QuickStats {
 }
 
 export class NewsService {
-  private client: VeniceClient;
+  // Null client = no-AI mode: stat-based headlines only, no API calls
+  private client: VeniceClient | null;
 
   // World events for Town Crier feature
   private worldEvents: WorldEvent[] = [];
@@ -45,7 +46,7 @@ export class NewsService {
   // Cached newspaper (regenerated periodically)
   private cachedNewspaper: NewspaperResult | null = null;
 
-  constructor(client: VeniceClient) {
+  constructor(client: VeniceClient | null) {
     this.client = client;
   }
 
@@ -87,16 +88,18 @@ export class NewsService {
     const stats = this.getWorldStats();
     const headlines: string[] = [];
 
-    // Generate AI headline for most interesting stat
-    const prompt = this.buildNewsPrompt(stats);
+    // Generate AI headline for most interesting stat (skipped in no-AI mode)
+    if (this.client) {
+      const prompt = this.buildNewsPrompt(stats);
 
-    try {
-      const aiHeadline = await this.client.call(prompt);
-      if (aiHeadline) {
-        headlines.push(aiHeadline);
+      try {
+        const aiHeadline = await this.client.call(prompt);
+        if (aiHeadline) {
+          headlines.push(aiHeadline);
+        }
+      } catch (error) {
+        log.error({ err: error }, 'Venice newspaper error');
       }
-    } catch (error) {
-      log.error({ err: error }, 'Venice newspaper error');
     }
 
     // Add stat-based headlines

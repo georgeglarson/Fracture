@@ -460,4 +460,37 @@ describe('ThoughtService', () => {
       //  but the interval should exist)
     });
   });
+
+  // =============================================================
+  // No-AI mode (null client)
+  // =============================================================
+  describe('no-AI mode (null client)', () => {
+    it('should serve static template thoughts without an API client', () => {
+      const noAi = new ThoughtService(null);
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      const result = noAi.getEntityThought('skeleton', 'idle');
+
+      // skeleton has no 'special' array, so the pick is deterministic-idle
+      expect(result.state).toBe('idle');
+      expect(['Bones rattle...']).toContain(result.thought);
+    });
+
+    it('should not schedule the AI pool refresh without an API client', () => {
+      const timersBefore = vi.getTimerCount();
+
+      new ThoughtService(null);
+
+      expect(vi.getTimerCount()).toBe(timersBefore);
+    });
+
+    it('should return the static thought from generateAIThought without an API client', async () => {
+      const noAi = new ThoughtService(null);
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      const thought = await noAi.generateAIThought('skeleton', 'idle');
+
+      expect(thought).toBe('Bones rattle...');
+    });
+  });
 });

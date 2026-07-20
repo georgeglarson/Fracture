@@ -12,13 +12,14 @@ import { createModuleLogger } from '../utils/logger.js';
 const log = createModuleLogger('QuestService');
 
 export class QuestService {
-  private client: VeniceClient;
+  // Null client = no-AI mode: quests come from templates, no API calls
+  private client: VeniceClient | null;
   private profiles: ProfileService;
 
   // Active quests: { playerId: quest }
   private activeQuests: Map<string, Quest> = new Map();
 
-  constructor(client: VeniceClient, profiles: ProfileService) {
+  constructor(client: VeniceClient | null, profiles: ProfileService) {
     this.client = client;
     this.profiles = profiles;
   }
@@ -36,8 +37,21 @@ export class QuestService {
     }
 
     // Pick a quest template based on player progress
-    const questType = profile.totalKills < 10 ? 'kill' : (Math.random() < 0.7 ? 'kill' : 'explore');
-    const templates = QUEST_TEMPLATES[questType].templates;
+    let questType: 'kill' | 'explore' = profile.totalKills < 10 ? 'kill' : (Math.random() < 0.7 ? 'kill' : 'explore');
+    let templates = QUEST_TEMPLATES[questType].templates;
+
+    // Explore quests only target unvisited areas — progress fires on first
+    // visit, so "explore X" for an already-visited X is uncompletable
+    // (cypher review finding). All areas visited → fall back to kill quests.
+    if (questType === 'explore') {
+      const unvisited = templates.filter(t => t.area && !profile.areas.includes(t.area));
+      if (unvisited.length > 0) {
+        templates = unvisited;
+      } else {
+        questType = 'kill';
+        templates = QUEST_TEMPLATES.kill.templates;
+      }
+    }
 
     // Filter to appropriate difficulty
     const suitable = templates.filter(t => {
@@ -68,19 +82,27 @@ REWARD: ${template.reward}
 
 Write a SHORT quest description (under 100 chars). Sound urgent but friendly:`;
 
+    // Template fallback must match the quest type — "Defeat 1 forest!" is
+    // what an explore quest gets otherwise (cypher review finding).
+    // Nullish (??), not ||: a 0 count or empty target must not silently
+    // substitute (panel review finding).
+    const fallbackDescription = questType === 'explore'
+      ? `Explore ${template.area ?? template.target}!`
+      : `Defeat ${template.count ?? 1} ${template.target ?? template.area}!`;
+
     let description: string;
     try {
-      description = await this.client.call(prompt) ||
-        `Defeat ${template.count || 1} ${template.target || template.area}!`;
+      description = (this.client ? await this.client.call(prompt) : null) ||
+        fallbackDescription;
     } catch (err) {
       log.debug({ err }, 'Quest description generation failed');
-      description = `Defeat ${template.count || 1} ${template.target || template.area}!`;
+      description = fallbackDescription;
     }
 
     const quest: Quest = {
-      type: questType as 'kill' | 'explore',
-      target: template.target || template.area || '',
-      count: template.count || 1,
+      type: questType,
+      target: template.target ?? template.area ?? '',
+      count: template.count ?? 1,
       progress: 0,
       reward: template.reward,
       xp: template.xp,
