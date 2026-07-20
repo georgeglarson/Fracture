@@ -585,9 +585,11 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
 
 function setupAIHandlers(game: Game, client: GameClient): void {
   client.on(ClientEvents.NPC_TALK, function (npcKind, response, audioUrl) {
-    if (game.currentNpcTalk) {
-      var npc = game.currentNpcTalk;
-      game.currentNpcTalk = null;
+    // Key the response by the NPC kind the server echoes — talking to a
+    // second NPC before the first answers no longer eats the first's line
+    var npc = game.pendingNpcTalks[npcKind];
+    if (npc) {
+      delete game.pendingNpcTalks[npcKind];
       if (response) {
         game.showBubbleFor(npc, response);
         // Play TTS audio if available, otherwise fall back to sound effect

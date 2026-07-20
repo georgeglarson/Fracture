@@ -568,8 +568,7 @@ export class Game {
       get hoveringPlateauTile() { return self.hoveringPlateauTile; },
       get previousClickPosition() { return self.previousClickPosition; },
       set previousClickPosition(val) { self.previousClickPosition = val; },
-      get currentNpcTalk() { return self.currentNpcTalk; },
-      set currentNpcTalk(val) { self.currentNpcTalk = val; }
+      get pendingNpcTalks() { return self.pendingNpcTalks; }
     };
   }
 
@@ -945,8 +944,9 @@ export class Game {
     this.questController?.requestQuest(npcKind);
   }
 
-  // Current NPC being talked to (for Venice AI response handling)
-  currentNpcTalk = null;
+  // Pending NPC talks keyed by NPC kind (for response handling — the server
+  // echoes the NPC kind in NPCTALK_RESPONSE)
+  pendingNpcTalks: { [npcKind: number]: Character } = {};
 
   // Current quest (for tracking)
   currentQuest = null;

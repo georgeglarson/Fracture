@@ -46,8 +46,11 @@ export interface InteractionControllerDeps {
   // State management
   getPreviousClickPosition: () => { x: number; y: number };
   setPreviousClickPosition: (pos: { x: number; y: number }) => void;
-  setCurrentNpcTalk: (npc: any) => void;
-  getCurrentNpcTalk: () => any;
+  // Pending NPC talks, keyed by NPC kind (the server echoes the kind in
+  // NPCTALK_RESPONSE, so responses can be attributed to the right NPC)
+  setPendingNpcTalk: (npc: any) => void;
+  getPendingNpcTalk: (npcKind: number) => any;
+  clearPendingNpcTalk: (npcKind: number) => void;
 }
 
 /**
@@ -213,8 +216,8 @@ export class InteractionController {
       this.deps.tryUnlockingAchievement('RICKROLLD');
     }
 
-    // Store current NPC for response handling
-    this.deps.setCurrentNpcTalk(npc);
+    // Register pending talk (keyed by NPC kind) for response handling
+    this.deps.setPendingNpcTalk(npc);
 
     // Show thinking indicator
     this.deps.showBubbleFor(npc, '...');
@@ -225,8 +228,8 @@ export class InteractionController {
     // Fallback: if no response in 5 seconds, use static dialogue
     const currentNpc = npc;
     setTimeout(() => {
-      if (this.deps.getCurrentNpcTalk() === currentNpc) {
-        this.deps.setCurrentNpcTalk(null);
+      if (this.deps.getPendingNpcTalk(currentNpc.kind) === currentNpc) {
+        this.deps.clearPendingNpcTalk(currentNpc.kind);
         const msg = currentNpc.talk();
         if (msg) {
           this.deps.showBubbleFor(currentNpc, msg);
