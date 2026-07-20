@@ -941,4 +941,9 @@ export class GameClient extends EventEmitter {
   sendRiftLeaderboardRequest() {
     this.sendMessage([Types.Messages.RIFT_LEADERBOARD_REQ]);
   }
+
+  // Boss leaderboard (roaming boss kills)
+  sendLeaderboardRequest() {
+    this.sendMessage([Types.Messages.LEADERBOARD_REQUEST]);
+  }
 }

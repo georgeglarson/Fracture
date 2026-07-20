@@ -1635,6 +1635,10 @@ export class Game {
     this.uiManager?.toggleNewspaper();
   }
 
+  requestBossLeaderboard() {
+    this.client.sendLeaderboardRequest();
+  }
+
   dropCurrentWeapon() {
     console.log('[Drop] dropCurrentWeapon called, player:', this.player ? this.player.getWeaponName() : 'no player');
     if (this.player && this.player.getWeaponName() !== 'sword1') {

@@ -891,6 +891,11 @@ function setupBossHandlers(game: Game, client: GameClient): void {
     GameEventHandler.handleBossKill(game, bossName, killerName);
   });
 
+  // World event announcement - show boss spawns ("The Harvester Emerges!") and other world events
+  client.on(ClientEvents.WORLD_EVENT, function (title, description, eventType) {
+    GameEventHandler.handleWorldEvent(game, title, description, eventType);
+  });
+
   // Kill streak announcement - show when player reaches a new tier
   client.on(ClientEvents.KILL_STREAK, function (playerId, playerName, streakCount, tierTitle, announcement) {
     GameEventHandler.handleKillStreak(game, playerId, playerName, streakCount, tierTitle, announcement);

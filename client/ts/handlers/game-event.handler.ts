@@ -116,6 +116,22 @@ export function handleBossKill(
 }
 
 /**
+ * Handle world event announcement (boss spawns, hordes, village events)
+ */
+export function handleWorldEvent(
+  ctx: GameEventContext,
+  title: string,
+  description: string,
+  eventType: string
+): void {
+  ctx.showNotification(title);
+  if (description && description !== title) {
+    ctx.showNotification(description);
+  }
+  console.info(`[WorldEvent] ${eventType}: ${title}`);
+}
+
+/**
  * Handle kill streak announcement
  */
 export function handleKillStreak(

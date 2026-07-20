@@ -457,6 +457,12 @@ var initGame = function () {
         }
         return false;
       }
+      if (key === 76) { // L - Boss kill leaderboard
+        if (game.ready && game.started) {
+          game.requestBossLeaderboard();
+        }
+        return false;
+      }
       // WASD and Arrow keys for movement
       if (key === 87 || key === 38) { // W or Up Arrow
         if (game.ready && game.started && game.player) {
