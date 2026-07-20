@@ -438,6 +438,11 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
       if (playerId === game.playerId) {
         game.audioManager.playSound('equip');
         game.updateEquippedDisplay();
+        // Refresh HUD statusbar weapon/armor icons — the onSwitch callback chain
+        // only fires from the loot path, not this live EQUIP path
+        if (game.equipment_callback) {
+          game.equipment_callback();
+        }
       }
     }
   });
