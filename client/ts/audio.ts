@@ -17,7 +17,7 @@ export class AudioManager {
   currentMusic = null;
   areas = [];
   musicNames = ['village', 'beach', 'forest', 'cave', 'desert', 'lavaland', 'boss', 'graveyard'];
-  soundNames = ['loot', 'hit1', 'hit2', 'hurt', 'heal', 'chat', 'revive', 'death', 'firefox', 'achievement', 'kill1', 'kill2', 'noloot', 'teleport', 'chest', 'npc', 'npc-end', 'levelup', 'gold', 'equip', 'quest'];
+  soundNames = ['loot', 'hit1', 'hit2', 'hurt', 'heal', 'chat', 'revive', 'death', 'firefox', 'achievement', 'kill1', 'kill2', 'noloot', 'teleport', 'chest', 'npc', 'npc-end', 'levelup', 'gold', 'equip', 'quest', 'glitch1'];
 
   // Combat music state
   inCombat = false;

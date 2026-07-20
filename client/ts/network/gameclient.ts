@@ -848,6 +848,10 @@ export class GameClient extends EventEmitter {
     this.sendMessage([Types.Messages.REQUEST_QUEST, npcKind]);
   }
 
+  sendQuestAbandon() {
+    this.sendMessage([Types.Messages.QUEST_ABANDON]);
+  }
+
   sendDropItem(itemType: string) {
     this.sendMessage([Types.Messages.DROP_ITEM, itemType]);
   }
@@ -940,5 +944,10 @@ export class GameClient extends EventEmitter {
 
   sendRiftLeaderboardRequest() {
     this.sendMessage([Types.Messages.RIFT_LEADERBOARD_REQ]);
+  }
+
+  // Boss leaderboard (roaming boss kills)
+  sendLeaderboardRequest() {
+    this.sendMessage([Types.Messages.LEADERBOARD_REQUEST]);
   }
 }

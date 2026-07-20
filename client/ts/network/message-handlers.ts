@@ -438,6 +438,11 @@ function setupPlayerHandlers(game: Game, client: GameClient): void {
       if (playerId === game.playerId) {
         game.audioManager.playSound('equip');
         game.updateEquippedDisplay();
+        // Refresh HUD statusbar weapon/armor icons — the onSwitch callback chain
+        // only fires from the loot path, not this live EQUIP path
+        if (game.equipment_callback) {
+          game.equipment_callback();
+        }
       }
     }
   });
@@ -580,9 +585,11 @@ function setupCombatHandlers(game: Game, client: GameClient): void {
 
 function setupAIHandlers(game: Game, client: GameClient): void {
   client.on(ClientEvents.NPC_TALK, function (npcKind, response, audioUrl) {
-    if (game.currentNpcTalk) {
-      var npc = game.currentNpcTalk;
-      game.currentNpcTalk = null;
+    // Key the response by the NPC kind the server echoes — talking to a
+    // second NPC before the first answers no longer eats the first's line
+    var npc = game.pendingNpcTalks[npcKind];
+    if (npc) {
+      delete game.pendingNpcTalks[npcKind];
       if (response) {
         game.showBubbleFor(npc, response);
         // Play TTS audio if available, otherwise fall back to sound effect
@@ -598,13 +605,6 @@ function setupAIHandlers(game: Game, client: GameClient): void {
   client.on(ClientEvents.COMPANION_HINT, function (hint) {
     if (hint && game.player) {
       game.showBubbleFor(game.player, '\u2728 ' + hint);
-    }
-  });
-
-  client.on(ClientEvents.QUEST_OFFER, function (quest) {
-    if (quest && game.notification_callback) {
-      game.notification_callback('Quest: ' + quest.description);
-      game.currentQuest = quest;
     }
   });
 
@@ -889,6 +889,11 @@ function setupBossHandlers(game: Game, client: GameClient): void {
   // Boss kill announcement - show notification when boss is killed
   client.on(ClientEvents.BOSS_KILL, function (bossName, killerName) {
     GameEventHandler.handleBossKill(game, bossName, killerName);
+  });
+
+  // World event announcement - show boss spawns ("The Harvester Emerges!") and other world events
+  client.on(ClientEvents.WORLD_EVENT, function (title, description, eventType) {
+    GameEventHandler.handleWorldEvent(game, title, description, eventType);
   });
 
   // Kill streak announcement - show when player reaches a new tier

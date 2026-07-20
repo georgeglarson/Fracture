@@ -568,8 +568,7 @@ export class Game {
       get hoveringPlateauTile() { return self.hoveringPlateauTile; },
       get previousClickPosition() { return self.previousClickPosition; },
       set previousClickPosition(val) { self.previousClickPosition = val; },
-      get currentNpcTalk() { return self.currentNpcTalk; },
-      set currentNpcTalk(val) { self.currentNpcTalk = val; }
+      get pendingNpcTalks() { return self.pendingNpcTalks; }
     };
   }
 
@@ -808,6 +807,7 @@ export class Game {
         self.showFirstTimeHints();
         // Auto-show minimap for new players
         self.initMinimap();
+        self.minimapUI?.show();
       } else {
         self.showNotification('Welcome back to Fracture!');
         self.storage.setPlayerName(name);
@@ -944,8 +944,9 @@ export class Game {
     this.questController?.requestQuest(npcKind);
   }
 
-  // Current NPC being talked to (for Venice AI response handling)
-  currentNpcTalk = null;
+  // Pending NPC talks keyed by NPC kind (for response handling — the server
+  // echoes the NPC kind in NPCTALK_RESPONSE)
+  pendingNpcTalks: { [npcKind: number]: Character } = {};
 
   // Current quest (for tracking)
   currentQuest = null;
@@ -1273,17 +1274,6 @@ export class Game {
 
     if (character.isAttacking() && !character.previousTarget) {
       var isMoving = this.tryMovingToADifferentTile(character); // Don't let multiple mobs stack on the same tile when attacking a player.
-
-      // Combat debug overlay (read-only — do NOT call canAttack here, it consumes the cooldown)
-      if (character.id === this.playerId && character.target) {
-        const dbg = document.getElementById('tap-debug');
-        if (dbg) {
-          const dist = character.getDistanceToEntity(character.target);
-          const cd = character.attackCooldown;
-          const elapsed = cd ? Math.floor(time - cd.lastTime) : -1;
-          dbg.textContent = `t#${character.target.id} d=${dist} el=${elapsed}/${cd?.duration} mv=${character.isMoving()} reach=${character.canReachTarget()}`;
-        }
-      }
 
       if (character.canAttack(time)) {
         if (!isMoving) { // don't hit target if moving to a different tile.
@@ -1644,6 +1634,10 @@ export class Game {
 
   toggleNewspaper() {
     this.uiManager?.toggleNewspaper();
+  }
+
+  requestBossLeaderboard() {
+    this.client.sendLeaderboardRequest();
   }
 
   dropCurrentWeapon() {
