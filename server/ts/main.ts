@@ -25,6 +25,8 @@ import {Server, Connection} from './ws';
 import {Player} from './player';
 import {initVeniceService, initFishAudioService, getVeniceClient} from './ai';
 import {initIntroService} from './ai/intro.service';
+import {riftManager} from './rifts/rift-manager';
+import {getStorageService} from './storage/sqlite.service';
 import { createModuleLogger } from './utils/logger.js';
 
 const log = createModuleLogger('Server');
@@ -164,6 +166,28 @@ function main(config: ServerConfig): void {
     server.onRequestStatus(() => {
         return JSON.stringify(getWorldDistribution(worlds));
     });
+
+    // Fracture Rift: DB-backed leaderboard. The in-memory board stays the
+    // live-session cache — seed it from SQLite and persist every ranked run
+    // so the board (and RIFT_LEADERBOARD_REQ responses) survives restarts.
+    try {
+        const storage = getStorageService();
+        riftManager.loadLeaderboard(storage.getRiftLeaderboard(100).map((row) => ({
+            rank: 0,
+            playerName: row.player_name,
+            maxDepth: row.max_depth,
+            totalKills: row.total_kills,
+            completionTime: row.completion_time,
+            modifierCount: row.modifier_count,
+            timestamp: row.timestamp
+        })));
+        riftManager.setLeaderboardSink((entry) => {
+            storage.saveRiftEntry(entry);
+        });
+        log.info({ entries: riftManager.getLeaderboard(100).length }, 'Rift leaderboard loaded from storage');
+    } catch (e) {
+        log.error({ err: e }, 'Rift leaderboard persistence unavailable — running memory-only');
+    }
 
     // Start debug TUI server unless disabled
     if (!process.env.NO_DEBUG) {

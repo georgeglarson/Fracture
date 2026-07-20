@@ -57,6 +57,8 @@ export interface Entity {
   grantXP?(amount: number): void;  // For progression system
   grantGold?(amount: number): void;  // For economy system
   checkKillAchievements?(mobKind: number): void;  // For achievement system
+  handleRiftKill?(mobId: number): void;  // Fracture Rift progress (Player only)
+  handleRiftDeath?(): void;  // Fracture Rift run end on death (Player only)
   isPhased?(): boolean;  // Phase shift immunity check
   updatePartyHp?(): void;  // Party HP bar sync (Player only)
   getLootMultipliers?(): { xp: number; gold: number; dropBonus: number };  // RoamingBoss loot scaling
@@ -295,6 +297,9 @@ export class CombatSystem {
         attacker.checkKillAchievements(mob.kind);
       }
 
+      // Fracture Rift: counts only if the mob belongs to the attacker's run
+      attacker.handleRiftKill?.(mob.id as number);
+
       // Record world event for Town Crier (static news service in no-AI mode)
       const newsSink = getVeniceService() ?? getStaticServices().news;
       if (mobType) {
@@ -346,6 +351,9 @@ export class CombatSystem {
     player.handleDeath?.(killerType).catch((err) => {
       log.error({ err, playerName: player.name }, 'handleDeath hook failed');
     });
+
+    // Fracture Rift: dying ends the run (partial rewards, leaderboard entry)
+    player.handleRiftDeath?.();
 
     // Emit player:died event
     const eventBus = getServerEventBus();

@@ -37,6 +37,12 @@ export class RiftUI {
   private container: HTMLDivElement | null = null;
   private hudElement: HTMLDivElement | null = null;
   private leaderboardElement: HTMLDivElement | null = null;
+  private menuElement: HTMLDivElement | null = null;
+  private callbacks: {
+    onEnter?: () => void;
+    onExit?: () => void;
+    onLeaderboard?: () => void;
+  } = {};
   private state: RiftState = {
     active: false,
     runId: '',
@@ -101,7 +107,133 @@ export class RiftUI {
     `;
     this.container.appendChild(this.leaderboardElement);
 
+    // Create menu panel (entry point — opened via the status bar rift button)
+    this.menuElement = document.createElement('div');
+    this.menuElement.id = 'rift-menu';
+    this.menuElement.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(20,0,40,0.95) 100%);
+      border: 2px solid #a020f0;
+      border-radius: 8px;
+      padding: 20px;
+      color: #fff;
+      font-family: 'GraphicPixel', monospace;
+      font-size: 12px;
+      z-index: 600;
+      display: none;
+      min-width: 320px;
+      text-align: center;
+      box-shadow: 0 0 30px rgba(160, 32, 240, 0.6);
+    `;
+    this.container.appendChild(this.menuElement);
+
     document.body.appendChild(this.container);
+  }
+
+  /**
+   * Wire the menu buttons to game actions (enter/exit/leaderboard)
+   */
+  setCallbacks(callbacks: { onEnter?: () => void; onExit?: () => void; onLeaderboard?: () => void }): void {
+    this.callbacks = callbacks;
+  }
+
+  /**
+   * Toggle the rift menu panel
+   */
+  toggleMenu(): void {
+    if (this.menuElement && this.menuElement.style.display === 'block') {
+      this.hideMenu();
+    } else {
+      this.showMenu();
+    }
+  }
+
+  /**
+   * Show the rift menu
+   */
+  showMenu(): void {
+    if (!this.menuElement) return;
+
+    const buttonStyle = `
+      display: block;
+      width: 100%;
+      margin-top: 10px;
+      background: #a020f0;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 24px;
+      color: #fff;
+      font-family: 'GraphicPixel', monospace;
+      cursor: pointer;
+    `;
+
+    let html = `
+      <div style="margin-bottom: 8px;">
+        <span style="color: #a020f0; font-size: 18px; font-weight: bold;">
+          FRACTURE RIFT
+        </span>
+      </div>
+      <div style="color: #888; margin-bottom: 8px;">
+        Endless escalating depths. How deep can you go?
+      </div>
+    `;
+
+    if (this.state.active) {
+      html += `<button id="rift-menu-exit" style="${buttonStyle}">Exit Rift (Depth ${this.state.depth})</button>`;
+    } else {
+      html += `<button id="rift-menu-enter" style="${buttonStyle}">Enter the Rift</button>`;
+    }
+
+    html += `<button id="rift-menu-leaderboard" style="${buttonStyle}">Leaderboard</button>`;
+    html += `<button id="rift-menu-close" style="${buttonStyle} background: #444;">Close</button>`;
+
+    this.menuElement.innerHTML = html;
+    this.menuElement.style.display = 'block';
+
+    const enterBtn = document.getElementById('rift-menu-enter');
+    if (enterBtn) {
+      enterBtn.onclick = () => {
+        this.hideMenu();
+        this.callbacks.onEnter?.();
+      };
+    }
+    const exitBtn = document.getElementById('rift-menu-exit');
+    if (exitBtn) {
+      exitBtn.onclick = () => {
+        this.hideMenu();
+        this.callbacks.onExit?.();
+      };
+    }
+    const leaderboardBtn = document.getElementById('rift-menu-leaderboard');
+    if (leaderboardBtn) {
+      leaderboardBtn.onclick = () => {
+        this.hideMenu();
+        this.callbacks.onLeaderboard?.();
+      };
+    }
+    const closeBtn = document.getElementById('rift-menu-close');
+    if (closeBtn) {
+      closeBtn.onclick = () => this.hideMenu();
+    }
+  }
+
+  /**
+   * Hide the rift menu
+   */
+  hideMenu(): void {
+    if (this.menuElement) {
+      this.menuElement.style.display = 'none';
+    }
+  }
+
+  /**
+   * Check if the rift menu is open
+   */
+  isMenuOpen(): boolean {
+    return this.menuElement?.style.display === 'block';
   }
 
   /**

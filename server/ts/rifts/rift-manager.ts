@@ -38,6 +38,12 @@ interface ActiveRun extends RiftRunState {
   spawnedMobs: Set<number>;  // Entity IDs of mobs spawned for this rift
 }
 
+/** Validates whether a mob may spawn at a position (wired to the world map at boot) */
+export type RiftPositionValidator = (x: number, y: number) => boolean;
+
+/** Persists a leaderboard entry (wired to SQLite storage at boot) */
+export type RiftLeaderboardSink = (entry: RiftLeaderboardEntry) => void;
+
 /**
  * Rift Manager singleton
  */
@@ -47,19 +53,26 @@ export class RiftManager {
   // Active runs by player ID
   private activeRuns: Map<number, ActiveRun> = new Map();
 
-  // Leaderboard (sorted by maxDepth DESC)
+  // Leaderboard (sorted by maxDepth DESC).
+  // Live-session cache — seeded from and persisted to SQLite via the
+  // leaderboard sink/loader wired in main.ts, so the board survives restarts.
   private leaderboard: RiftLeaderboardEntry[] = [];
   private readonly MAX_LEADERBOARD_SIZE = 100;
 
   // Spawn configuration
   private readonly SPAWN_INTERVAL = 3000;    // ms between mob spawns
   private readonly MAX_ACTIVE_MOBS = 5;      // Max mobs at once per player
+  private readonly SPAWN_POSITION_ATTEMPTS = 5; // Re-rolls to find a walkable tile
   private readonly RIFT_BOUNDS = {           // Virtual rift arena bounds
     minX: 10,
     maxX: 30,
     minY: 10,
     maxY: 30
   };
+
+  // Defaults to allowing every tile until the world wires the real map check
+  private positionValidator: RiftPositionValidator = () => true;
+  private leaderboardSink: RiftLeaderboardSink | null = null;
 
   private constructor() {}
 
@@ -180,11 +193,15 @@ export class RiftManager {
     run: RiftRunState;
     finalRewards: { xp: number; gold: number };
     leaderboardRank: number | null;
+    spawnedMobIds: number[];
   } | null {
     const run = this.activeRuns.get(playerId);
     if (!run) return null;
 
     run.isComplete = true;
+
+    // Mobs still alive in the arena — caller despawns them
+    const spawnedMobIds = Array.from(run.spawnedMobs);
 
     // Calculate final rewards based on completed depth
     const finalRewards = {
@@ -195,7 +212,7 @@ export class RiftManager {
     // Update leaderboard if this is a good run
     let leaderboardRank: number | null = null;
     if (run.completedDepth > 0) {
-      leaderboardRank = this.updateLeaderboard({
+      const entry: RiftLeaderboardEntry = {
         rank: 0,
         playerName: run.playerName,
         maxDepth: run.completedDepth,
@@ -203,7 +220,17 @@ export class RiftManager {
         completionTime: Date.now() - run.startTime,
         modifierCount: run.modifiers.filter(m => MODIFIERS[m].isDebuff).length,
         timestamp: Date.now()
-      });
+      };
+      leaderboardRank = this.updateLeaderboard(entry);
+
+      // Persist to storage so the board survives restarts
+      if (leaderboardRank !== null && this.leaderboardSink) {
+        try {
+          this.leaderboardSink(entry);
+        } catch (e) {
+          log.error({ err: e, playerName: run.playerName }, 'Failed to persist rift leaderboard entry');
+        }
+      }
     }
 
     log.info({ playerName: run.playerName, depth: run.completedDepth, reason, kills: run.killCount }, 'Player ended rift run');
@@ -214,7 +241,8 @@ export class RiftManager {
     return {
       run,
       finalRewards,
-      leaderboardRank
+      leaderboardRank,
+      spawnedMobIds
     };
   }
 
@@ -244,7 +272,13 @@ export class RiftManager {
     const mobTypes = getRiftMobTypes(run.depth);
     const mobKind = mobTypes[Math.floor(Math.random() * mobTypes.length)];
 
-    // Calculate multipliers
+    // Calculate multipliers.
+    // NOTE (minimal modifier system): only the spawn-time mob scaling is
+    // applied — tier multipliers plus FORTIFIED (HP) and EMPOWERED (damage)
+    // below. All other modifier effects (SWIFT, VAMPIRIC, EXPLOSIVE, and the
+    // player-side FRAGILE/WEAKENED/CURSED/BLINDED/BLESSED/RESILIENT/LUCKY/
+    // HASTY from getModifierEffects) are display-only for now: they appear in
+    // the HUD but nothing consults them.
     const tier = getRiftTier(run.depth);
     let hpMult = tier.hpMultiplier;
     let dmgMult = tier.damageMultiplier;
@@ -255,9 +289,19 @@ export class RiftManager {
       if (mod === RiftModifier.EMPOWERED) dmgMult *= 1.5;
     }
 
-    // Random position in rift arena
-    const x = Math.floor(Math.random() * (this.RIFT_BOUNDS.maxX - this.RIFT_BOUNDS.minX)) + this.RIFT_BOUNDS.minX;
-    const y = Math.floor(Math.random() * (this.RIFT_BOUNDS.maxY - this.RIFT_BOUNDS.minY)) + this.RIFT_BOUNDS.minY;
+    // Random walkable position in rift arena
+    let x = this.RIFT_BOUNDS.minX;
+    let y = this.RIFT_BOUNDS.minY;
+    let valid = false;
+    for (let attempt = 0; attempt < this.SPAWN_POSITION_ATTEMPTS; attempt++) {
+      x = Math.floor(Math.random() * (this.RIFT_BOUNDS.maxX - this.RIFT_BOUNDS.minX)) + this.RIFT_BOUNDS.minX;
+      y = Math.floor(Math.random() * (this.RIFT_BOUNDS.maxY - this.RIFT_BOUNDS.minY)) + this.RIFT_BOUNDS.minY;
+      if (this.positionValidator(x, y)) {
+        valid = true;
+        break;
+      }
+    }
+    if (!valid) return null;
 
     return {
       mobKind,
@@ -276,6 +320,51 @@ export class RiftManager {
     if (run) {
       run.spawnedMobs.add(mobId);
     }
+  }
+
+  /**
+   * Check whether a mob was spawned for this player's active run.
+   * Only rift-spawned mobs count toward run progress.
+   */
+  isRiftMob(playerId: number, mobId: number): boolean {
+    const run = this.activeRuns.get(playerId);
+    return run ? run.spawnedMobs.has(mobId) : false;
+  }
+
+  /**
+   * Center of the rift arena — the teleport-in point for entering players
+   */
+  getArenaCenter(): { x: number; y: number } {
+    return {
+      x: Math.floor((this.RIFT_BOUNDS.minX + this.RIFT_BOUNDS.maxX) / 2),
+      y: Math.floor((this.RIFT_BOUNDS.minY + this.RIFT_BOUNDS.maxY) / 2)
+    };
+  }
+
+  /**
+   * Wire the world map's walkability check for mob spawn positions
+   */
+  setPositionValidator(validator: RiftPositionValidator): void {
+    this.positionValidator = validator;
+  }
+
+  /**
+   * Wire persistent storage for leaderboard entries (called once at boot)
+   */
+  setLeaderboardSink(sink: RiftLeaderboardSink): void {
+    this.leaderboardSink = sink;
+  }
+
+  /**
+   * Seed the in-memory leaderboard from persistent storage (called once at boot)
+   */
+  loadLeaderboard(entries: RiftLeaderboardEntry[]): void {
+    this.leaderboard = entries.slice(0, this.MAX_LEADERBOARD_SIZE);
+    this.leaderboard.sort((a, b) => {
+      if (b.maxDepth !== a.maxDepth) return b.maxDepth - a.maxDepth;
+      return a.completionTime - b.completionTime;
+    });
+    this.leaderboard.forEach((e, idx) => e.rank = idx + 1);
   }
 
   /**
@@ -393,12 +482,14 @@ export class RiftManager {
   }
 
   /**
-   * Clean up runs for disconnected players
+   * Clean up runs for disconnected players.
+   * Returns the endRun result (for leftover-mob cleanup) or null if not in a rift.
    */
-  cleanupDisconnectedPlayer(playerId: number): void {
+  cleanupDisconnectedPlayer(playerId: number): ReturnType<RiftManager['endRun']> {
     if (this.activeRuns.has(playerId)) {
-      this.endRun(playerId, 'disconnect');
+      return this.endRun(playerId, 'disconnect');
     }
+    return null;
   }
 
   /**

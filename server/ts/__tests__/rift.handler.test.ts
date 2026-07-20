@@ -1,8 +1,12 @@
 /**
  * Tests for RiftHandler
  * Covers: handleRiftEnter, handleRiftKill, handleRiftExit, handleRiftDeath,
- *         handleRiftLeaderboardRequest, isPlayerInRift, getRiftModifierEffects,
- *         getRiftState, handleRiftDisconnect
+ *         handleRiftLeaderboardRequest, isPlayerInRift, isRiftMob,
+ *         getRiftModifierEffects, getRiftState, handleRiftDisconnect,
+ *         position save/teleport/restore and leftover-mob cleanup.
+ *
+ * All client-bound messages are positional arrays matching the client
+ * parsers in client/ts/network/gameclient.ts (receiveRift*).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -32,6 +36,7 @@ import {
   handleRiftDeath,
   handleRiftLeaderboardRequest,
   isPlayerInRift,
+  isRiftMob,
   getRiftModifierEffects,
   getRiftState,
   handleRiftDisconnect,
@@ -52,7 +57,9 @@ function createMockCtx(overrides: Partial<RiftPlayerContext> = {}): RiftPlayerCo
     broadcast: vi.fn(),
     addXP: vi.fn(),
     addGold: vi.fn(),
-    setPosition: vi.fn(),
+    getPosition: vi.fn(() => ({ x: 50, y: 220 })),
+    teleport: vi.fn(),
+    despawnMobs: vi.fn(),
     ...overrides,
   };
 }
@@ -74,6 +81,16 @@ function makeActiveRun(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makeEndResult(overrides: Record<string, unknown> = {}) {
+  return {
+    run: makeActiveRun({ completedDepth: 3, killCount: 21 }),
+    finalRewards: { xp: 405, gold: 192 },
+    leaderboardRank: 5,
+    spawnedMobIds: [],
+    ...overrides,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -86,6 +103,8 @@ beforeEach(() => {
     getLeaderboard: vi.fn(),
     getPlayerRank: vi.fn(),
     isInRift: vi.fn(),
+    isRiftMob: vi.fn(),
+    getArenaCenter: vi.fn(() => ({ x: 20, y: 20 })),
     getModifierEffects: vi.fn(),
     getActiveRun: vi.fn(),
     cleanupDisconnectedPlayer: vi.fn(),
@@ -97,7 +116,7 @@ beforeEach(() => {
 // ==========================================================================
 
 describe('handleRiftEnter', () => {
-  it('should start a rift run and send RIFT_START message', () => {
+  it('should start a rift run and send a positional RIFT_START message', () => {
     const ctx = createMockCtx();
     const run = makeActiveRun();
     mockRiftManager.startRun.mockReturnValue(run);
@@ -109,16 +128,15 @@ describe('handleRiftEnter', () => {
     expect(ctx.send).toHaveBeenCalledTimes(1);
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
+    // receiveRiftStart: runId, depth, modifiers, requiredKills, killCount
     expect(sentMsg[0]).toBe(Types.Messages.RIFT_START);
-    expect(sentMsg[1]).toEqual(expect.objectContaining({
-      runId: run.runId,
-      depth: run.depth,
-      requiredKills: run.requiredKills,
-      killCount: 0,
-    }));
+    expect(sentMsg[1]).toBe(run.runId);
+    expect(sentMsg[2]).toBe(run.depth);
+    expect(sentMsg[4]).toBe(run.requiredKills);
+    expect(sentMsg[5]).toBe(0);
   });
 
-  it('should include formatted modifier info in start message', () => {
+  it('should include formatted modifier info in start message slot 3', () => {
     const ctx = createMockCtx();
     const run = makeActiveRun({ modifiers: [RiftModifier.EMPOWERED, RiftModifier.FRAGILE] });
     mockRiftManager.startRun.mockReturnValue(run);
@@ -126,11 +144,11 @@ describe('handleRiftEnter', () => {
     handleRiftEnter(ctx);
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
-    const payload = sentMsg[1];
-    expect(payload.modifiers).toHaveLength(2);
+    const modifiers = sentMsg[3];
+    expect(modifiers).toHaveLength(2);
 
     const expected0 = formatModifier(RiftModifier.EMPOWERED);
-    expect(payload.modifiers[0]).toEqual(expect.objectContaining({
+    expect(modifiers[0]).toEqual(expect.objectContaining({
       id: RiftModifier.EMPOWERED,
       name: expected0.name,
       description: expected0.description,
@@ -138,7 +156,7 @@ describe('handleRiftEnter', () => {
     }));
 
     const expected1 = formatModifier(RiftModifier.FRAGILE);
-    expect(payload.modifiers[1]).toEqual(expect.objectContaining({
+    expect(modifiers[1]).toEqual(expect.objectContaining({
       id: RiftModifier.FRAGILE,
       name: expected1.name,
       description: expected1.description,
@@ -146,7 +164,7 @@ describe('handleRiftEnter', () => {
     }));
   });
 
-  it('should return false and send RIFT_END when riftManager returns null', () => {
+  it('should return false and send RIFT_END (success 0) when riftManager returns null', () => {
     const ctx = createMockCtx();
     mockRiftManager.startRun.mockReturnValue(null);
 
@@ -156,10 +174,11 @@ describe('handleRiftEnter', () => {
     expect(ctx.send).toHaveBeenCalledTimes(1);
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
     expect(sentMsg[0]).toBe(Types.Messages.RIFT_END);
-    expect(sentMsg[1]).toEqual(expect.objectContaining({
-      success: false,
-      reason: expect.any(String),
-    }));
+    // Client treats data[1] === 1 as success; failure must be 0
+    expect(sentMsg[1]).toBe(0);
+    expect(typeof sentMsg[2]).toBe('string');
+    // No teleport on failed enter
+    expect(ctx.teleport).not.toHaveBeenCalled();
   });
 
   it('should pass correct player info to riftManager.startRun', () => {
@@ -179,7 +198,19 @@ describe('handleRiftEnter', () => {
     handleRiftEnter(ctx);
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
-    expect(sentMsg[1].modifiers).toHaveLength(0);
+    expect(sentMsg[3]).toHaveLength(0);
+  });
+
+  it('should save the current position and teleport into the arena center', () => {
+    const ctx = createMockCtx();
+    mockRiftManager.startRun.mockReturnValue(makeActiveRun());
+
+    handleRiftEnter(ctx);
+
+    expect(ctx.getPosition).toHaveBeenCalled();
+    expect(ctx.savedPosition).toEqual({ x: 50, y: 220 });
+    expect(mockRiftManager.getArenaCenter).toHaveBeenCalled();
+    expect(ctx.teleport).toHaveBeenCalledWith(20, 20);
   });
 });
 
@@ -188,7 +219,7 @@ describe('handleRiftEnter', () => {
 // ==========================================================================
 
 describe('handleRiftKill', () => {
-  it('should send RIFT_PROGRESS when kill does not advance floor', () => {
+  it('should send positional RIFT_PROGRESS when kill does not advance floor', () => {
     const ctx = createMockCtx();
     mockRiftManager.recordKill.mockReturnValue({
       advanced: false,
@@ -203,11 +234,10 @@ describe('handleRiftKill', () => {
     expect(ctx.send).toHaveBeenCalledTimes(1);
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
+    // receiveRiftProgress: killCount, requiredKills
     expect(sentMsg[0]).toBe(Types.Messages.RIFT_PROGRESS);
-    expect(sentMsg[1]).toEqual({
-      killCount: 3,
-      requiredKills: 7,
-    });
+    expect(sentMsg[1]).toBe(3);
+    expect(sentMsg[2]).toBe(7);
   });
 
   it('should send RIFT_ADVANCE and award rewards when floor advances', () => {
@@ -227,13 +257,12 @@ describe('handleRiftKill', () => {
     expect(ctx.addGold).toHaveBeenCalledWith(rewards.gold, 'Rift Floor Completion');
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
+    // receiveRiftAdvance: newDepth, killCount, requiredKills, rewards
     expect(sentMsg[0]).toBe(Types.Messages.RIFT_ADVANCE);
-    expect(sentMsg[1]).toEqual(expect.objectContaining({
-      newDepth: 2,
-      killCount: 0,
-      requiredKills: 9,
-      rewards,
-    }));
+    expect(sentMsg[1]).toBe(2);
+    expect(sentMsg[2]).toBe(0);
+    expect(sentMsg[3]).toBe(9);
+    expect(sentMsg[4]).toEqual(rewards);
   });
 
   it('should do nothing when recordKill returns null', () => {
@@ -262,6 +291,8 @@ describe('handleRiftKill', () => {
     expect(ctx.addXP).not.toHaveBeenCalled();
     expect(ctx.addGold).not.toHaveBeenCalled();
     expect(ctx.send).toHaveBeenCalledTimes(1);
+    const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
+    expect(sentMsg[4]).toBeNull();
   });
 
   it('should pass the correct mob id to recordKill', () => {
@@ -279,13 +310,9 @@ describe('handleRiftKill', () => {
 // ==========================================================================
 
 describe('handleRiftExit', () => {
-  it('should award full rewards and send RIFT_END with success', () => {
+  it('should award full rewards and send RIFT_END with success 1', () => {
     const ctx = createMockCtx();
-    const endResult = {
-      run: makeActiveRun({ completedDepth: 3, killCount: 21 }),
-      finalRewards: { xp: 405, gold: 192 },
-      leaderboardRank: 5,
-    };
+    const endResult = makeEndResult();
     mockRiftManager.endRun.mockReturnValue(endResult);
 
     handleRiftExit(ctx);
@@ -295,15 +322,14 @@ describe('handleRiftExit', () => {
     expect(ctx.addGold).toHaveBeenCalledWith(192, 'Rift Completion');
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
+    // receiveRiftEnd: success, reason, completedDepth, totalKills, rewards, leaderboardRank
     expect(sentMsg[0]).toBe(Types.Messages.RIFT_END);
-    expect(sentMsg[1]).toEqual(expect.objectContaining({
-      success: true,
-      reason: 'exit',
-      completedDepth: 3,
-      totalKills: 21,
-      rewards: endResult.finalRewards,
-      leaderboardRank: 5,
-    }));
+    expect(sentMsg[1]).toBe(1);
+    expect(sentMsg[2]).toBe('exit');
+    expect(sentMsg[3]).toBe(3);
+    expect(sentMsg[4]).toBe(21);
+    expect(sentMsg[5]).toEqual(endResult.finalRewards);
+    expect(sentMsg[6]).toBe(5);
   });
 
   it('should send failure message when not in a rift', () => {
@@ -317,24 +343,51 @@ describe('handleRiftExit', () => {
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
     expect(sentMsg[0]).toBe(Types.Messages.RIFT_END);
-    expect(sentMsg[1]).toEqual(expect.objectContaining({
-      success: false,
-      reason: 'Not in a rift',
-    }));
+    expect(sentMsg[1]).toBe(0);
+    expect(sentMsg[2]).toBe('Not in a rift');
   });
 
   it('should include null leaderboardRank when run had no completed depth', () => {
     const ctx = createMockCtx();
-    mockRiftManager.endRun.mockReturnValue({
+    mockRiftManager.endRun.mockReturnValue(makeEndResult({
       run: makeActiveRun({ completedDepth: 0, killCount: 2 }),
       finalRewards: { xp: 10, gold: 4 },
       leaderboardRank: null,
-    });
+    }));
 
     handleRiftExit(ctx);
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
-    expect(sentMsg[1].leaderboardRank).toBeNull();
+    expect(sentMsg[6]).toBeNull();
+  });
+
+  it('should restore the saved position and clear it', () => {
+    const ctx = createMockCtx();
+    ctx.savedPosition = { x: 50, y: 220 };
+    mockRiftManager.endRun.mockReturnValue(makeEndResult());
+
+    handleRiftExit(ctx);
+
+    expect(ctx.teleport).toHaveBeenCalledWith(50, 220);
+    expect(ctx.savedPosition).toBeUndefined();
+  });
+
+  it('should despawn leftover rift mobs', () => {
+    const ctx = createMockCtx();
+    mockRiftManager.endRun.mockReturnValue(makeEndResult({ spawnedMobIds: [611, 622] }));
+
+    handleRiftExit(ctx);
+
+    expect(ctx.despawnMobs).toHaveBeenCalledWith([611, 622]);
+  });
+
+  it('should not teleport when there is no saved position', () => {
+    const ctx = createMockCtx();
+    mockRiftManager.endRun.mockReturnValue(makeEndResult());
+
+    handleRiftExit(ctx);
+
+    expect(ctx.teleport).not.toHaveBeenCalled();
   });
 });
 
@@ -345,11 +398,11 @@ describe('handleRiftExit', () => {
 describe('handleRiftDeath', () => {
   it('should award 50% rewards on death', () => {
     const ctx = createMockCtx();
-    mockRiftManager.endRun.mockReturnValue({
+    mockRiftManager.endRun.mockReturnValue(makeEndResult({
       run: makeActiveRun({ completedDepth: 2, depth: 3, killCount: 15 }),
       finalRewards: { xp: 300, gold: 180 },
       leaderboardRank: 8,
-    });
+    }));
 
     handleRiftDeath(ctx);
 
@@ -358,34 +411,32 @@ describe('handleRiftDeath', () => {
     expect(ctx.addGold).toHaveBeenCalledWith(90, 'Rift (Death)');
   });
 
-  it('should send RIFT_END with success false and reason death', () => {
+  it('should send RIFT_END with success 0 and reason death', () => {
     const ctx = createMockCtx();
-    mockRiftManager.endRun.mockReturnValue({
+    mockRiftManager.endRun.mockReturnValue(makeEndResult({
       run: makeActiveRun({ completedDepth: 2, depth: 3, killCount: 15 }),
       finalRewards: { xp: 300, gold: 180 },
       leaderboardRank: 8,
-    });
+    }));
 
     handleRiftDeath(ctx);
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
     expect(sentMsg[0]).toBe(Types.Messages.RIFT_END);
-    expect(sentMsg[1]).toEqual(expect.objectContaining({
-      success: false,
-      reason: 'death',
-      completedDepth: 2,
-      totalKills: 15,
-      leaderboardRank: 8,
-    }));
+    expect(sentMsg[1]).toBe(0);
+    expect(sentMsg[2]).toBe('death');
+    expect(sentMsg[3]).toBe(2);
+    expect(sentMsg[4]).toBe(15);
+    expect(sentMsg[6]).toBe(8);
   });
 
   it('should floor death rewards to integers', () => {
     const ctx = createMockCtx();
-    mockRiftManager.endRun.mockReturnValue({
+    mockRiftManager.endRun.mockReturnValue(makeEndResult({
       run: makeActiveRun({ completedDepth: 1, killCount: 3 }),
       finalRewards: { xp: 111, gold: 55 },
       leaderboardRank: null,
-    });
+    }));
 
     handleRiftDeath(ctx);
 
@@ -395,18 +446,18 @@ describe('handleRiftDeath', () => {
     expect(ctx.addGold).toHaveBeenCalledWith(27, 'Rift (Death)');
   });
 
-  it('should include halved rewards in RIFT_END payload', () => {
+  it('should include halved rewards in RIFT_END payload slot 5', () => {
     const ctx = createMockCtx();
-    mockRiftManager.endRun.mockReturnValue({
+    mockRiftManager.endRun.mockReturnValue(makeEndResult({
       run: makeActiveRun({ completedDepth: 1, killCount: 3 }),
       finalRewards: { xp: 200, gold: 100 },
       leaderboardRank: null,
-    });
+    }));
 
     handleRiftDeath(ctx);
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
-    expect(sentMsg[1].rewards).toEqual({ xp: 100, gold: 50 });
+    expect(sentMsg[5]).toEqual({ xp: 100, gold: 50 });
   });
 
   it('should do nothing when endRun returns null', () => {
@@ -422,11 +473,11 @@ describe('handleRiftDeath', () => {
 
   it('should handle zero rewards gracefully', () => {
     const ctx = createMockCtx();
-    mockRiftManager.endRun.mockReturnValue({
+    mockRiftManager.endRun.mockReturnValue(makeEndResult({
       run: makeActiveRun({ completedDepth: 0, killCount: 0 }),
       finalRewards: { xp: 0, gold: 0 },
       leaderboardRank: null,
-    });
+    }));
 
     handleRiftDeath(ctx);
 
@@ -436,17 +487,29 @@ describe('handleRiftDeath', () => {
 
   it('should handle odd reward values (test rounding)', () => {
     const ctx = createMockCtx();
-    mockRiftManager.endRun.mockReturnValue({
+    mockRiftManager.endRun.mockReturnValue(makeEndResult({
       run: makeActiveRun({ completedDepth: 1, killCount: 1 }),
       finalRewards: { xp: 1, gold: 1 },
       leaderboardRank: null,
-    });
+    }));
 
     handleRiftDeath(ctx);
 
     // 1 * 0.5 = 0.5 -> floor = 0
     expect(ctx.addXP).toHaveBeenCalledWith(0, 'Rift (Death)');
     expect(ctx.addGold).toHaveBeenCalledWith(0, 'Rift (Death)');
+  });
+
+  it('should clear the saved position without teleporting (respawn flow relocates)', () => {
+    const ctx = createMockCtx();
+    ctx.savedPosition = { x: 50, y: 220 };
+    mockRiftManager.endRun.mockReturnValue(makeEndResult({ spawnedMobIds: [611] }));
+
+    handleRiftDeath(ctx);
+
+    expect(ctx.teleport).not.toHaveBeenCalled();
+    expect(ctx.savedPosition).toBeUndefined();
+    expect(ctx.despawnMobs).toHaveBeenCalledWith([611]);
   });
 });
 
@@ -470,11 +533,10 @@ describe('handleRiftLeaderboardRequest', () => {
     expect(mockRiftManager.getPlayerRank).toHaveBeenCalledWith('Alice');
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
+    // receiveRiftLeaderboard: entries, playerRank
     expect(sentMsg[0]).toBe(Types.Messages.RIFT_LEADERBOARD);
-    expect(sentMsg[1]).toEqual({
-      entries: leaderboardEntries,
-      playerRank: 2,
-    });
+    expect(sentMsg[1]).toEqual(leaderboardEntries);
+    expect(sentMsg[2]).toBe(2);
   });
 
   it('should return null player rank when player has no entry', () => {
@@ -485,7 +547,7 @@ describe('handleRiftLeaderboardRequest', () => {
     handleRiftLeaderboardRequest(ctx);
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
-    expect(sentMsg[1].playerRank).toBeNull();
+    expect(sentMsg[2]).toBeNull();
   });
 
   it('should send empty entries when leaderboard is empty', () => {
@@ -496,7 +558,7 @@ describe('handleRiftLeaderboardRequest', () => {
     handleRiftLeaderboardRequest(ctx);
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
-    expect(sentMsg[1].entries).toEqual([]);
+    expect(sentMsg[1]).toEqual([]);
   });
 });
 
@@ -517,6 +579,25 @@ describe('isPlayerInRift', () => {
 
     expect(isPlayerInRift(99)).toBe(false);
     expect(mockRiftManager.isInRift).toHaveBeenCalledWith(99);
+  });
+});
+
+// ==========================================================================
+// isRiftMob
+// ==========================================================================
+
+describe('isRiftMob', () => {
+  it('should delegate to the rift manager', () => {
+    mockRiftManager.isRiftMob.mockReturnValue(true);
+
+    expect(isRiftMob(42, 611)).toBe(true);
+    expect(mockRiftManager.isRiftMob).toHaveBeenCalledWith(42, 611);
+  });
+
+  it('should return false for mobs outside the run', () => {
+    mockRiftManager.isRiftMob.mockReturnValue(false);
+
+    expect(isRiftMob(42, 999)).toBe(false);
   });
 });
 
@@ -642,6 +723,15 @@ describe('handleRiftDisconnect', () => {
 
     expect(mockRiftManager.cleanupDisconnectedPlayer).toHaveBeenCalledWith(999);
   });
+
+  it('should return the cleanup result so callers can despawn leftover mobs', () => {
+    const endResult = makeEndResult({ spawnedMobIds: [611, 622] });
+    mockRiftManager.cleanupDisconnectedPlayer.mockReturnValue(endResult);
+
+    const result = handleRiftDisconnect(42);
+
+    expect(result).toBe(endResult);
+  });
 });
 
 // ==========================================================================
@@ -662,6 +752,7 @@ describe('Rift lifecycle', () => {
     mockRiftManager.startRun.mockReturnValue(run);
     const entered = handleRiftEnter(ctx);
     expect(entered).toBe(true);
+    expect(ctx.teleport).toHaveBeenCalledWith(20, 20);
 
     vi.mocked(ctx.send).mockClear();
 
@@ -698,19 +789,23 @@ describe('Rift lifecycle', () => {
     vi.mocked(ctx.send).mockClear();
     vi.mocked(ctx.addXP).mockClear();
     vi.mocked(ctx.addGold).mockClear();
+    vi.mocked(ctx.teleport).mockClear();
 
-    // 4. Exit rift
-    mockRiftManager.endRun.mockReturnValue({
+    // 4. Exit rift — teleports back to the saved entry position
+    mockRiftManager.endRun.mockReturnValue(makeEndResult({
       run: makeActiveRun({ completedDepth: 1, killCount: 8 }),
       finalRewards: { xp: 140, gold: 66 },
       leaderboardRank: 3,
-    });
+      spawnedMobIds: [611],
+    }));
     handleRiftExit(ctx);
     expect(ctx.addXP).toHaveBeenCalledWith(140, 'Rift Completion');
     expect(ctx.addGold).toHaveBeenCalledWith(66, 'Rift Completion');
     const endMsg = vi.mocked(ctx.send).mock.calls[0][0];
     expect(endMsg[0]).toBe(Types.Messages.RIFT_END);
-    expect(endMsg[1].success).toBe(true);
+    expect(endMsg[1]).toBe(1);
+    expect(ctx.teleport).toHaveBeenCalledWith(50, 220);
+    expect(ctx.despawnMobs).toHaveBeenCalledWith([611]);
   });
 
   it('should handle enter -> die flow with partial rewards', () => {
@@ -729,19 +824,19 @@ describe('Rift lifecycle', () => {
     vi.mocked(ctx.addGold).mockClear();
 
     // Die
-    mockRiftManager.endRun.mockReturnValue({
+    mockRiftManager.endRun.mockReturnValue(makeEndResult({
       run: makeActiveRun({ completedDepth: 0, depth: 1, killCount: 2 }),
       finalRewards: { xp: 10, gold: 4 },
       leaderboardRank: null,
-    });
+    }));
     handleRiftDeath(ctx);
 
     expect(ctx.addXP).toHaveBeenCalledWith(5, 'Rift (Death)');
     expect(ctx.addGold).toHaveBeenCalledWith(2, 'Rift (Death)');
 
     const sentMsg = vi.mocked(ctx.send).mock.calls[0][0];
-    expect(sentMsg[1].success).toBe(false);
-    expect(sentMsg[1].reason).toBe('death');
+    expect(sentMsg[1]).toBe(0);
+    expect(sentMsg[2]).toBe('death');
   });
 
   it('should handle failed enter followed by successful enter', () => {

@@ -1231,6 +1231,109 @@ describe('Messages.NemesisKilled', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Fracture Rift messages — positional field order is the contract with the
+// client parsers in client/ts/network/gameclient.ts (receiveRift*). Do not
+// reorder without changing the client.
+// ---------------------------------------------------------------------------
+
+describe('Messages.RiftStart', () => {
+  it('should serialize positionally as the client parser expects', () => {
+    const modifiers = [{ id: 'empowered', name: 'Empowered', description: 'Enemies deal 50% more damage', color: '#ff4444' }];
+    const msg = new Messages.RiftStart('rift_1_abc', 2, modifiers, 9, 3);
+    // receiveRiftStart: runId=data[1], depth=data[2], modifiers=data[3], requiredKills=data[4], killCount=data[5]
+    expect(msg.serialize()).toEqual([
+      Types.Messages.RIFT_START,
+      'rift_1_abc',
+      2,
+      modifiers,
+      9,
+      3,
+    ]);
+  });
+});
+
+describe('Messages.RiftProgress', () => {
+  it('should serialize positionally as the client parser expects', () => {
+    const msg = new Messages.RiftProgress(4, 9);
+    // receiveRiftProgress: killCount=data[1], requiredKills=data[2]
+    expect(msg.serialize()).toEqual([
+      Types.Messages.RIFT_PROGRESS,
+      4,
+      9,
+    ]);
+  });
+});
+
+describe('Messages.RiftAdvance', () => {
+  it('should serialize with rewards in slot 4', () => {
+    const rewards = { xp: 100, gold: 50 };
+    const msg = new Messages.RiftAdvance(3, 0, 11, rewards);
+    // receiveRiftAdvance: newDepth=data[1], killCount=data[2], requiredKills=data[3], rewards=data[4]
+    expect(msg.serialize()).toEqual([
+      Types.Messages.RIFT_ADVANCE,
+      3,
+      0,
+      11,
+      rewards,
+    ]);
+  });
+
+  it('should serialize null rewards as null', () => {
+    const msg = new Messages.RiftAdvance(3, 0, 11, null);
+    expect(msg.serialize()[4]).toBeNull();
+  });
+});
+
+describe('Messages.RiftEnd', () => {
+  it('should serialize success as 1 (client checks data[1] === 1)', () => {
+    const rewards = { xp: 200, gold: 100 };
+    const msg = new Messages.RiftEnd(true, 'exit', 2, 15, rewards, 1);
+    // receiveRiftEnd: success=data[1]===1, reason=data[2], completedDepth=data[3],
+    // totalKills=data[4], rewards=data[5], leaderboardRank=data[6]
+    expect(msg.serialize()).toEqual([
+      Types.Messages.RIFT_END,
+      1,
+      'exit',
+      2,
+      15,
+      rewards,
+      1,
+    ]);
+  });
+
+  it('should serialize failure as 0 with null rewards and rank', () => {
+    const msg = new Messages.RiftEnd(false, 'death', 1, 7, null, null);
+    expect(msg.serialize()).toEqual([
+      Types.Messages.RIFT_END,
+      0,
+      'death',
+      1,
+      7,
+      null,
+      null,
+    ]);
+  });
+});
+
+describe('Messages.RiftLeaderboard', () => {
+  it('should serialize entries and player rank positionally', () => {
+    const entries = [{ rank: 1, playerName: 'Bob', maxDepth: 10, totalKills: 50, completionTime: 60000 }];
+    const msg = new Messages.RiftLeaderboard(entries, 2);
+    // receiveRiftLeaderboard: entries=data[1], playerRank=data[2]
+    expect(msg.serialize()).toEqual([
+      Types.Messages.RIFT_LEADERBOARD,
+      entries,
+      2,
+    ]);
+  });
+
+  it('should serialize null player rank as null', () => {
+    const msg = new Messages.RiftLeaderboard([], null);
+    expect(msg.serialize()).toEqual([Types.Messages.RIFT_LEADERBOARD, [], null]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Cross-cutting: every message's first element is the correct type constant
 // ---------------------------------------------------------------------------
 
@@ -1286,6 +1389,11 @@ describe('Messages - type code consistency', () => {
       { name: 'KillStreakEnded', msg: new Messages.KillStreakEnded(1, 'N', 5, null), expectedType: Types.Messages.KILL_STREAK_ENDED },
       { name: 'NemesisPowerUp', msg: new Messages.NemesisPowerUp(1, 'o', 'n', 't', 1, 1, 'v'), expectedType: Types.Messages.NEMESIS_POWER_UP },
       { name: 'NemesisKilled', msg: new Messages.NemesisKilled(1, 'n', 't', 1, 'k', false), expectedType: Types.Messages.NEMESIS_KILLED },
+      { name: 'RiftStart', msg: new Messages.RiftStart('r', 1, [], 7, 0), expectedType: Types.Messages.RIFT_START },
+      { name: 'RiftProgress', msg: new Messages.RiftProgress(1, 7), expectedType: Types.Messages.RIFT_PROGRESS },
+      { name: 'RiftAdvance', msg: new Messages.RiftAdvance(2, 0, 9, null), expectedType: Types.Messages.RIFT_ADVANCE },
+      { name: 'RiftEnd', msg: new Messages.RiftEnd(true, 'exit', 1, 7, null, null), expectedType: Types.Messages.RIFT_END },
+      { name: 'RiftLeaderboard', msg: new Messages.RiftLeaderboard([], null), expectedType: Types.Messages.RIFT_LEADERBOARD },
     ];
 
     for (const { name, msg, expectedType } of cases) {

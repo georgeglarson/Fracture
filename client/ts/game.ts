@@ -53,6 +53,7 @@ import * as PartyHandler from './handlers/party.handler';
 import * as InventoryHandler from './handlers/inventory.handler';
 import * as GameEventHandler from './handlers/game-event.handler';
 import * as NetworkConnectionHandler from './handlers/network-connection.handler';
+import * as RiftUIHandler from './handlers/rift-ui.handler';
 import { PlayerController } from './player/player-controller';
 import { InteractionController } from './player/interaction-controller';
 import { QuestController } from './quest/quest-controller';
@@ -649,6 +650,9 @@ export class Game {
 
         // Initialize achievements panel UI
         self.initAchievementsUI();
+
+        // Initialize Fracture Rift UI (menu, HUD, leaderboard)
+        self.initRiftUI();
 
         // Set camera map bounds to prevent rendering outside the map
         self.camera.setMapSize(self.map.width, self.map.height);
@@ -1881,5 +1885,30 @@ export class Game {
       this.initAchievementsUI();
     }
     this.achievementUI?.toggle();
+  }
+
+  // Fracture Rift UI (menu, HUD, leaderboard)
+  initRiftUI() {
+    if (this.riftUI) return;
+
+    this.riftUI = new RiftUI();
+    this.riftUI.setCallbacks({
+      onEnter: () => RiftUIHandler.enterRift(this),
+      onExit: () => RiftUIHandler.exitRift(this),
+      onLeaderboard: () => RiftUIHandler.requestRiftLeaderboard(this)
+    });
+
+    console.info('[Rift] UI initialized');
+  }
+
+  toggleRiftMenu() {
+    if (!this.riftUI) {
+      this.initRiftUI();
+    }
+    this.riftUI?.toggleMenu();
+  }
+
+  exitRift() {
+    RiftUIHandler.exitRift(this);
   }
 }

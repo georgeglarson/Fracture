@@ -2,9 +2,13 @@
  * RiftHandler - Handles Fracture Rift operations for players
  *
  * Single Responsibility: Rift entry, progress tracking, and rewards
+ *
+ * All client-bound messages use the Messages.* classes (positional arrays)
+ * whose field order matches the client parsers in
+ * client/ts/network/gameclient.ts (receiveRiftStart/Progress/Advance/End/Leaderboard).
  */
 
-import { Types } from '../../../shared/ts/gametypes';
+import { Messages } from '../message.js';
 import { riftManager } from '../rifts/rift-manager';
 import { RiftModifier, MODIFIERS, formatModifier } from '../../../shared/ts/rifts/rift-data';
 import { createModuleLogger } from '../utils/logger.js';
@@ -29,8 +33,14 @@ export interface RiftPlayerContext {
   addXP: (amount: number, source: string) => void;
   addGold: (amount: number, source: string) => void;
 
-  // Position for rift teleport
-  setPosition: (x: number, y: number) => void;
+  // Position for rift teleport.
+  // teleport() must move the player through the established path
+  // (setPosition + broadcast Teleport + vanish/repush) as doors do.
+  getPosition: () => { x: number; y: number };
+  teleport: (x: number, y: number) => void;
+
+  // Despawn leftover rift mobs when a run ends
+  despawnMobs?: (mobIds: number[]) => void;
 
   // Save/restore position for rift exit
   savedPosition?: { x: number; y: number };
@@ -44,10 +54,11 @@ export function handleRiftEnter(ctx: RiftPlayerContext): boolean {
   const run = riftManager.startRun(ctx.id, ctx.name, ctx.level);
 
   if (!run) {
-    ctx.send([Types.Messages.RIFT_END, {
-      success: false,
-      reason: 'Cannot enter rift. Already in a rift or level too low.'
-    }]);
+    ctx.send(new Messages.RiftEnd(
+      false,
+      'Cannot enter rift. Already in a rift or level too low.',
+      0, 0, null, null
+    ).serialize());
     return false;
   }
 
@@ -58,13 +69,18 @@ export function handleRiftEnter(ctx: RiftPlayerContext): boolean {
   }));
 
   // Send rift start message
-  ctx.send([Types.Messages.RIFT_START, {
-    runId: run.runId,
-    depth: run.depth,
+  ctx.send(new Messages.RiftStart(
+    run.runId,
+    run.depth,
     modifiers,
-    requiredKills: run.requiredKills,
-    killCount: 0
-  }]);
+    run.requiredKills,
+    0
+  ).serialize());
+
+  // Save the return position and teleport the player into the rift arena
+  ctx.savedPosition = ctx.getPosition();
+  const center = riftManager.getArenaCenter();
+  ctx.teleport(center.x, center.y);
 
   log.info({ player: ctx.name, depth: 1 }, 'Entered rift');
   return true;
@@ -85,18 +101,18 @@ export function handleRiftKill(ctx: RiftPlayerContext, mobId: number): void {
     }
 
     // Send advance message
-    ctx.send([Types.Messages.RIFT_ADVANCE, {
-      newDepth: result.newDepth,
-      killCount: 0,
-      requiredKills: result.requiredKills,
-      rewards: result.rewards
-    }]);
+    ctx.send(new Messages.RiftAdvance(
+      result.newDepth,
+      0,
+      result.requiredKills,
+      result.rewards ?? null
+    ).serialize());
   } else {
     // Send progress update
-    ctx.send([Types.Messages.RIFT_PROGRESS, {
-      killCount: result.killCount,
-      requiredKills: result.requiredKills
-    }]);
+    ctx.send(new Messages.RiftProgress(
+      result.killCount,
+      result.requiredKills
+    ).serialize());
   }
 }
 
@@ -107,10 +123,11 @@ export function handleRiftExit(ctx: RiftPlayerContext): void {
   const result = riftManager.endRun(ctx.id, 'exit');
 
   if (!result) {
-    ctx.send([Types.Messages.RIFT_END, {
-      success: false,
-      reason: 'Not in a rift'
-    }]);
+    ctx.send(new Messages.RiftEnd(
+      false,
+      'Not in a rift',
+      0, 0, null, null
+    ).serialize());
     return;
   }
 
@@ -119,14 +136,21 @@ export function handleRiftExit(ctx: RiftPlayerContext): void {
   ctx.addGold(result.finalRewards.gold, 'Rift Completion');
 
   // Send end message
-  ctx.send([Types.Messages.RIFT_END, {
-    success: true,
-    reason: 'exit',
-    completedDepth: result.run.completedDepth,
-    totalKills: result.run.killCount,
-    rewards: result.finalRewards,
-    leaderboardRank: result.leaderboardRank
-  }]);
+  ctx.send(new Messages.RiftEnd(
+    true,
+    'exit',
+    result.run.completedDepth,
+    result.run.killCount,
+    result.finalRewards,
+    result.leaderboardRank
+  ).serialize());
+
+  // Return the player to where they entered and clean up leftover mobs
+  if (ctx.savedPosition) {
+    ctx.teleport(ctx.savedPosition.x, ctx.savedPosition.y);
+    ctx.savedPosition = undefined;
+  }
+  ctx.despawnMobs?.(result.spawnedMobIds);
 
   log.info({ player: ctx.name, completedDepth: result.run.completedDepth }, 'Exited rift');
 }
@@ -148,14 +172,19 @@ export function handleRiftDeath(ctx: RiftPlayerContext): void {
   ctx.addXP(deathRewards.xp, 'Rift (Death)');
   ctx.addGold(deathRewards.gold, 'Rift (Death)');
 
-  ctx.send([Types.Messages.RIFT_END, {
-    success: false,
-    reason: 'death',
-    completedDepth: result.run.completedDepth,
-    totalKills: result.run.killCount,
-    rewards: deathRewards,
-    leaderboardRank: result.leaderboardRank
-  }]);
+  ctx.send(new Messages.RiftEnd(
+    false,
+    'death',
+    result.run.completedDepth,
+    result.run.killCount,
+    deathRewards,
+    result.leaderboardRank
+  ).serialize());
+
+  // No teleport on death — the normal death/respawn flow relocates the
+  // player to their checkpoint. Just drop the saved position and clean up.
+  ctx.savedPosition = undefined;
+  ctx.despawnMobs?.(result.spawnedMobIds);
 
   log.info({ player: ctx.name, depth: result.run.depth }, 'Died in rift');
 }
@@ -167,10 +196,7 @@ export function handleRiftLeaderboardRequest(ctx: RiftPlayerContext): void {
   const leaderboard = riftManager.getLeaderboard(10);
   const playerRank = riftManager.getPlayerRank(ctx.name);
 
-  ctx.send([Types.Messages.RIFT_LEADERBOARD, {
-    entries: leaderboard,
-    playerRank
-  }]);
+  ctx.send(new Messages.RiftLeaderboard(leaderboard, playerRank).serialize());
 }
 
 /**
@@ -178,6 +204,13 @@ export function handleRiftLeaderboardRequest(ctx: RiftPlayerContext): void {
  */
 export function isPlayerInRift(playerId: number): boolean {
   return riftManager.isInRift(playerId);
+}
+
+/**
+ * Check whether a mob belongs to the player's active rift run
+ */
+export function isRiftMob(playerId: number, mobId: number): boolean {
+  return riftManager.isRiftMob(playerId, mobId);
 }
 
 /**
@@ -215,8 +248,9 @@ export function getRiftState(playerId: number): {
 }
 
 /**
- * Clean up on player disconnect
+ * Clean up on player disconnect.
+ * Returns the manager's endRun result so the caller can despawn leftover mobs.
  */
-export function handleRiftDisconnect(playerId: number): void {
-  riftManager.cleanupDisconnectedPlayer(playerId);
+export function handleRiftDisconnect(playerId: number): ReturnType<typeof riftManager.cleanupDisconnectedPlayer> {
+  return riftManager.cleanupDisconnectedPlayer(playerId);
 }

@@ -687,6 +687,93 @@ export const Messages = {
         this.killerName,
         this.isRevenge ? 1 : 0];
     }
+  },
+
+  // Fracture Rift messages.
+  // Field order must match the positional client parsers in
+  // client/ts/network/gameclient.ts (receiveRiftStart/Progress/Advance/End/Leaderboard).
+  RiftStart: class {
+    constructor(
+      private runId: string,
+      private depth: number,
+      private modifiers: Array<{ id: string; name: string; description: string; color: string }>,
+      private requiredKills: number,
+      private killCount: number
+    ) {}
+
+    serialize() {
+      return [Types.Messages.RIFT_START,
+        this.runId,
+        this.depth,
+        this.modifiers,
+        this.requiredKills,
+        this.killCount];
+    }
+  },
+
+  RiftProgress: class {
+    constructor(
+      private killCount: number,
+      private requiredKills: number
+    ) {}
+
+    serialize() {
+      return [Types.Messages.RIFT_PROGRESS,
+        this.killCount,
+        this.requiredKills];
+    }
+  },
+
+  RiftAdvance: class {
+    constructor(
+      private newDepth: number,
+      private killCount: number,
+      private requiredKills: number,
+      private rewards: { xp: number; gold: number } | null
+    ) {}
+
+    serialize() {
+      return [Types.Messages.RIFT_ADVANCE,
+        this.newDepth,
+        this.killCount,
+        this.requiredKills,
+        this.rewards];
+    }
+  },
+
+  RiftEnd: class {
+    constructor(
+      private success: boolean,
+      private reason: string,
+      private completedDepth: number,
+      private totalKills: number,
+      private rewards: { xp: number; gold: number } | null,
+      private leaderboardRank: number | null
+    ) {}
+
+    serialize() {
+      // Client treats data[1] === 1 as success
+      return [Types.Messages.RIFT_END,
+        this.success ? 1 : 0,
+        this.reason,
+        this.completedDepth,
+        this.totalKills,
+        this.rewards,
+        this.leaderboardRank];
+    }
+  },
+
+  RiftLeaderboard: class {
+    constructor(
+      private entries: Array<{ rank: number; playerName: string; maxDepth: number; totalKills: number; completionTime: number }>,
+      private playerRank: number | null
+    ) {}
+
+    serialize() {
+      return [Types.Messages.RIFT_LEADERBOARD,
+        this.entries,
+        this.playerRank];
+    }
   }
 };
 

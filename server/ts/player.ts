@@ -473,10 +473,16 @@ export class Player extends Character {
   // FRACTURE RIFT SYSTEM - Delegated to RiftHandler
   // ============================================================================
 
+  // Position saved on rift entry, restored on rift exit
+  riftSavedPosition: { x: number; y: number } | null = null;
+
   /**
    * Get rift handler context
    */
   private getRiftContext(): RiftHandler.RiftPlayerContext {
+    const world = this.world;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const player = this;
     return {
       id: this.id,
       name: this.name,
@@ -487,7 +493,30 @@ export class Player extends Character {
       broadcast: (msg: unknown[], ignoreSelf?: boolean) => this.broadcast(msg, ignoreSelf),
       addXP: (amount: number, _source: string) => this.grantXP(amount),
       addGold: (amount: number, _source: string) => this.grantGold(amount),
-      setPosition: (x: number, y: number) => this.setPosition(x, y)
+      getPosition: () => ({ x: this.x, y: this.y }),
+      // Same path the TELEPORT message handler uses (doors)
+      teleport: (x: number, y: number) => {
+        this.spawnProtectionUntil = 0;
+        this.setPosition(x, y);
+        this.clearTarget();
+        this.broadcast(new Messages.Teleport(this));
+        world.handlePlayerVanish(this);
+        world.pushRelevantEntityListTo(this);
+      },
+      despawnMobs: (mobIds: number[]) => {
+        for (const mobId of mobIds) {
+          const entity = world.getEntityById(mobId);
+          if (entity) {
+            world.despawn(entity);
+          }
+        }
+      },
+      get savedPosition(): { x: number; y: number } | undefined {
+        return player.riftSavedPosition ?? undefined;
+      },
+      set savedPosition(pos: { x: number; y: number } | undefined) {
+        player.riftSavedPosition = pos ?? null;
+      }
     };
   }
 
@@ -510,6 +539,36 @@ export class Player extends Character {
    */
   handleRiftLeaderboardRequest(): void {
     RiftHandler.handleRiftLeaderboardRequest(this.getRiftContext());
+  }
+
+  /**
+   * Record a mob kill toward the active rift run.
+   * Only mobs spawned for this player's run count (wired from combat-system).
+   */
+  handleRiftKill(mobId: number): void {
+    if (RiftHandler.isRiftMob(this.id, mobId)) {
+      RiftHandler.handleRiftKill(this.getRiftContext(), mobId);
+    }
+  }
+
+  /**
+   * End the active rift run on player death (wired from combat-system)
+   */
+  handleRiftDeath(): void {
+    if (RiftHandler.isPlayerInRift(this.id)) {
+      RiftHandler.handleRiftDeath(this.getRiftContext());
+    }
+  }
+
+  /**
+   * Clean up rift state on disconnect (wired from world onExit)
+   */
+  handleRiftDisconnect(): void {
+    const result = RiftHandler.handleRiftDisconnect(this.id);
+    if (result && result.spawnedMobIds.length > 0) {
+      this.getRiftContext().despawnMobs?.(result.spawnedMobIds);
+    }
+    this.riftSavedPosition = null;
   }
 
   /**
