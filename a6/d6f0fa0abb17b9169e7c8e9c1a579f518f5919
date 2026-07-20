@@ -1,0 +1,19 @@
+server/ts/__tests__/storage.service.test.ts
+  s_e098fca318c3c5::t_ec252b5f469dff 864-947
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a6d6f0fa0abb17b9169e7c8e9c1a579f518f5919",
+  "prompts": {},
+  "sessions": {
+    "s_e098fca318c3c5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "91045e30-f789-439d-9fc1-0499e3f3e96e",
+        "model": "MiniMax-M3"
+      },
+      "human_author": "george larson <george.g.larson@gmail.com>"
+    }
+  }
+}
