@@ -139,6 +139,21 @@ describe('Character', () => {
         expect(c.maxHitPoints).toBe(300);
         expect(c.hitPoints).toBe(300);
       });
+
+      it('should apply the ascension HP bonus (+5% per ascension)', () => {
+        const c = createChar();
+        (c as unknown as { ascensionCount: number }).ascensionCount = 2; // 1 + 2 * 0.05 = 1.1
+        c.resetHitPoints(100);
+        expect(c.maxHitPoints).toBe(110);
+        expect(c.hitPoints).toBe(110);
+      });
+
+      it('should leave HP unmodified when ascensionCount is 0 or absent', () => {
+        const c = createChar();
+        (c as unknown as { ascensionCount: number }).ascensionCount = 0;
+        c.resetHitPoints(100);
+        expect(c.maxHitPoints).toBe(100);
+      });
     });
 
     describe('regenHealthBy', () => {
