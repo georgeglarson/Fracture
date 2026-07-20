@@ -80,6 +80,28 @@ vi.mock('../party/index.js', () => ({
   },
 }));
 
+// Nemesis service: default no revenge (1.0 multipliers), overridable per test
+const mockGetRevengeMultipliers = vi.fn(() => ({ xp: 1.0, gold: 1.0 }));
+
+vi.mock('../combat/nemesis.service.js', () => ({
+  nemesisService: {
+    getRevengeMultipliers: (...args: [number, number]) => mockGetRevengeMultipliers(...args),
+  },
+}));
+
+// Zone manager: default no zone at mob position, overridable per test.
+// applyXpBonus/applyGoldBonus mirror the real multiplier math.
+type FakeZone = { id: string; xpBonus: number; goldBonus: number };
+const mockGetZoneAt = vi.fn((): FakeZone | null => null);
+
+vi.mock('../zones/zone-manager.js', () => ({
+  getZoneManager: vi.fn(() => ({
+    getZoneAt: mockGetZoneAt,
+    applyXpBonus: vi.fn((xp: number, zone: FakeZone | null) => (zone ? Math.floor(xp * (1 + zone.xpBonus)) : xp)),
+    applyGoldBonus: vi.fn((gold: number, zone: FakeZone | null) => (zone ? Math.floor(gold * (1 + zone.goldBonus)) : gold)),
+  })),
+}));
+
 // ---------------------------------------------------------------------------
 // Now import the module under test (after all vi.mock calls)
 // ---------------------------------------------------------------------------
@@ -184,8 +206,16 @@ describe('CombatSystem — Bug Fix & Security Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Restore default implementations (mockClear keeps mockImplementation/mockReturnValue)
+    vi.mocked(Formulas.xpFromMob).mockImplementation((level: number) => level * 10);
+    vi.mocked(Formulas.goldFromMob).mockImplementation((armorLevel: number) => armorLevel * 5);
+    mockIsInParty.mockReturnValue(false);
+    mockGetMembersInRange.mockReturnValue([]);
+    mockCalculatePartyXpBonus.mockReturnValue(1.0);
     mockHasAggro.mockReturnValue(false);
     mockGetMobsAttacking.mockReturnValue([]);
+    mockGetRevengeMultipliers.mockReturnValue({ xp: 1.0, gold: 1.0 });
+    mockGetZoneAt.mockReturnValue(null);
 
     player = createMockPlayer();
     mob = createMockMob();
@@ -215,8 +245,8 @@ describe('CombatSystem — Bug Fix & Security Tests', () => {
 
       combatSystem.handleHurtEntity(mob, player, 50);
 
-      expect(Formulas.xpFromMob).toHaveBeenCalledWith(25);
-      expect(Formulas.xpFromMob).not.toHaveBeenCalledWith(3);
+      expect(Formulas.xpFromMob).toHaveBeenCalledWith(25, 1);
+      expect(Formulas.xpFromMob).not.toHaveBeenCalledWith(3, 1);
     });
 
     it('passes mob.level=25 to xpFromMob (XP = 250 not 30 from armorLevel=3)', () => {
@@ -496,7 +526,7 @@ describe('CombatSystem — Bug Fix & Security Tests', () => {
 
       combatSystem.handleHurtEntity(mob, player, 50);
 
-      expect(Formulas.xpFromMob).toHaveBeenCalledWith(7);
+      expect(Formulas.xpFromMob).toHaveBeenCalledWith(7, 1);
     });
 
     it('calls Formulas.goldFromMob with 0 when armorLevel is 0', () => {
@@ -759,6 +789,206 @@ describe('CombatSystem — Bug Fix & Security Tests', () => {
       combatSystem.handleHurtEntity(player, mob, 5); // 15% — fires again
 
       expect(handleLowHealth).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ==========================================================================
+  // Gray-mob XP protection: the real player level drives xpLevelModifier
+  // ==========================================================================
+
+  describe('gray-mob XP protection uses the real player level', () => {
+    it('passes the attacker level to Formulas.xpFromMob (solo)', () => {
+      const highLevelPlayer = createMockPlayer({ id: 1, level: 40 });
+      mob = createMockMob({ id: 100, level: 5, armorLevel: 1, hitPoints: 0 });
+      world = createMockWorld({
+        getEntityById: vi.fn((id) => (id === 1 ? highLevelPlayer : id === 100 ? mob : undefined)),
+      });
+      combatSystem = new CombatSystem(world);
+
+      combatSystem.handleHurtEntity(mob, highLevelPlayer, 50);
+
+      expect(Formulas.xpFromMob).toHaveBeenCalledWith(5, 40);
+    });
+
+    it('scales each party member share by their own level', () => {
+      const attacker = createMockPlayer({ id: 1, level: 40 });
+      const member2 = createMockPlayer({ id: 2, level: 5, grantXP: vi.fn(), grantGold: vi.fn() });
+      mob = createMockMob({ id: 100, level: 10, armorLevel: 2, hitPoints: 0 });
+
+      // Distinct return per playerLevel so per-member shares are distinguishable
+      vi.mocked(Formulas.xpFromMob).mockImplementation(
+        (_mobLevel: number, playerLevel?: number) => (playerLevel === 40 ? 1000 : 100)
+      );
+
+      mockIsInParty.mockReturnValue(true);
+      mockGetMembersInRange.mockReturnValue([1, 2]);
+      mockHasAggro.mockImplementation((_mobId: number, playerId: number) => playerId === 2);
+      mockCalculatePartyXpBonus.mockReturnValue(1.0);
+
+      world = createMockWorld({
+        getEntityById: vi.fn((id) => {
+          if (id === 1) return attacker;
+          if (id === 2) return member2;
+          if (id === 100) return mob;
+          return undefined;
+        }),
+      });
+      combatSystem = new CombatSystem(world);
+
+      combatSystem.handleHurtEntity(mob, attacker, 50);
+
+      // floor(1000 / 2) = 500 for the level-40 attacker vs floor(100 / 2) = 50
+      expect(attacker.grantXP).toHaveBeenCalledWith(500);
+      expect(member2.grantXP).toHaveBeenCalledWith(50);
+    });
+  });
+
+  // ==========================================================================
+  // Nemesis revenge multipliers in reward distribution
+  // ==========================================================================
+
+  describe('nemesis revenge multipliers in reward distribution', () => {
+    it('applies revenge XP/gold multipliers when the mob was the attacker nemesis', () => {
+      mockGetRevengeMultipliers.mockReturnValue({ xp: 2.5, gold: 2.0 });
+      mob = createMockMob({ id: 100, level: 25, armorLevel: 3, hitPoints: 0 });
+      world = createMockWorld({
+        getEntityById: vi.fn((id) => (id === 1 ? player : id === 100 ? mob : undefined)),
+      });
+      combatSystem = new CombatSystem(world);
+
+      combatSystem.handleHurtEntity(mob, player, 50);
+
+      expect(mockGetRevengeMultipliers).toHaveBeenCalledWith(1, 100);
+      // XP: floor(250 * 2.5) = 625; gold: floor(15 * 2.0) = 30
+      expect(player.grantXP).toHaveBeenCalledWith(625);
+      expect(player.grantGold).toHaveBeenCalledWith(30);
+    });
+
+    it('uses neutral multipliers when the mob is not a nemesis of the attacker', () => {
+      mob = createMockMob({ id: 100, level: 25, armorLevel: 3, hitPoints: 0 });
+      world = createMockWorld({
+        getEntityById: vi.fn((id) => (id === 1 ? player : id === 100 ? mob : undefined)),
+      });
+      combatSystem = new CombatSystem(world);
+
+      combatSystem.handleHurtEntity(mob, player, 50);
+
+      expect(player.grantXP).toHaveBeenCalledWith(250);
+      expect(player.grantGold).toHaveBeenCalledWith(15);
+    });
+  });
+
+  // ==========================================================================
+  // Zone XP/gold bonuses in reward distribution
+  // ==========================================================================
+
+  describe('zone XP/gold bonuses in reward distribution', () => {
+    it('applies the mob zone xpBonus/goldBonus to rewards', () => {
+      mockGetZoneAt.mockReturnValue({ id: 'lavaland', xpBonus: 0.5, goldBonus: 0.5 });
+      mob = createMockMob({ id: 100, level: 25, armorLevel: 3, hitPoints: 0 });
+      world = createMockWorld({
+        getEntityById: vi.fn((id) => (id === 1 ? player : id === 100 ? mob : undefined)),
+      });
+      combatSystem = new CombatSystem(world);
+
+      combatSystem.handleHurtEntity(mob, player, 50);
+
+      // XP: floor(250 * 1.5) = 375; gold: floor(15 * 1.5) = 22
+      expect(player.grantXP).toHaveBeenCalledWith(375);
+      expect(player.grantGold).toHaveBeenCalledWith(22);
+    });
+
+    it('looks up the zone at the MOB position, not the player position', () => {
+      mob = createMockMob({ id: 100, level: 25, armorLevel: 3, hitPoints: 0, x: 300, y: 30 });
+      world = createMockWorld({
+        getEntityById: vi.fn((id) => (id === 1 ? player : id === 100 ? mob : undefined)),
+      });
+      combatSystem = new CombatSystem(world);
+
+      combatSystem.handleHurtEntity(mob, player, 50);
+
+      expect(mockGetZoneAt).toHaveBeenCalledWith(300, 30);
+    });
+
+    it('leaves rewards unmodified when the mob is outside any zone', () => {
+      mob = createMockMob({ id: 100, level: 25, armorLevel: 3, hitPoints: 0 });
+      world = createMockWorld({
+        getEntityById: vi.fn((id) => (id === 1 ? player : id === 100 ? mob : undefined)),
+      });
+      combatSystem = new CombatSystem(world);
+
+      combatSystem.handleHurtEntity(mob, player, 50);
+
+      expect(player.grantXP).toHaveBeenCalledWith(250);
+      expect(player.grantGold).toHaveBeenCalledWith(15);
+    });
+  });
+
+  // ==========================================================================
+  // Zone-boss loot multipliers in reward distribution
+  // ==========================================================================
+
+  describe('zone-boss loot multipliers in reward distribution', () => {
+    it('applies RoamingBoss xp/gold loot multipliers', () => {
+      mob = createMockMob({
+        id: 100,
+        level: 25,
+        armorLevel: 3,
+        hitPoints: 0,
+        getLootMultipliers: vi.fn(() => ({ xp: 3, gold: 2.5, dropBonus: 0.15 })),
+      });
+      world = createMockWorld({
+        getEntityById: vi.fn((id) => (id === 1 ? player : id === 100 ? mob : undefined)),
+      });
+      combatSystem = new CombatSystem(world);
+
+      combatSystem.handleHurtEntity(mob, player, 50);
+
+      // XP: floor(250 * 3) = 750; gold: floor(15 * 2.5) = 37
+      expect(player.grantXP).toHaveBeenCalledWith(750);
+      expect(player.grantGold).toHaveBeenCalledWith(37);
+    });
+
+    it('stacks with nemesis revenge multipliers', () => {
+      mockGetRevengeMultipliers.mockReturnValue({ xp: 2.5, gold: 2.0 });
+      mob = createMockMob({
+        id: 100,
+        level: 25,
+        armorLevel: 3,
+        hitPoints: 0,
+        getLootMultipliers: vi.fn(() => ({ xp: 3, gold: 2.5, dropBonus: 0.15 })),
+      });
+      world = createMockWorld({
+        getEntityById: vi.fn((id) => (id === 1 ? player : id === 100 ? mob : undefined)),
+      });
+      combatSystem = new CombatSystem(world);
+
+      combatSystem.handleHurtEntity(mob, player, 50);
+
+      // XP: floor(250 * 2.5 * 3) = 1875; gold: floor(15 * 2.0 * 2.5) = 75
+      expect(player.grantXP).toHaveBeenCalledWith(1875);
+      expect(player.grantGold).toHaveBeenCalledWith(75);
+    });
+  });
+
+  // ==========================================================================
+  // Party HP sync on player damage
+  // ==========================================================================
+
+  describe('party HP sync on player damage', () => {
+    it('calls updatePartyHp when a player takes damage', () => {
+      const updatePartyHp = vi.fn();
+      const hurtPlayer = createMockPlayer({ hitPoints: 80, maxHitPoints: 100, updatePartyHp });
+
+      combatSystem.handleHurtEntity(hurtPlayer, mob, 10);
+
+      expect(updatePartyHp).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not require updatePartyHp to exist (plain entities skip it)', () => {
+      const hurtPlayer = createMockPlayer({ hitPoints: 80, maxHitPoints: 100 });
+
+      expect(() => combatSystem.handleHurtEntity(hurtPlayer, mob, 10)).not.toThrow();
     });
   });
 });

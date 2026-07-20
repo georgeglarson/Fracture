@@ -294,7 +294,7 @@ describe('CombatHandler', () => {
       handleHurt(player, [9, 42]);
 
       expect(player.hitPoints).toBeLessThan(100);
-      expect(world.handleHurtEntity).toHaveBeenCalledWith(player);
+      expect(world.handleHurtEntity).toHaveBeenCalledWith(player, mob, 10);
     });
 
     it('should clamp hitPoints at 0 on overkill damage', () => {
@@ -415,6 +415,99 @@ describe('CombatHandler', () => {
 
       expect(player.addAttacker).toHaveBeenCalledWith(mob);
       expect(world.broadcastAttacker).toHaveBeenCalledWith(mob);
+    });
+
+    it('should pass the attacking mob to handleHurtEntity so player:died carries killerId', () => {
+      player.hitPoints = 5;
+      vi.mocked(Formulas.dmg).mockReturnValue(10);
+
+      handleHurt(player, [9, 42]);
+
+      // The mob reference + damage must flow through for the nemesis system
+      expect(world.handleHurtEntity).toHaveBeenCalledWith(player, mob, 10);
+    });
+
+    it('should apply nemesisPowerLevel as a damage multiplier', () => {
+      mob.nemesisPowerLevel = 2.0;
+      vi.mocked(Formulas.dmg).mockReturnValue(10);
+
+      handleHurt(player, [9, 42]);
+
+      // floor(10 * 2.0) = 20
+      expect(player.hitPoints).toBe(80);
+      expect(world.handleHurtEntity).toHaveBeenCalledWith(player, mob, 20);
+    });
+
+    it('should ignore nemesisPowerLevel when it is not a number', () => {
+      mob.nemesisPowerLevel = undefined;
+      vi.mocked(Formulas.dmg).mockReturnValue(10);
+
+      handleHurt(player, [9, 42]);
+
+      expect(player.hitPoints).toBe(90);
+    });
+  });
+
+  // =========================================================================
+  // Ascension damage multiplier (handleHit)
+  // =========================================================================
+
+  describe('handleHit ascension damage multiplier', () => {
+    let player: Player;
+    let world: ReturnType<typeof createMockWorld>;
+    let mob: {
+      id: number;
+      isDead: boolean;
+      armorLevel: number;
+      weaponLevel: number;
+      receiveDamage: ReturnType<typeof vi.fn>;
+      hitPoints: number;
+      x: number;
+      y: number;
+    };
+
+    beforeEach(() => {
+      player = createMockPlayer();
+      world = player.getWorld() as ReturnType<typeof createMockWorld>;
+      mob = {
+        id: 42,
+        isDead: false,
+        armorLevel: 1,
+        weaponLevel: 1,
+        receiveDamage: vi.fn(),
+        hitPoints: 50,
+        x: 51,
+        y: 50,
+      };
+      world.getEntityById = vi.fn(() => mob);
+      vi.mocked(Formulas.dmg).mockReturnValue(10);
+    });
+
+    it('should deal unmodified damage with no ascensions', () => {
+      player.ascensionCount = 0;
+
+      handleHit(player, [8, 42]);
+
+      expect(mob.receiveDamage).toHaveBeenCalledWith(10, player.id);
+    });
+
+    it('should apply +5% damage per ascension', () => {
+      player.ascensionCount = 2; // 1 + 2 * 0.05 = 1.1
+
+      handleHit(player, [8, 42]);
+
+      // floor(10 * 1 * 1.1) = 11
+      expect(mob.receiveDamage).toHaveBeenCalledWith(11, player.id);
+    });
+
+    it('should stack with the power strike multiplier', () => {
+      player.ascensionCount = 4; // 1 + 4 * 0.05 = 1.2
+      (player.consumePowerStrike as ReturnType<typeof vi.fn>).mockReturnValue(2);
+
+      handleHit(player, [8, 42]);
+
+      // floor(10 * 2 * 1.2) = 24
+      expect(mob.receiveDamage).toHaveBeenCalledWith(24, player.id);
     });
   });
 });

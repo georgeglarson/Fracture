@@ -392,6 +392,56 @@ describe('getGroupIdFromPosition', () => {
     const m = createMap(makeMapData({ width: 84, height: 24 })); // 84/28=3 groups
     expect(m.getGroupIdFromPosition(57, 1)).toBe('2-0'); // floor(56/28)=2
   });
+
+  // Edge-clamping: real map is 172x314 → 6x26 full groups (x 0-167, y 0-311).
+  // Tiles in the truncated remainder must join the last group, not a
+  // nonexistent one (addToGroup skips those → invisible entities).
+  describe('edge clamping (non-multiple map dimensions)', () => {
+    // 172 = 6*28 + 4, 314 = 26*12 + 2 → groupWidth=6, groupHeight=26
+    let m: Map;
+
+    beforeEach(() => {
+      m = createMap(makeMapData({ width: 172, height: 314 }));
+    });
+
+    it('clamps x in the truncated east strip (169-171) into the last group', () => {
+      // gy = floor(99/12) = 8
+      expect(m.getGroupIdFromPosition(169, 100)).toBe('5-8');
+      expect(m.getGroupIdFromPosition(171, 100)).toBe('5-8');
+    });
+
+    it('keeps x=168 in the last full group (unclamped geometry)', () => {
+      expect(m.getGroupIdFromPosition(168, 100)).toBe('5-8'); // floor(167/28)=5
+    });
+
+    it('clamps y in the truncated south strip (312-313) into the last group', () => {
+      expect(m.getGroupIdFromPosition(100, 312)).toBe('3-25'); // floor(311/12)=25, unclamped
+      expect(m.getGroupIdFromPosition(100, 313)).toBe('3-25'); // floor(312/12)=26 → clamped
+    });
+
+    it('clamps the far corner (171,313) into the last group', () => {
+      expect(m.getGroupIdFromPosition(171, 313)).toBe('5-25');
+    });
+
+    it('clamps out-of-range coordinates at 0 from below', () => {
+      // x=0 → floor(-1/28) = -1 → clamped to 0
+      expect(m.getGroupIdFromPosition(0, 0)).toBe('0-0');
+    });
+
+    it('every position on the map resolves to a group that forEachGroup creates', () => {
+      const existing = new Set<string>();
+      m.forEachGroup((id) => existing.add(id));
+
+      for (let x = 1; x <= m.width; x++) {
+        for (let y = 1; y <= m.height; y++) {
+          const id = m.getGroupIdFromPosition(x, y);
+          if (!existing.has(id)) {
+            throw new Error(`position (${x},${y}) maps to nonexistent group ${id}`);
+          }
+        }
+      }
+    });
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@
 
 import { Formulas } from '../formulas';
 import { MELEE_RANGE } from '../combat/combat-constants.js';
+import { getAscensionDamageMultiplier } from './progression.handler.js';
 import { createModuleLogger } from '../utils/logger.js';
 import type { Player } from '../player';
 
@@ -44,8 +45,10 @@ export function handleHit(player: Player, msg: any[]): void {
   if (mob && !mob.isDead && isInMeleeRange(player, mob)) {
     // Apply Power Strike multiplier (consumes the buff if active)
     const powerStrikeMultiplier = player.consumePowerStrike();
+    // Ascension damage bonus (+5% per ascension, advertised via PROGRESSION_INIT)
+    const ascensionMultiplier = getAscensionDamageMultiplier(player.ascensionCount ?? 0);
     const baseDmg = Formulas.dmg(player.weaponLevel, mob.armorLevel, player.level);
-    const dmg = Math.floor(baseDmg * powerStrikeMultiplier);
+    const dmg = Math.floor(baseDmg * powerStrikeMultiplier * ascensionMultiplier);
     if (dmg > 0) {
       const mobHpBefore = mob.hitPoints;
       mob.receiveDamage(dmg, player.id);
@@ -81,10 +84,13 @@ export function handleHurt(player: Player, msg: any[]): void {
     }
 
     const hpBefore = player.hitPoints;
-    const dmg = Formulas.dmg(mob.weaponLevel, player.armorLevel, mob.level ?? 1);
+    // Nemesis power: mobs that have killed players hit harder (set by nemesis.service)
+    const nemesisMultiplier = typeof mob.nemesisPowerLevel === 'number' ? mob.nemesisPowerLevel : 1;
+    const dmg = Math.floor(Formulas.dmg(mob.weaponLevel, player.armorLevel, mob.level ?? 1) * nemesisMultiplier);
     player.hitPoints = Math.max(0, player.hitPoints - dmg);
     player.getAuditLog()?.record('hp', 'hurt', { hp: hpBefore }, { hp: player.hitPoints }, { mobId: mob.id, dmg, mobWeaponLevel: mob.weaponLevel, armorLevel: player.armorLevel });
-    world.handleHurtEntity(player);
+    // Pass the attacking mob through so player:died carries killerId (nemesis system)
+    world.handleHurtEntity(player, mob, dmg);
 
     if (player.hitPoints <= 0) {
       player.isDead = true;
