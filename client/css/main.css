@@ -425,31 +425,24 @@ footer, header, hgroup, menu, nav, section {
     /* Fracture Logo - CSS Text */
     #logo {font-family:'GraphicPixel', sans-serif;color:#FFD700;text-shadow:4px 4px 0 #8B4513, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 6px 0 #5C3317;letter-spacing:4px;text-align:center;background:none !important;}
 
-    /* Venice Button - LEFT side */
-    #venice-button {
+    /* AI retirement note - LEFT side */
+    #ai-retired-note {
         position:fixed;
         bottom:10px;
         left:10px;
         z-index:10001;
         opacity:0.9;
-        transition:opacity 0.3s ease, bottom 0.3s ease;
-        pointer-events:auto;
         background:rgba(255,255,255,0.95);
         padding:6px 10px;
         border-radius:6px;
         border:1px solid rgba(200,200,200,0.8);
         display:block;
-    }
-    #venice-button:hover {
-        opacity:1;
-    }
-    #venice-button img {
-        height:80px;
-        width:auto;
-        display:block;
+        font-size:11px;
+        color:#333;
+        max-width:200px;
     }
     /* During game: move above status bar */
-    .game #venice-button {
+    .game #ai-retired-note {
         bottom:68px;
         left:20px;
     }
@@ -486,7 +479,7 @@ footer, header, hgroup, menu, nav, section {
 
     /* Hide on small screens */
     @media (max-width: 800px) {
-        #venice-button,
+        #ai-retired-note,
         #hire-button {
             display:none;
         }
