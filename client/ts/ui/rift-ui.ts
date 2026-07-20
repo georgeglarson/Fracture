@@ -9,6 +9,20 @@
 
 import { RiftModifier } from '../../../shared/ts/rifts/rift-data';
 
+/**
+ * Escape user/server-supplied strings before innerHTML interpolation.
+ * Leaderboard player names are user-controlled; modifier text comes from the
+ * static MODIFIERS table but gets the same treatment (Sourcery XSS finding).
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 interface ModifierInfo {
   id: string;
   name: string;
@@ -340,7 +354,7 @@ export class RiftUI {
               margin: 2px;
               font-size: 10px;
               color: ${m.color};
-            " title="${m.description}">${m.name}</span>
+            " title="${escapeHtml(m.description)}">${escapeHtml(m.name)}</span>
           `).join('')}
         </div>
       `;
@@ -449,7 +463,7 @@ export class RiftUI {
       html += `
         <tr style="border-bottom: 1px solid #333;">
           <td style="padding: 8px; color: ${rankColor};">#${entry.rank}</td>
-          <td style="padding: 8px;">${entry.playerName}</td>
+          <td style="padding: 8px;">${escapeHtml(entry.playerName)}</td>
           <td style="padding: 8px; text-align: right; color: #ff8800;">${entry.maxDepth}</td>
           <td style="padding: 8px; text-align: right; color: #44ff44;">${entry.totalKills}</td>
         </tr>
