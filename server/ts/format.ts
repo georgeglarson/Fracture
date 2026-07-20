@@ -67,6 +67,10 @@ export class FormatChecker {
 
     // Progression system
     this.formats[Types.Messages.ASCEND_REQUEST] = []; // no params
+
+    // Boss leaderboard + quest abandon
+    this.formats[Types.Messages.LEADERBOARD_REQUEST] = []; // no params
+    this.formats[Types.Messages.QUEST_ABANDON] = []; // no params
   }
 
   check(msg: unknown[]): boolean {
