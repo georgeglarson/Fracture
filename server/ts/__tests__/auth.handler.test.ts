@@ -35,6 +35,7 @@ vi.mock('../player/skill.handler', () => ({
 }));
 
 import { handleHello } from '../player/auth.handler';
+import { initAchievements } from '../player/achievement.handler';
 import type { Player } from '../player';
 
 // ---------------------------------------------------------------------------
@@ -65,6 +66,7 @@ function createMockWorld(storage?: any) {
   return {
     addPlayer: vi.fn(),
     enterCallback: vi.fn(),
+    pushRelevantEntityListTo: vi.fn(),
     getStorageService: vi.fn(() => storage || createMockStorage()),
   };
 }
@@ -292,6 +294,109 @@ describe('AuthHandler', () => {
       expect(player.equipArmor).toHaveBeenCalledWith(Types.Entities.CLOTHARMOR);
       expect(player.equipWeapon).toHaveBeenCalledWith(Types.Entities.SWORD1);
       expect(player.setGold).toHaveBeenCalledWith(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Respawn: a second HELLO on the same connection for a dead, already-
+  // authenticated player must NOT reload from storage (it would clobber up
+  // to 60s of in-memory progress with the last autosave).
+  // ---------------------------------------------------------------------------
+
+  describe('handleHello — respawn after death', () => {
+    function createDeadPlayer(world: ReturnType<typeof createMockWorld>, overrides: Record<string, unknown> = {}): Player {
+      return createMockPlayer({
+        hasEnteredGame: true,
+        isDead: true,
+        hitPoints: 0,
+        maxHitPoints: 200,
+        level: 5,
+        xp: 250,
+        gold: 123,
+        weapon: Types.Entities.SWORD2,
+        armor: Types.Entities.LEATHERARMOR,
+        name: 'Existing',
+        characterId: 'char-1',
+        getWorld: vi.fn(() => world),
+        ...overrides,
+      });
+    }
+
+    it('skips the storage reload entirely', async () => {
+      const storage = createMockStorage();
+      const world = createMockWorld(storage);
+      const player = createDeadPlayer(world);
+
+      await handleHello(player, [Msg.HELLO, 'Existing', 0, 0, 0, 'pw123'], mockUtils, mockFormulas);
+
+      expect(storage.characterExists).not.toHaveBeenCalled();
+      expect(storage.createCharacter).not.toHaveBeenCalled();
+      expect(player.loadFromStorage).not.toHaveBeenCalled();
+    });
+
+    it('restores HP, repositions at checkpoint, and clears the dead flag', async () => {
+      const world = createMockWorld();
+      const player = createDeadPlayer(world);
+
+      await handleHello(player, [Msg.HELLO, 'Existing', 0, 0, 0, 'pw123'], mockUtils, mockFormulas);
+
+      expect(player.updateHitPoints).toHaveBeenCalled(); // full HP
+      expect(player.updatePosition).toHaveBeenCalled();  // last checkpoint
+      expect(player.isDead).toBe(false);
+      expect(player.spawnProtectionUntil).toBeGreaterThan(Date.now());
+    });
+
+    it('re-registers with the world and pushes the entity list', async () => {
+      const world = createMockWorld();
+      const player = createDeadPlayer(world);
+
+      await handleHello(player, [Msg.HELLO, 'Existing', 0, 0, 0, 'pw123'], mockUtils, mockFormulas);
+
+      expect(world.addPlayer).toHaveBeenCalledWith(player);
+      expect(world.pushRelevantEntityListTo).toHaveBeenCalledWith(player);
+      // Not a fresh join: no enterCallback, no achievement re-init
+      expect(world.enterCallback).not.toHaveBeenCalled();
+      expect(initAchievements).not.toHaveBeenCalled();
+    });
+
+    it('sends WELCOME with live in-memory state, not stale storage state', async () => {
+      const world = createMockWorld();
+      const player = createDeadPlayer(world);
+
+      await handleHello(player, [Msg.HELLO, 'Existing', 0, 0, 0, 'pw123'], mockUtils, mockFormulas);
+
+      expect(player.send).toHaveBeenCalledWith([
+        Msg.WELCOME,
+        player.id,
+        'Existing',
+        player.x,
+        player.y,
+        player.hitPoints,
+        player.maxHitPoints,
+        5,   // level
+        250, // xp
+        100, // xpToNext (mock Formulas)
+        123, // gold
+      ]);
+    });
+
+    it('resends EQUIP messages for the rebuilt client entity', async () => {
+      const world = createMockWorld();
+      const player = createDeadPlayer(world);
+
+      await handleHello(player, [Msg.HELLO, 'Existing', 0, 0, 0, 'pw123'], mockUtils, mockFormulas);
+
+      expect(player.send).toHaveBeenCalledWith([Msg.EQUIP, player.id, Types.Entities.SWORD2]);
+      expect(player.send).toHaveBeenCalledWith([Msg.EQUIP, player.id, Types.Entities.LEATHERARMOR]);
+    });
+
+    it('keeps hasEnteredGame true', async () => {
+      const world = createMockWorld();
+      const player = createDeadPlayer(world);
+
+      await handleHello(player, [Msg.HELLO, 'Existing', 0, 0, 0, 'pw123'], mockUtils, mockFormulas);
+
+      expect(player.hasEnteredGame).toBe(true);
     });
   });
 });
