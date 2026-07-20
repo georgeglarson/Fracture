@@ -36,6 +36,15 @@ import { trace } from '@opentelemetry/api';
 
 const log = createModuleLogger('World');
 
+/**
+ * RoamingBoss instances (identified by their ZoneBossConfig) roam far from
+ * their spawn point by design — exempt them from leash resets or they
+ * rubber-band back to spawn mid-fight.
+ */
+function isRoamingBoss(mob: Mob): boolean {
+  return (mob as Mob & { config?: unknown }).config !== undefined;
+}
+
 // Message type for push methods - can be an object with serialize() or a raw array
 type MessagePayload = { serialize(): unknown[] } | unknown[];
 
@@ -161,7 +170,7 @@ export class World {
             const pos = this.findPositionNextTo(mob, target);
             // Leash: mob gives up if next position is too far from spawn
             const leashDist = getLeashDistance(mob.aggroRange);
-            if (mob.distanceToSpawningPoint(pos.x, pos.y) > leashDist) {
+            if (!isRoamingBoss(mob) && mob.distanceToSpawningPoint(pos.x, pos.y) > leashDist) {
               mob.clearTarget();
               mob.forgetEveryone();
               player.removeAttacker(mob);
@@ -253,6 +262,11 @@ export class World {
 
           if (character.type === 'player') {
             this.pushToPlayer(character as Player, character.regen());
+
+            // Party HP bars: regen changes HP without a damage event, so
+            // push the update here (AIPlayers have type 'player' but no
+            // party methods — hence the optional call)
+            (character as unknown as { updatePartyHp?: () => void }).updatePartyHp?.();
 
             // Regen heals without a damage event — re-arm the low-health
             // crossing detector once they're back above the threshold
@@ -356,7 +370,7 @@ export class World {
           }
           // Leash based on mob's own position (consistent with move_callback leash)
           const mobDist = mob.distanceToSpawningPoint(mob.x, mob.y);
-          if (mobDist > leashDistance) {
+          if (!isRoamingBoss(mob) && mobDist > leashDistance) {
             // Remove mob from target's attacker list before leashing
             (target as Character).removeAttacker(mob);
             mob.clearTarget();

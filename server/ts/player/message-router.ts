@@ -121,6 +121,8 @@ export function createMessageHandlers(
           player.broadcast(new Messages.Move(player));
           player.moveCallback(player.x, player.y);
           player.checkZoneChange(x, y);
+          // Keep party state (shared-XP range checks, party UI) on live positions
+          player.updatePartyPosition();
         }
       }
     }

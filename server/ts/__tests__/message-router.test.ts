@@ -221,6 +221,8 @@ function createMockContext(
 
     checkZoneChange: vi.fn(),
     updatePosition: vi.fn(),
+    updatePartyPosition: vi.fn(),
+    updatePartyHp: vi.fn(),
 
     initProgressionSystem: vi.fn(),
     handleAscendRequest: vi.fn(),
@@ -570,6 +572,20 @@ describe('MessageRouter', () => {
       // Move within MAX_MOVE_DISTANCE (3 tiles) of player position (50,50)
       await router.route(ctx, [Msg.MOVE, 51, 52]);
       expect(ctx.checkZoneChange).toHaveBeenCalledWith(51, 52);
+    });
+
+    it('should update party position after a successful move', async () => {
+      await router.route(ctx, [Msg.MOVE, 51, 52]);
+
+      expect(ctx.updatePartyPosition).toHaveBeenCalled();
+    });
+
+    it('should not update party position when the move is rejected', async () => {
+      mockWorld.isValidPosition = vi.fn(() => false);
+
+      await router.route(ctx, [Msg.MOVE, -1, -1]);
+
+      expect(ctx.updatePartyPosition).not.toHaveBeenCalled();
     });
   });
 
