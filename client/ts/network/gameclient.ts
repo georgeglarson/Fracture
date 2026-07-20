@@ -848,6 +848,10 @@ export class GameClient extends EventEmitter {
     this.sendMessage([Types.Messages.REQUEST_QUEST, npcKind]);
   }
 
+  sendQuestAbandon() {
+    this.sendMessage([Types.Messages.QUEST_ABANDON]);
+  }
+
   sendDropItem(itemType: string) {
     this.sendMessage([Types.Messages.DROP_ITEM, itemType]);
   }

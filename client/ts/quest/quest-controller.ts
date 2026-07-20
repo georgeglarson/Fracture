@@ -46,6 +46,7 @@ export const QuestEvents = {
 export interface QuestControllerDeps {
   // Network
   sendRequestQuest: (npcKind: number) => void;
+  sendQuestAbandon: () => void;
 
   // UI callbacks
   showNotification: (message: string) => void;
@@ -147,7 +148,7 @@ export class QuestController extends EventEmitter {
   }
 
   /**
-   * Abandon current quest (client-side only for now)
+   * Abandon current quest
    */
   abandonQuest(): void {
     if (!this.activeQuest) {
@@ -157,6 +158,11 @@ export class QuestController extends EventEmitter {
     const abandoned = this.activeQuest;
     this.activeQuest = null;
     this.lastQuestGiverKind = null;
+
+    // Tell the server so it abandons the quest server-side. It replies
+    // [QUEST_STATUS, null], which handleQuestStatus already handles as a
+    // (now idempotent) local clear.
+    this.deps.sendQuestAbandon();
 
     this.emit(QuestEvents.QUEST_ABANDONED, abandoned);
     this.deps.showNotification('Quest abandoned');
