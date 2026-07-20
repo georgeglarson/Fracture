@@ -2,7 +2,8 @@
  * Structured Logging with Pino + OpenTelemetry Correlation
  *
  * - Dev: pino-pretty for human-readable output
- * - Prod: pino-opentelemetry-transport injects trace_id/span_id into every log line
+ * - Prod: JSON to stdout; pino-opentelemetry-transport (trace_id/span_id
+ *   injection + log shipping) only when OTEL_EXPORTER_OTLP_ENDPOINT is set
  * - createModuleLogger() for per-module child loggers
  * - createPlayerLogger() for player-scoped child loggers with id/name context
  */
@@ -23,8 +24,12 @@ const baseConfig: pino.LoggerOptions = {
   // (OTel SDK rejects ISO string timestamps silently)
 };
 
+// OTel log shipping is opt-in: without an explicit endpoint there is no
+// collector to receive records (one HTTP attempt per log line otherwise).
+const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+
 // Dev: pino-pretty for readable output
-// Prod: pino-opentelemetry-transport for trace correlation
+// Prod: JSON to stdout, plus OTel transport when a collector endpoint is configured
 const transport = isDev
   ? {
       target: 'pino-pretty',
@@ -39,28 +44,30 @@ const transport = isDev
         // JSON to stdout (standard structured logging)
         { target: 'pino/file', options: { destination: 1 }, level: logLevel as string },
         // OTel transport: injects trace_id/span_id and ships to collector
-        {
-          target: require.resolve('pino-opentelemetry-transport'),
-          options: {
-            loggerName: 'fracture-server',
-            resourceAttributes: {
-              'service.name': 'fracture-server',
-              'deployment.environment': process.env.NODE_ENV || 'production',
-            },
-            logRecordProcessorOptions: {
-              recordProcessorType: 'simple',
-              exporterOptions: {
-                protocol: 'http',
-                httpExporterOptions: {
-                  url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT
-                    ? `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/logs`
-                    : 'http://localhost:4318/v1/logs',
+        ...(otelEndpoint
+          ? [
+              {
+                target: require.resolve('pino-opentelemetry-transport'),
+                options: {
+                  loggerName: 'fracture-server',
+                  resourceAttributes: {
+                    'service.name': 'fracture-server',
+                    'deployment.environment': process.env.NODE_ENV || 'production',
+                  },
+                  logRecordProcessorOptions: {
+                    recordProcessorType: 'simple',
+                    exporterOptions: {
+                      protocol: 'http',
+                      httpExporterOptions: {
+                        url: `${otelEndpoint}/v1/logs`,
+                      },
+                    },
+                  },
                 },
+                level: logLevel as string,
               },
-            },
-          },
-          level: logLevel as string,
-        },
+            ]
+          : []),
       ],
     };
 

@@ -5,7 +5,8 @@
  * Initializes the OTel SDK with tracing and HTTP auto-instrumentation.
  *
  * - Dev: ConsoleSpanExporter (traces to terminal)
- * - Prod: OTLP HTTP exporter to SigNoz collector
+ * - Prod: OTLP HTTP exporter, only when OTEL_EXPORTER_OTLP_ENDPOINT is
+ *   explicitly set (no collector runs by default); otherwise no trace export
  * - HTTP auto-instrumentation covers Socket.IO transport
  * - Timer instrumentation is NOT enabled (game loop is 50/sec)
  */
@@ -32,16 +33,20 @@ const resource = resourceFromAttributes({
 });
 
 // Dev: console exporter for local visibility
-// Prod: OTLP HTTP to SigNoz collector
+// Prod: OTLP HTTP exporter, opt-in via OTEL_EXPORTER_OTLP_ENDPOINT.
+// When the endpoint is unset there is no collector to talk to, so no exporter
+// is created at all — tracing stays active in-process but exports nothing.
 // Note: OTLPTraceExporter's `url` option requires the full signal-specific path.
 // OTEL_EXPORTER_OTLP_ENDPOINT is the base URL (e.g. http://localhost:4318),
 // so we must append /v1/traces — same pattern as pino-opentelemetry-transport in logger.ts.
-const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318';
+const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 const traceExporter = isDev
   ? new ConsoleSpanExporter()
-  : new OTLPTraceExporter({
-      url: `${endpoint}/v1/traces`,
-    });
+  : endpoint
+    ? new OTLPTraceExporter({
+        url: `${endpoint}/v1/traces`,
+      })
+    : undefined;
 
 // OTEL_TRACES_SAMPLER_ARG controls prod sampling ratio (0.0–1.0, default 1.0)
 // Set to 0.1 for high-traffic production, leave default for demos

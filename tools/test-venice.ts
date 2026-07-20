@@ -4,7 +4,13 @@
 
 import { VeniceAI } from '@venice-dev-tools/core';
 
-const apiKey = process.env.VENICE_API_KEY || 'zMej4Dp426O4SBebgzjdJBhdiXS6WSn5ddw10-zhNr';
+const apiKey = process.env.VENICE_API_KEY;
+
+if (!apiKey) {
+  console.error('Error: VENICE_API_KEY is not set.');
+  console.error('Export it before running this test — no API key is stored in this repo.');
+  process.exit(1);
+}
 
 async function test() {
   console.log('Testing Venice AI integration...\n');
