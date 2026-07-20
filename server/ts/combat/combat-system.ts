@@ -12,6 +12,7 @@ import { getServerEventBus } from '../../../shared/ts/events/index.js';
 import { PartyService } from '../party/index.js';
 import { getKillStreakService } from './kill-streak.service.js';
 import { getCombatTracker } from './combat-tracker.js';
+import { LOW_HEALTH_THRESHOLD } from './combat-constants.js';
 import { createModuleLogger } from '../utils/logger.js';
 
 const log = createModuleLogger('CombatSystem');
@@ -204,15 +205,15 @@ export class CombatSystem {
         this.world.pushToPlayer(entity, entity.health());
       }
 
-      // Low-health companion hook — fires once per crossing below 30%
-      // (skipped on the killing blow — the death hook covers that case)
+      // Low-health companion hook — fires once per crossing below the
+      // threshold (skipped on the killing blow — the death hook covers that)
       const healthPct = entity.maxHitPoints ? entity.hitPoints / entity.maxHitPoints : 1;
-      if (healthPct < 0.3 && entity.hitPoints > 0 && !entity.wasLowHealth) {
+      if (healthPct < LOW_HEALTH_THRESHOLD && entity.hitPoints > 0 && !entity.wasLowHealth) {
         entity.wasLowHealth = true;
         entity.handleLowHealth?.(healthPct).catch((err) => {
           log.error({ err, playerName: entity.name }, 'handleLowHealth hook failed');
         });
-      } else if (healthPct >= 0.3 && entity.wasLowHealth) {
+      } else if (healthPct >= LOW_HEALTH_THRESHOLD && entity.wasLowHealth) {
         entity.wasLowHealth = false;
       }
     }

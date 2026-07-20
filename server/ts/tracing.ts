@@ -9,8 +9,12 @@
  *   explicitly set (no collector runs by default); otherwise no trace export
  * - HTTP auto-instrumentation covers Socket.IO transport
  * - Timer instrumentation is NOT enabled (game loop is 50/sec)
+ *
+ * dotenv is loaded here (before the endpoint read) because main.ts imports
+ * this module first — an endpoint set in .env would otherwise read as unset.
  */
 
+import 'dotenv/config';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import {

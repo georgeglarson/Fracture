@@ -84,9 +84,11 @@ Write a SHORT quest description (under 100 chars). Sound urgent but friendly:`;
 
     // Template fallback must match the quest type — "Defeat 1 forest!" is
     // what an explore quest gets otherwise (cypher review finding).
+    // Nullish (??), not ||: a 0 count or empty target must not silently
+    // substitute (panel review finding).
     const fallbackDescription = questType === 'explore'
-      ? `Explore ${template.area || template.target}!`
-      : `Defeat ${template.count || 1} ${template.target || template.area}!`;
+      ? `Explore ${template.area ?? template.target}!`
+      : `Defeat ${template.count ?? 1} ${template.target ?? template.area}!`;
 
     let description: string;
     try {
@@ -98,9 +100,9 @@ Write a SHORT quest description (under 100 chars). Sound urgent but friendly:`;
     }
 
     const quest: Quest = {
-      type: questType as 'kill' | 'explore',
-      target: template.target || template.area || '',
-      count: template.count || 1,
+      type: questType,
+      target: template.target ?? template.area ?? '',
+      count: template.count ?? 1,
       progress: 0,
       reward: template.reward,
       xp: template.xp,

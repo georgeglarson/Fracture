@@ -12,6 +12,9 @@ export const LEASH_BASE = 15;
 /** Leash multiplier applied to mob aggroRange. */
 export const LEASH_AGGRO_MULT = 4;
 
+/** Health fraction below which the low-health companion hook fires. */
+export const LOW_HEALTH_THRESHOLD = 0.3;
+
 /** Compute leash distance for a mob given its aggro range. */
 export function getLeashDistance(aggroRange: number): number {
   return Math.max(LEASH_BASE, aggroRange * LEASH_AGGRO_MULT);

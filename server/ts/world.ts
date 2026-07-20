@@ -29,7 +29,7 @@ import {Character} from './character';
 import {MobArea} from './mobarea';
 import {ChestArea} from './chestarea';
 import {evaluateAggro} from './combat/aggro-policy';
-import {getLeashDistance} from './combat/combat-constants';
+import {getLeashDistance, LOW_HEALTH_THRESHOLD} from './combat/combat-constants';
 import type {Player} from './player'; // Type-only import to avoid circular dep
 import { createModuleLogger } from './utils/logger.js';
 import { trace } from '@opentelemetry/api';
@@ -249,6 +249,13 @@ export class World {
 
           if (character.type === 'player') {
             this.pushToPlayer(character as Player, character.regen());
+
+            // Regen heals without a damage event — re-arm the low-health
+            // crossing detector once they're back above the threshold
+            const p = character as Player & { wasLowHealth?: boolean };
+            if (p.wasLowHealth && character.hitPoints / character.maxHitPoints >= LOW_HEALTH_THRESHOLD) {
+              p.wasLowHealth = false;
+            }
           }
         }
       });
