@@ -138,7 +138,8 @@ export class Player extends Character {
       checkLevelAchievements: (level) => this.checkLevelAchievements(level),
       checkGoldAchievements: (amount) => this.checkGoldAchievements(amount),
       getName: () => this.name,
-      checkSkillUnlocks: (oldLevel, newLevel) => this.checkSkillUnlocks(oldLevel, newLevel)
+      checkSkillUnlocks: (oldLevel, newLevel) => this.checkSkillUnlocks(oldLevel, newLevel),
+      isDead: () => this.isDead
     });
 
     this.connection.listen(async (message: unknown[]) => {

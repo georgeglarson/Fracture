@@ -446,8 +446,8 @@ var initGame = function () {
       }
       if (key === 27) { // ESC
         app.hideWindows();
-        if (game.riftUI?.isMenuOpen()) {
-          game.riftUI.hideMenu();
+        if (game.riftUI?.hasOpenPanel?.()) {
+          game.riftUI.closePanels();
         } else if (game.riftUI?.isActive()) {
           game.exitRift();
         }

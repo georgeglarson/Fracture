@@ -503,6 +503,24 @@ export class RiftUI {
   }
 
   /**
+   * Any closable rift panel open (menu or leaderboard)? ESC closes panels
+   * before it exits the run — a player closing an overlay must not
+   * accidentally end their run (panel review finding).
+   */
+  hasOpenPanel(): boolean {
+    return this.isMenuOpen() ||
+      (this.leaderboardElement?.style.display === 'block');
+  }
+
+  /**
+   * Close every closable rift panel
+   */
+  closePanels(): void {
+    this.hideMenu();
+    this.hideLeaderboard();
+  }
+
+  /**
    * Check if rift is currently active
    */
   isActive(): boolean {

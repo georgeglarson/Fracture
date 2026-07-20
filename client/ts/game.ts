@@ -815,6 +815,8 @@ export class Game {
       } else {
         self.showNotification('Welcome back to Fracture!');
         self.storage.setPlayerName(name);
+        // Returning players get the minimap too (it defaults hidden)
+        self.minimapUI?.show();
       }
 
       // Update UI with server progression

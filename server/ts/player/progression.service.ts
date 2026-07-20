@@ -46,6 +46,8 @@ export interface ProgressionCallbacks {
   getName: () => string;
   /** Called on level up so new skill unlocks reach the client mid-session */
   checkSkillUnlocks?: (oldLevel: number, newLevel: number) => void;
+  /** Dead players skip HP refill/reset on level-up (death-reward edge case) */
+  isDead?: () => boolean;
 }
 
 export class ProgressionService {
@@ -101,12 +103,18 @@ export class ProgressionService {
 
     log.info({ playerName: this.callbacks.getName(), oldLevel, newLevel: this.level, bonusHP, bonusDamage }, 'Level up');
 
-    // Update HP with new level bonus
-    this.callbacks.updateHitPoints();
+    // Update HP with new level bonus — skipped for dead players: refilling
+    // HP on a corpse confuses the death screen and any hitPoints<=0 cleanup
+    // downstream (panel review finding: rift death-reward level-ups)
+    if (!this.callbacks.isDead?.()) {
+      this.callbacks.updateHitPoints();
+    }
 
     // Send level up message
     this.callbacks.send(new Messages.LevelUp(this.level, bonusHP, bonusDamage).serialize());
-    this.callbacks.send(new Messages.HitPoints(this.callbacks.getMaxHitPoints()).serialize());
+    if (!this.callbacks.isDead?.()) {
+      this.callbacks.send(new Messages.HitPoints(this.callbacks.getMaxHitPoints()).serialize());
+    }
 
     // Check level achievements
     this.callbacks.checkLevelAchievements(this.level);
