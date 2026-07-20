@@ -219,6 +219,9 @@ export class World {
         this.removePlayer(player);
         this.decrementPlayerCount();
 
+        // Clear per-player AI/static-service state (profiles, active quests)
+        player.cleanupVenice();
+
         if (this.removedCallback) {
           this.removedCallback();
         }

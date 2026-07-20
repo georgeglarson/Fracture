@@ -47,6 +47,10 @@ export interface Entity {
   drop?(item: any): any;
   health?(): any;
   handleKill?(mobType: string): void;
+  handleDeath?(killerType: string): Promise<void>;  // AI/companion death hook
+  handleLowHealth?(healthPercent: number): Promise<void>;  // AI/companion low-health hook
+  wasLowHealth?: boolean;  // Low-health crossing detector (fires once per dip)
+  maxHitPoints?: number;  // For low-health percentage
   grantXP?(amount: number): void;  // For progression system
   grantGold?(amount: number): void;  // For economy system
   checkKillAchievements?(mobKind: number): void;  // For achievement system
@@ -199,6 +203,18 @@ export class CombatSystem {
       if (entity.health) {
         this.world.pushToPlayer(entity, entity.health());
       }
+
+      // Low-health companion hook — fires once per crossing below 30%
+      // (skipped on the killing blow — the death hook covers that case)
+      const healthPct = entity.maxHitPoints ? entity.hitPoints / entity.maxHitPoints : 1;
+      if (healthPct < 0.3 && entity.hitPoints > 0 && !entity.wasLowHealth) {
+        entity.wasLowHealth = true;
+        entity.handleLowHealth?.(healthPct).catch((err) => {
+          log.error({ err, playerName: entity.name }, 'handleLowHealth hook failed');
+        });
+      } else if (healthPct >= 0.3 && entity.wasLowHealth) {
+        entity.wasLowHealth = false;
+      }
     }
 
     if (entity.type === 'mob' && attacker && damage !== undefined) {
@@ -316,6 +332,11 @@ export class CombatSystem {
     const killerType = attacker ? Types.getKindAsString(attacker.kind) : 'unknown';
     newsSink.recordWorldEvent('death', player.name, {
       killer: killerType
+    });
+
+    // Companion/AI death hook (static hint in no-AI mode)
+    player.handleDeath?.(killerType).catch((err) => {
+      log.error({ err, playerName: player.name }, 'handleDeath hook failed');
     });
 
     // Emit player:died event

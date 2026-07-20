@@ -21,6 +21,9 @@ export interface ZonePlayerContext {
   // Methods
   send: (message: any) => void;
 
+  // AI/companion hook (Player.handleAreaChange) — quest progress + hints
+  handleAreaChange?: (area: string) => Promise<void>;
+
   // World access for zone manager
   getWorld: () => {
     zoneManager: ZoneManager;
@@ -40,6 +43,13 @@ export function checkZoneChange(ctx: ZonePlayerContext, x: number, y: number): v
 
     // Send zone info (bonus percentages)
     ctx.send(world.zoneManager.createZoneInfoMessage(result.zone));
+
+    // Fire the area-change hook (explore-quest progress, companion hints)
+    if (ctx.handleAreaChange) {
+      ctx.handleAreaChange(result.zone.id).catch((err) => {
+        log.error({ err, playerName: ctx.name }, 'handleAreaChange hook failed');
+      });
+    }
 
     log.info({ playerName: ctx.name, zoneName: result.zone.name, minLevel: result.zone.minLevel, maxLevel: result.zone.maxLevel }, 'Player entered zone');
   }

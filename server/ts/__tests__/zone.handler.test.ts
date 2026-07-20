@@ -192,6 +192,38 @@ describe('ZoneHandler', () => {
   });
 
   // ========================================================================
+  // checkZoneChange — area-change hook (quest progress, companion hints)
+  // ========================================================================
+
+  describe('checkZoneChange area-change hook', () => {
+    it('calls handleAreaChange with the zone id when the zone changes', () => {
+      const handleAreaChange = vi.fn().mockResolvedValue(undefined);
+      const hooked = makeMockCtx({ handleAreaChange });
+
+      checkZoneChange(hooked, COORDS.forest.x, COORDS.forest.y);
+
+      expect(handleAreaChange).toHaveBeenCalledTimes(1);
+      expect(handleAreaChange).toHaveBeenCalledWith('forest');
+    });
+
+    it('does not call handleAreaChange when the zone is unchanged', () => {
+      const handleAreaChange = vi.fn().mockResolvedValue(undefined);
+      const hooked = makeMockCtx({ handleAreaChange });
+
+      checkZoneChange(hooked, COORDS.beach.x, COORDS.beach.y);
+      handleAreaChange.mockClear();
+
+      checkZoneChange(hooked, COORDS.beach.x + 10, COORDS.beach.y + 5);
+
+      expect(handleAreaChange).not.toHaveBeenCalled();
+    });
+
+    it('works when the hook is absent (no handleAreaChange on ctx)', () => {
+      expect(() => checkZoneChange(ctx, COORDS.beach.x, COORDS.beach.y)).not.toThrow();
+    });
+  });
+
+  // ========================================================================
   // getCurrentZone
   // ========================================================================
 

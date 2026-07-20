@@ -452,6 +452,20 @@ describe('World', () => {
       const world = createWorld();
       expect(world.enterCallback).toBeTypeOf('function');
     });
+
+    it('calls player.cleanupVenice() when a player exits', () => {
+      const world = createWorld();
+      const player = makeMockPlayer({ cleanupVenice: vi.fn() });
+      let exitCb: (() => void) | undefined;
+      player.onExit = vi.fn((cb: () => void) => { exitCb = cb; });
+
+      world.enterCallback!(player); // constructor wiring registers onExit
+      expect(exitCb).toBeTypeOf('function');
+
+      exitCb!();
+
+      expect(player.cleanupVenice).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ────────────────────────────────────────────

@@ -37,8 +37,21 @@ export class QuestService {
     }
 
     // Pick a quest template based on player progress
-    const questType = profile.totalKills < 10 ? 'kill' : (Math.random() < 0.7 ? 'kill' : 'explore');
-    const templates = QUEST_TEMPLATES[questType].templates;
+    let questType: 'kill' | 'explore' = profile.totalKills < 10 ? 'kill' : (Math.random() < 0.7 ? 'kill' : 'explore');
+    let templates = QUEST_TEMPLATES[questType].templates;
+
+    // Explore quests only target unvisited areas — progress fires on first
+    // visit, so "explore X" for an already-visited X is uncompletable
+    // (cypher review finding). All areas visited → fall back to kill quests.
+    if (questType === 'explore') {
+      const unvisited = templates.filter(t => !profile.areas.includes(t.area || ''));
+      if (unvisited.length > 0) {
+        templates = unvisited;
+      } else {
+        questType = 'kill';
+        templates = QUEST_TEMPLATES.kill.templates;
+      }
+    }
 
     // Filter to appropriate difficulty
     const suitable = templates.filter(t => {

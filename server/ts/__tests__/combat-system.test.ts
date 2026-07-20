@@ -706,4 +706,56 @@ describe('CombatSystem — Bug Fix & Security Tests', () => {
       expect(mockCalculatePartyXpBonus).toHaveBeenCalledWith(2);
     });
   });
+
+  // ==========================================================================
+  // AI/companion wiring: death + low-health hooks
+  // ==========================================================================
+
+  describe('player AI hooks', () => {
+    let combatSystem: CombatSystem;
+    let world: WorldContext;
+
+    beforeEach(() => {
+      world = createMockWorld();
+      combatSystem = new CombatSystem(world);
+    });
+
+    it('calls handleDeath with the killer type when a player dies', () => {
+      const handleDeath = vi.fn().mockResolvedValue(undefined);
+      const player = createMockPlayer({ hitPoints: 0, handleDeath });
+      const mob = createMockEntity({ id: 2 });
+
+      combatSystem.handleHurtEntity(player, mob, 50);
+
+      expect(handleDeath).toHaveBeenCalledTimes(1);
+      expect(handleDeath).toHaveBeenCalledWith('rat'); // mocked getKindAsString
+    });
+
+    it('fires handleLowHealth once per crossing below 30%', () => {
+      const handleLowHealth = vi.fn().mockResolvedValue(undefined);
+      const player = createMockPlayer({ hitPoints: 25, maxHitPoints: 100, handleLowHealth });
+      const mob = createMockEntity({ id: 2 });
+
+      combatSystem.handleHurtEntity(player, mob, 5);
+      expect(handleLowHealth).toHaveBeenCalledTimes(1);
+      expect(handleLowHealth).toHaveBeenCalledWith(0.25);
+
+      combatSystem.handleHurtEntity(player, mob, 5); // still below 30%
+      expect(handleLowHealth).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-arms the low-health hook after recovering above 30%', () => {
+      const handleLowHealth = vi.fn().mockResolvedValue(undefined);
+      const player = createMockPlayer({ hitPoints: 25, maxHitPoints: 100, handleLowHealth });
+      const mob = createMockEntity({ id: 2 });
+
+      combatSystem.handleHurtEntity(player, mob, 5); // fires at 25%
+      player.hitPoints = 80;
+      combatSystem.handleHurtEntity(player, mob, 5); // 75% — clears the flag
+      player.hitPoints = 20;
+      combatSystem.handleHurtEntity(player, mob, 5); // 15% — fires again
+
+      expect(handleLowHealth).toHaveBeenCalledTimes(2);
+    });
+  });
 });

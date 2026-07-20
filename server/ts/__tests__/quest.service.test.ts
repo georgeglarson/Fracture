@@ -468,6 +468,32 @@ describe('QuestService', () => {
       expect(quest.description).not.toMatch(/Defeat/);
     });
 
+    it('should not offer explore quests for already-visited areas', async () => {
+      const profiles = new ProfileService();
+      for (let i = 0; i < 10; i++) profiles.recordKill('player3', 'rat');
+      profiles.recordArea('player3', 'beach');
+      // mocked templates: beach + forest — only forest is unvisited
+      const noAiService = new QuestService(null, profiles);
+      vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+      const quest = await noAiService.generateQuest('player3', 'guard');
+
+      expect(quest.type).toBe('explore');
+      expect(quest.target).toBe('forest');
+    });
+
+    it('should fall back to a kill quest when every area is visited', async () => {
+      const profiles = new ProfileService();
+      for (let i = 0; i < 10; i++) profiles.recordKill('player4', 'rat');
+      for (const area of ['beach', 'forest']) profiles.recordArea('player4', area);
+      const noAiService = new QuestService(null, profiles);
+      vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+      const quest = await noAiService.generateQuest('player4', 'guard');
+
+      expect(quest.type).toBe('kill');
+    });
+
     it('should still track quest progress in no-AI mode', async () => {
       const profiles = new ProfileService();
       const noAiService = new QuestService(null, profiles);
