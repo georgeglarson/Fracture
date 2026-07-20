@@ -445,10 +445,16 @@ var initGame = function () {
         return false;
       }
       if (key === 27) { // ESC
+        // Only exit an active rift when ESC closed nothing: if any window or
+        // rift panel was open, ESC's job was to close it, not end the run
+        const hadOpenUi = !!(game.achievementUI?.isVisible?.()) ||
+          $('#instructions').hasClass('active') ||
+          $('body').hasClass('credits') ||
+          !!(game.riftUI?.hasOpenPanel?.());
         app.hideWindows();
         if (game.riftUI?.hasOpenPanel?.()) {
           game.riftUI.closePanels();
-        } else if (game.riftUI?.isActive()) {
+        } else if (!hadOpenUi && game.riftUI?.isActive()) {
           game.exitRift();
         }
         Object.values(game.player.attackers).forEach(function (attacker: any) {

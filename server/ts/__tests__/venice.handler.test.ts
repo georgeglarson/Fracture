@@ -222,9 +222,12 @@ describe('VeniceHandler no-AI mode', () => {
       expect(p2).toEqual([Types.Messages.QUEST_STATUS, 'kill', 'rat', 3, 2]);
 
       handleKill(ctx, 'rat', triggerNarration);
-      expect(ctx.send).toHaveBeenCalledTimes(5);
+      expect(ctx.send).toHaveBeenCalledTimes(6);
+      // Final progress sync (3/3) arrives before the completion message
+      const p3 = ctx.send.mock.calls[4][0];
+      expect(p3).toEqual([Types.Messages.QUEST_STATUS, 'kill', 'rat', 3, 3]);
       // [QUEST_COMPLETE, reward, xp, description]
-      const complete = ctx.send.mock.calls[4][0];
+      const complete = ctx.send.mock.calls[5][0];
       expect(complete[0]).toBe(Types.Messages.QUEST_COMPLETE);
       expect(complete[1]).toBe('burger');
       expect(complete[2]).toBe(10);

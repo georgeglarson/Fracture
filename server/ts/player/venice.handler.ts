@@ -241,6 +241,8 @@ export function handleKill(ctx: VenicePlayerContext, mobType: string, triggerNar
     profiles.recordKill(ctx.id.toString(), mobType);
     const result = quests.checkQuestProgress(ctx.id.toString(), 'kill', mobType);
     if (result && result.completed) {
+      // Final progress sync so the tracker shows N/N before the completion toast
+      if (result.quest) ctx.send(new Messages.QuestStatus(result.quest).serialize());
       ctx.send(new Messages.QuestComplete(result).serialize());
       grantQuestRewards(ctx, result);
     } else {
@@ -254,6 +256,8 @@ export function handleKill(ctx: VenicePlayerContext, mobType: string, triggerNar
 
   const result = venice.recordKill(ctx.id.toString(), mobType);
   if (result && result.completed) {
+    // Final progress sync so the tracker shows N/N before the completion toast
+    if (result.quest) ctx.send(new Messages.QuestStatus(result.quest).serialize());
     ctx.send(new Messages.QuestComplete(result).serialize());
     grantQuestRewards(ctx, result);
   } else {
@@ -291,6 +295,8 @@ export async function handleAreaChange(ctx: VenicePlayerContext, area: string, t
       ? quests.checkQuestProgress(ctx.id.toString(), 'explore', area)
       : null;
     if (result && result.completed) {
+      // Final progress sync so the tracker shows N/N before the completion toast
+      if (result.quest) ctx.send(new Messages.QuestStatus(result.quest).serialize());
       ctx.send(new Messages.QuestComplete(result).serialize());
       grantQuestRewards(ctx, result);
     } else {
@@ -308,6 +314,8 @@ export async function handleAreaChange(ctx: VenicePlayerContext, area: string, t
 
   const result = venice.recordArea(ctx.id.toString(), area);
   if (result && result.completed) {
+    // Final progress sync so the tracker shows N/N before the completion toast
+    if (result.quest) ctx.send(new Messages.QuestStatus(result.quest).serialize());
     ctx.send(new Messages.QuestComplete(result).serialize());
     grantQuestRewards(ctx, result);
   } else {

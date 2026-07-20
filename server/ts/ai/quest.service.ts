@@ -149,7 +149,8 @@ Write a SHORT quest description (under 100 chars). Sound urgent but friendly:`;
       completed: true,
       reward: quest.reward,
       xp: quest.xp,
-      description: quest.description
+      description: quest.description,
+      quest
     };
 
     this.activeQuests.delete(playerId);
