@@ -3,6 +3,8 @@
  * Shows terrain, player position, entities, and viewport
  */
 
+import { Types } from '../../../shared/ts/gametypes';
+
 export interface MinimapCallbacks {
   getMap: () => any;
   getPlayer: () => any;
@@ -12,7 +14,9 @@ export interface MinimapCallbacks {
 }
 
 export class MinimapUI {
-  private visible = true;
+  // Starts hidden: the container is created with display:none, so the
+  // visibility flag must match or the first toggle() is a no-op
+  private visible = false;
   private callbacks: MinimapCallbacks | null = null;
 
   // Canvas for the minimap
@@ -264,15 +268,16 @@ export class MinimapUI {
         // Skip player here, draw last
         return;
       } else if (entity.kind !== undefined) {
-        // Check entity type by properties
-        if (entity.type === 'mob') {
+        // Derive the dot type from the entity kind — only Items set a .type
+        // property, so checking entity.type skips everything else
+        if (Types.isMob(entity.kind)) {
           ctx.fillStyle = '#8b3a3a'; // Dark red ink for mobs
-        } else if (entity.type === 'npc') {
+        } else if (Types.isNpc(entity.kind)) {
           ctx.fillStyle = '#3a5a8b'; // Dark blue ink for NPCs
-        } else if (entity.type === 'player') {
+        } else if (Types.isPlayer(entity.kind)) {
           // Other players - dark green ink
           ctx.fillStyle = '#3a6b3a';
-        } else if (entity.type === 'item') {
+        } else if (Types.isWeapon(entity.kind) || Types.isArmor(entity.kind) || Types.isObject(entity.kind)) {
           ctx.fillStyle = '#8b7a2a'; // Gold ink for items
         } else {
           return; // Skip unknown

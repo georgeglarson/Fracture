@@ -808,6 +808,7 @@ export class Game {
         self.showFirstTimeHints();
         // Auto-show minimap for new players
         self.initMinimap();
+        self.minimapUI?.show();
       } else {
         self.showNotification('Welcome back to Fracture!');
         self.storage.setPlayerName(name);
