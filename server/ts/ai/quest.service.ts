@@ -69,13 +69,19 @@ REWARD: ${template.reward}
 
 Write a SHORT quest description (under 100 chars). Sound urgent but friendly:`;
 
+    // Template fallback must match the quest type — "Defeat 1 forest!" is
+    // what an explore quest gets otherwise (cypher review finding).
+    const fallbackDescription = questType === 'explore'
+      ? `Explore ${template.area || template.target}!`
+      : `Defeat ${template.count || 1} ${template.target || template.area}!`;
+
     let description: string;
     try {
       description = (this.client ? await this.client.call(prompt) : null) ||
-        `Defeat ${template.count || 1} ${template.target || template.area}!`;
+        fallbackDescription;
     } catch (err) {
       log.debug({ err }, 'Quest description generation failed');
-      description = `Defeat ${template.count || 1} ${template.target || template.area}!`;
+      description = fallbackDescription;
     }
 
     const quest: Quest = {

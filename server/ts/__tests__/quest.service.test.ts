@@ -454,6 +454,20 @@ describe('QuestService', () => {
       expect(quest.giver).toBe('guard');
     });
 
+    it('should describe explore quests as exploration in no-AI mode', async () => {
+      const profiles = new ProfileService();
+      for (let i = 0; i < 10; i++) profiles.recordKill('player2', 'rat');
+      const noAiService = new QuestService(null, profiles);
+      // totalKills >= 10 unlocks explore; random >= 0.7 picks it
+      vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+      const quest = await noAiService.generateQuest('player2', 'guard');
+
+      expect(quest.type).toBe('explore');
+      expect(quest.description).toMatch(/^Explore .+!$/);
+      expect(quest.description).not.toMatch(/Defeat/);
+    });
+
     it('should still track quest progress in no-AI mode', async () => {
       const profiles = new ProfileService();
       const noAiService = new QuestService(null, profiles);
