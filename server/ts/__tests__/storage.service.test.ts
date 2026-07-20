@@ -862,6 +862,90 @@ describe('SQLiteStorageService', () => {
   });
 
   // =========================================================================
+  // Rift Leaderboard Persistence (saveRiftEntry / getRiftLeaderboard)
+  // =========================================================================
+
+  describe('rift leaderboard persistence', () => {
+    it('should persist a rift leaderboard entry and read it back', () => {
+      const ok = service.saveRiftEntry({
+        playerName: 'RiftHero',
+        maxDepth: 5,
+        totalKills: 50,
+        completionTime: 90_000,
+        modifierCount: 3,
+        timestamp: 1_700_000_000_000
+      });
+      expect(ok).toBe(true);
+
+      const rows = service.getRiftLeaderboard(10);
+      expect(rows.length).toBe(1);
+      expect(rows[0].player_name).toBe('RiftHero');
+      expect(rows[0].max_depth).toBe(5);
+      expect(rows[0].total_kills).toBe(50);
+      expect(rows[0].completion_time).toBe(90_000);
+      expect(rows[0].modifier_count).toBe(3);
+    });
+
+    it('should sort by max_depth DESC and completion_time ASC', () => {
+      service.saveRiftEntry({ playerName: 'SlowButDeep', maxDepth: 8, totalKills: 80, completionTime: 200_000, modifierCount: 4, timestamp: 1 });
+      service.saveRiftEntry({ playerName: 'FastShallow', maxDepth: 3, totalKills: 20, completionTime: 30_000, modifierCount: 1, timestamp: 2 });
+      service.saveRiftEntry({ playerName: 'MidRun', maxDepth: 5, totalKills: 40, completionTime: 60_000, modifierCount: 2, timestamp: 3 });
+
+      const rows = service.getRiftLeaderboard(10);
+      expect(rows.map(r => r.player_name)).toEqual(['SlowButDeep', 'MidRun', 'FastShallow']);
+    });
+
+    it('should keep best entry per player (upsert)', () => {
+      // First entry — depth 3
+      service.saveRiftEntry({ playerName: 'Climber', maxDepth: 3, totalKills: 25, completionTime: 40_000, modifierCount: 1, timestamp: 1 });
+      // Worse run — should be ignored
+      service.saveRiftEntry({ playerName: 'Climber', maxDepth: 2, totalKills: 15, completionTime: 30_000, modifierCount: 1, timestamp: 2 });
+      // Better run — should replace
+      service.saveRiftEntry({ playerName: 'Climber', maxDepth: 6, totalKills: 55, completionTime: 120_000, modifierCount: 3, timestamp: 3 });
+
+      const rows = service.getRiftLeaderboard(10);
+      expect(rows.length).toBe(1);
+      expect(rows[0].player_name).toBe('Climber');
+      expect(rows[0].max_depth).toBe(6);
+      expect(rows[0].total_kills).toBe(55);
+    });
+
+    it('should respect the limit parameter', () => {
+      for (let i = 0; i < 5; i++) {
+        service.saveRiftEntry({
+          playerName: `R${i}`,
+          maxDepth: i + 1,
+          totalKills: (i + 1) * 5,
+          completionTime: (i + 1) * 1000,
+          modifierCount: 1,
+          timestamp: i
+        });
+      }
+      const rows = service.getRiftLeaderboard(3);
+      expect(rows.length).toBe(3);
+    });
+
+    it('should return an empty list when no entries exist', () => {
+      const rows = service.getRiftLeaderboard(10);
+      expect(rows).toEqual([]);
+    });
+
+    it('should return false from saveRiftEntry when db is not initialized', () => {
+      const s = new SQLiteStorageService();
+      const ok = s.saveRiftEntry({
+        playerName: 'X', maxDepth: 1, totalKills: 1, completionTime: 1, modifierCount: 0, timestamp: 1
+      });
+      expect(ok).toBe(false);
+    });
+
+    it('should return an empty array from getRiftLeaderboard when db is not initialized', () => {
+      const s = new SQLiteStorageService();
+      const rows = s.getRiftLeaderboard(10);
+      expect(rows).toEqual([]);
+    });
+  });
+
+  // =========================================================================
   // Uninitialized DB guards
   // =========================================================================
 
