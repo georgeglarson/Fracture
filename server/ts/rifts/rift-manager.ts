@@ -332,6 +332,20 @@ export class RiftManager {
   }
 
   /**
+   * Free a spawn slot for a rift mob killed by someone other than its run's
+   * owner (another player or a party member). No progress credit — rift runs
+   * are personal — but the owner's spawn cap must not stall on off-owner
+   * kills (panel review finding). Owner kills already free the slot via
+   * recordKill, so this is a no-op for them.
+   */
+  freeSpawnSlotForMob(mobId: number): boolean {
+    for (const run of this.activeRuns.values()) {
+      if (run.spawnedMobs.delete(mobId)) return true;
+    }
+    return false;
+  }
+
+  /**
    * Center of the rift arena — the teleport-in point for entering players
    */
   getArenaCenter(): { x: number; y: number } {

@@ -568,7 +568,13 @@ export class Player extends Character {
     if (result && result.spawnedMobIds.length > 0) {
       this.getRiftContext().despawnMobs?.(result.spawnedMobIds);
     }
-    this.riftSavedPosition = null;
+    // Leave the player where they entered, not in the arena — the exit path
+    // runs before saveToStorage, so the restored position is what persists
+    // (panel review finding: disconnect-in-rift saved the arena position)
+    if (this.riftSavedPosition) {
+      this.setPosition(this.riftSavedPosition.x, this.riftSavedPosition.y);
+      this.riftSavedPosition = null;
+    }
   }
 
   /**

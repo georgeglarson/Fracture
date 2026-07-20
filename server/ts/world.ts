@@ -220,6 +220,14 @@ export class World {
       player.onExit(() => {
         log.info({ playerName: player.name }, 'Player left the game');
 
+        // End any active rift run FIRST — it restores the player's entry
+        // position, and the save below must persist that, not the arena spot
+        try {
+          player.handleRiftDisconnect?.();
+        } catch (e) {
+          log.error({ err: e, playerName: player.name }, 'Failed to clean up rift state on exit');
+        }
+
         // Save player data to database before removing
         if (this.storageService && player.characterId) {
           try {
@@ -238,13 +246,6 @@ export class World {
           player.cleanupVenice();
         } catch (e) {
           log.error({ err: e, playerName: player.name }, 'Failed to clean up AI state on exit');
-        }
-
-        // End any active rift run and despawn its leftover mobs
-        try {
-          player.handleRiftDisconnect?.();
-        } catch (e) {
-          log.error({ err: e, playerName: player.name }, 'Failed to clean up rift state on exit');
         }
 
         if (this.removedCallback) {
@@ -594,9 +595,11 @@ export class World {
             const spawn = riftManager.getMobToSpawn(player.id);
             if (!spawn) return;
 
-            // Rift mob ids follow the codebase convention ('6' prefix is unused:
-            // players '5', static mobs '7', npcs '8', items '9')
-            const mob = new Mob('6' + spawn.mobKind + this.riftMobCounter++, spawn.mobKind, spawn.x, spawn.y);
+            // Rift mob ids: '6' prefix (unused: players '5', static mobs '7',
+            // npcs '8', items '9') + zero-padded session counter. Ids are
+            // parsed with parseInt in entity.ts, so they must stay purely
+            // numeric — and the kind lives on mob.kind, not in the id.
+            const mob = new Mob('6' + String(this.riftMobCounter++).padStart(6, '0'), spawn.mobKind, spawn.x, spawn.y);
 
             // Apply rift difficulty scaling at spawn (tier + FORTIFIED/EMPOWERED modifiers)
             mob.maxHitPoints = Math.max(1, Math.floor(mob.maxHitPoints * spawn.hpMultiplier));

@@ -14,6 +14,7 @@ import { getKillStreakService } from './kill-streak.service.js';
 import { getCombatTracker } from './combat-tracker.js';
 import { nemesisService } from './nemesis.service.js';
 import { getZoneManager } from '../zones/zone-manager.js';
+import { riftManager } from '../rifts/rift-manager.js';
 import { LOW_HEALTH_THRESHOLD } from './combat-constants.js';
 import { createModuleLogger } from '../utils/logger.js';
 
@@ -299,6 +300,9 @@ export class CombatSystem {
 
       // Fracture Rift: counts only if the mob belongs to the attacker's run
       attacker.handleRiftKill?.(mob.id as number);
+      // Killed by a non-owner (party member / another player): no progress
+      // credit, but free the owning run's spawn slot so it can't stall
+      riftManager.freeSpawnSlotForMob(mob.id as number);
 
       // Record world event for Town Crier (static news service in no-AI mode)
       const newsSink = getVeniceService() ?? getStaticServices().news;

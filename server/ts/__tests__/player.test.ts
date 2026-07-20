@@ -83,3 +83,26 @@ describe('Player.grantXP', () => {
     expect(player.restedXp).toBe(0);
   });
 });
+
+describe('Player.handleRiftDisconnect', () => {
+  it('restores the rift entry position so the exit save persists it, not the arena', () => {
+    const player = createPlayer();
+    player.riftSavedPosition = { x: 100, y: 200 };
+    player.setPosition(20, 20); // standing in the rift arena
+
+    player.handleRiftDisconnect();
+
+    expect(player.x).toBe(100);
+    expect(player.y).toBe(200);
+    expect(player.riftSavedPosition).toBeNull();
+  });
+
+  it('is a no-op without a saved rift position', () => {
+    const player = createPlayer();
+    player.setPosition(50, 60);
+
+    expect(() => player.handleRiftDisconnect()).not.toThrow();
+    expect(player.x).toBe(50);
+    expect(player.y).toBe(60);
+  });
+});
