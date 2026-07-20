@@ -44,7 +44,7 @@ export class QuestService {
     // visit, so "explore X" for an already-visited X is uncompletable
     // (cypher review finding). All areas visited → fall back to kill quests.
     if (questType === 'explore') {
-      const unvisited = templates.filter(t => !profile.areas.includes(t.area || ''));
+      const unvisited = templates.filter(t => t.area && !profile.areas.includes(t.area));
       if (unvisited.length > 0) {
         templates = unvisited;
       } else {

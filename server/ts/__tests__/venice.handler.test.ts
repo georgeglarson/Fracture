@@ -184,6 +184,34 @@ describe('VeniceHandler no-AI mode', () => {
 
       expect(triggerNarration).not.toHaveBeenCalled(); // narration is Venice-only
     });
+
+    it('completes an explore quest through area-change progress', async () => {
+      const ctx = createCtx(778);
+      // Explore quests unlock at 10+ kills; random >= 0.7 rolls explore
+      const statics = getStaticServices();
+      for (let i = 0; i < 10; i++) statics.profiles.recordKill(ctx.id.toString(), 'rat');
+      const rand = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+      try {
+        await handleRequestQuest(ctx, Types.Entities.GUARD);
+        const offer = ctx.send.mock.calls[0][0];
+        expect(offer[0]).toBe(Types.Messages.QUEST_OFFER);
+        expect(offer[1]).toBe('explore');
+        const targetArea = offer[2]; // real templates: last unvisited (lavaland)
+        expect(targetArea).toBe('lavaland');
+
+        ctx.send.mockClear();
+        await handleAreaChange(ctx, targetArea, vi.fn());
+
+        const msgs = ctx.send.mock.calls.map((c) => c[0]);
+        const complete = msgs.find((m) => m[0] === Types.Messages.QUEST_COMPLETE);
+        expect(complete).toBeTruthy();
+        expect(complete[1]).toBe('bluesword');
+        expect(complete[2]).toBe(75);
+      } finally {
+        rand.mockRestore();
+      }
+    });
   });
 
   // ── companion hints (no-AI mode) ───────────────────────────────

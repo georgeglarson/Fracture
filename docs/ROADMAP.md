@@ -64,7 +64,7 @@ We have a fully playable core game with SRP architecture, roaming bosses, and AI
 ---
 
 ### P0: Venice AI Fix ✅ (superseded)
-**Status:** Complete - API key updated
+**Status:** Superseded — static fallback mode
 **Impact:** All AI features working (NPC dialogue, quests, narrator, news)
 
 **Superseded 2026-06:** the Venice account was cancelled. The game now runs permanently on its static fallback content (template quests, mad-libs thought bubbles, stat-based newspaper headlines) and is fully playable. The AI code and circuit breaker remain; re-enabling takes any OpenAI-compatible provider plus one env var. No re-enable is planned.

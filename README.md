@@ -12,7 +12,7 @@ Most of my career has been taking old systems and making them maintainable. Frac
 
 The starting point was [BrowserQuest](https://github.com/mozilla/BrowserQuest), Mozilla's 2012 HTML5 demo. A vertical slice that proved HTML5 could do real-time multiplayer, but was never meant to run in production. No types, no tests, no persistence beyond localStorage, no security, no observability, no separation of concerns. I picked it because it's a good stand-in for what legacy modernization actually looks like: a prototype that worked once and now needs real supporting systems to scale.
 
-What you're looking at now is **~217 TypeScript source files** (283 including tests), **3,167 passing tests**, a real-time multiplayer game with zone-based combat, persistent player progression, and a production deployment behind nginx with SSL. Two more production systems ran on top of it and have since been retired: an AI integration layer (Venice-powered NPC dialogue, TTS narration, mob thought bubbles) and a self-hosted observability stack (SigNoz, Grafana, ClickHouse). Both stories are below. The original codebase is still in there (every entity, every sprite, every tile) but the architecture around it is unrecognizable.
+What you're looking at now is **~217 TypeScript source files** (283 including tests), **3,198 passing tests**, a real-time multiplayer game with zone-based combat, persistent player progression, and a production deployment behind nginx with SSL. Two more production systems ran on top of it and have since been retired: an AI integration layer (Venice-powered NPC dialogue, TTS narration, mob thought bubbles) and a self-hosted observability stack (SigNoz, Grafana, ClickHouse). Both stories are below. The original codebase is still in there (every entity, every sprite, every tile) but the architecture around it is unrecognizable.
 
 ## The legacy modernization story
 
@@ -20,7 +20,7 @@ This is the same approach that works on enterprise software. It works on games t
 
 **1. Understand before changing.** Read every file. Map the dependency graph. Identify the blast radius. The original had circular dependencies, `var self = this` patterns, `as any` casts holding things together, and zero separation of concerns. You can't fix what you don't understand.
 
-**2. Add a safety net first.** Before refactoring anything, write tests. 3,167 of them. That's what makes the rest possible. When I extracted the combat system, every interaction was verified. When I built the aggro policy engine, tests caught edge cases I'd have shipped as bugs.
+**2. Add a safety net first.** Before refactoring anything, write tests. 3,198 of them. That's what makes the rest possible. When I extracted the combat system, every interaction was verified. When I built the aggro policy engine, tests caught edge cases I'd have shipped as bugs.
 
 **3. Refactor incrementally.** No big rewrites. Extract a module, test it, ship it. The MessageRouter was one change. Each handler module (auth, combat, loot, inventory, equipment, skills, party, shop) was one change. The CombatTracker was one change. At every step the game kept running.
 
@@ -122,7 +122,7 @@ configs no longer ship. The WebSocket debug feed on :8001 is still live.
 ## Test suite
 
 ```
-66 test files | 3,167 tests | 0 failures
+67 test files | 3,198 tests | 0 failures
 ```
 
 | Module | Coverage |
@@ -250,7 +250,7 @@ Fracture/
 - **Systems design.** Combat, inventory, progression, zones, AI, persistence, real-time networking, all integrated and tested.
 - **Observability engineering.** Structured logging, distributed tracing, and self-hosted monitoring wired end-to-end and run in production, then retired when the ops cost stopped making sense for a demo site. The OTel + Pino instrumentation remains and reactivates with one env var.
 - **AI-augmented development.** Built with Claude as a development partner, showing what one engineer can ship with AI tooling.
-- **Testing discipline.** 3,167 tests across 66 test files, coverage thresholds enforced, tests written before refactors.
+- **Testing discipline.** 3,198 tests across 67 test files, coverage thresholds enforced, tests written before refactors.
 - **Production operations.** SSL, reverse proxy, rate limiting, anti-exploit guards, systemd-managed, deployed and running.
 
 ## Credits

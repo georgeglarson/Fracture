@@ -1,7 +1,7 @@
 ---
 title: I Took a 2012 Mozilla Demo and Turned It Into a Production MMO With AI (Then the AI Went Away)
 published: false
-description: How a legacy modernization veteran used Claude as a development partner to transform BrowserQuest into Fracture, a real-time multiplayer RPG with AI NPCs, distributed tracing, and 3,167 tests.
+description: How a legacy modernization veteran used Claude as a development partner to transform BrowserQuest into Fracture, a real-time multiplayer RPG with AI NPCs, distributed tracing, and 3,198 tests.
 tags: ai, gamedev, typescript, legacy
 cover_image:
 ---
@@ -87,7 +87,7 @@ This is the same pattern you'd use in a microservice architecture, applied at th
 
 ### 4. Test everything
 
-The codebase has **3,167 tests across 66 test files** with zero failures. Coverage by module:
+The codebase has **3,198 tests across 67 test files** with zero failures. Coverage by module:
 
 - Party, Shop, Zones, Events: **100%**
 - Rifts: **98%**
@@ -130,7 +130,7 @@ Claude was my development partner throughout this project. Here's what that actu
 
 **AI as force multiplier, not replacement.** I made every architectural decision. I chose SRP decomposition. I chose event-driven communication. I chose OpenTelemetry over custom metrics. AI didn't make those calls — 25 years of legacy modernization did. But AI let me *execute* those decisions at a pace that would've required a team.
 
-**AI for the tedious but important work.** Migrating 316 console.log calls to structured logging with proper context? Writing 3,167 tests? Extracting 13 handler modules from a monolithic class? This is work that matters but takes forever when you're doing it alone. AI compressed weeks into days.
+**AI for the tedious but important work.** Migrating 316 console.log calls to structured logging with proper context? Writing 3,198 tests? Extracting 13 handler modules from a monolithic class? This is work that matters but takes forever when you're doing it alone. AI compressed weeks into days.
 
 **AI-powered game features.** The AI integration wasn't just in the development process. It ran in the game itself:
 
