@@ -137,7 +137,8 @@ export class Player extends Character {
       getMaxHitPoints: () => this.maxHitPoints,
       checkLevelAchievements: (level) => this.checkLevelAchievements(level),
       checkGoldAchievements: (amount) => this.checkGoldAchievements(amount),
-      getName: () => this.name
+      getName: () => this.name,
+      checkSkillUnlocks: (oldLevel, newLevel) => this.checkSkillUnlocks(oldLevel, newLevel)
     });
 
     this.connection.listen(async (message: unknown[]) => {
@@ -395,7 +396,11 @@ export class Player extends Character {
    */
   grantXP(amount: number): void {
     // Apply progression multipliers (efficiency, rested, ascension)
-    const result = ProgressionHandler.applyXpGain(this.getProgressionContext(), amount);
+    const ctx = this.getProgressionContext();
+    const result = ProgressionHandler.applyXpGain(ctx, amount);
+    // applyXpGain burns rested XP on the context copy — write it back so
+    // the rested bonus actually depletes
+    this.restedXp = ctx.restedXp;
     this.progression.grantXP(result.finalXp);
   }
 

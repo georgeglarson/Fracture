@@ -44,6 +44,8 @@ export interface ProgressionCallbacks {
   checkLevelAchievements: (level: number) => void;
   checkGoldAchievements: (amount: number) => void;
   getName: () => string;
+  /** Called on level up so new skill unlocks reach the client mid-session */
+  checkSkillUnlocks?: (oldLevel: number, newLevel: number) => void;
 }
 
 export class ProgressionService {
@@ -89,6 +91,7 @@ export class ProgressionService {
    * Level up the player
    */
   private levelUp(): LevelUpResult {
+    const oldLevel = this.level;
     this.xp -= this.xpToNext;
     this.level++;
     this.xpToNext = Formulas.xpToNextLevel(this.level);
@@ -96,7 +99,7 @@ export class ProgressionService {
     const bonusHP = Formulas.levelBonusHP(this.level);
     const bonusDamage = Formulas.levelBonusDamage(this.level);
 
-    log.info({ playerName: this.callbacks.getName(), oldLevel: this.level - 1, newLevel: this.level, bonusHP, bonusDamage }, 'Level up');
+    log.info({ playerName: this.callbacks.getName(), oldLevel, newLevel: this.level, bonusHP, bonusDamage }, 'Level up');
 
     // Update HP with new level bonus
     this.callbacks.updateHitPoints();
@@ -107,6 +110,9 @@ export class ProgressionService {
 
     // Check level achievements
     this.callbacks.checkLevelAchievements(this.level);
+
+    // Unlock any newly available skills (SKILL_UNLOCK to the client)
+    this.callbacks.checkSkillUnlocks?.(oldLevel, this.level);
 
     return { newLevel: this.level, bonusHP, bonusDamage };
   }
